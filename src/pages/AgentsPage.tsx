@@ -24,11 +24,12 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SyncIcon from '@mui/icons-material/Sync';
 import AddTaskIcon from '@mui/icons-material/AddTask';
-import SchemaIcon from '@mui/icons-material/Schema';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import DescriptionIcon from '@mui/icons-material/Description';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { GlowCard } from '../components/ui/GlowCard';
 
 const floatAnimation = keyframes`
@@ -103,8 +104,9 @@ export const AgentsPage = () => {
       status: 'Online',
       statusColor: 'success',
       route: '/agents/dfd',
-      icon: <SchemaIcon />,
+      icon: <AssessmentIcon />,
       iconGradient: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+      iconBgGradient: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.primary.dark, 0.1)} 100%)`,
       gradient: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
       borderGradient: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.4)} 0%, ${alpha(theme.palette.primary.dark, 0.3)} 100%)`,
     },
@@ -116,8 +118,9 @@ export const AgentsPage = () => {
       status: 'Em Análise',
       statusColor: 'warning',
       route: '/agents/trp',
-      icon: <ReceiptLongIcon />,
+      icon: <DescriptionIcon />,
       iconGradient: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${alpha(theme.palette.warning.main, 0.8)} 100%)`,
+      iconBgGradient: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.15)} 0%, ${alpha(theme.palette.warning.main, 0.1)} 100%)`,
       gradient: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
       borderGradient: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.4)} 0%, ${alpha(theme.palette.warning.main, 0.3)} 100%)`,
     },
@@ -169,83 +172,12 @@ export const AgentsPage = () => {
           maxWidth: { xs: '100%', sm: '1200px', md: '1400px', lg: '1600px' },
           mx: 'auto',
           px: { xs: 3, sm: 4, md: 5, lg: 6 },
-          py: { xs: 4, sm: 5, md: 6 },
+          py: { xs: 3, sm: 4, md: 5 },
           display: 'flex',
           flexDirection: 'column',
           gap: { xs: 6, md: 8 },
         }}
       >
-        {/* Hero Section */}
-        <Box
-          sx={{
-            position: 'relative',
-            textAlign: 'center',
-            overflow: 'hidden',
-            py: { xs: 4, md: 6 },
-            px: { xs: 2, sm: 3 },
-          }}
-        >
-          {/* Subtle background gradient */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: { xs: '100%', md: '1200px' },
-              height: { xs: '400px', md: '600px' },
-              borderRadius: '50%',
-              background: `radial-gradient(ellipse 60% 40% at 50% 50%, ${alpha(theme.palette.primary.main, 0.08)} 0%, transparent 70%)`,
-              filter: 'blur(60px)',
-              animation: `${pulseGlow} 6s ease-in-out infinite`,
-              zIndex: 0,
-            }}
-          />
-
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Typography
-              variant="h1"
-              sx={{
-                fontSize: { xs: '2.25rem', sm: '3rem', md: '4rem', lg: '4.75rem' },
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-                mb: 3,
-                lineHeight: 1.1,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Plataforma Global de Agentes de IA para Licitações
-            </Typography>
-            <Typography
-              variant="h6"
-              sx={{
-                fontSize: { xs: '0.9375rem', sm: '1.125rem', md: '1.25rem' },
-                fontWeight: 500,
-                color: theme.palette.text.secondary,
-                mb: 4,
-                letterSpacing: '-0.01em',
-                maxWidth: '800px',
-                mx: 'auto',
-              }}
-            >
-              Automação Inteligente · Conformidade 14.133 · Auditoria em Alta Precisão
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{
-                maxWidth: '720px',
-                mx: 'auto',
-                color: theme.palette.text.secondary,
-                fontSize: { xs: '0.9375rem', sm: '1.0625rem' },
-                lineHeight: 1.75,
-                fontWeight: 400,
-              }}
-            >
-              Infraestrutura avançada que integra agentes de inteligência artificial para análise documental, verificação de conformidade e otimização completa dos processos de compras públicas.
-            </Typography>
-          </Box>
-        </Box>
-
         {/* KPI Metrics */}
         <Box>
           <Grid container spacing={{ xs: 2.5, sm: 3, md: 3.5 }} sx={{ justifyContent: 'center' }}>
@@ -392,22 +324,52 @@ export const AgentsPage = () => {
                   }}
                 >
                   <Box sx={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                      <Box sx={{ flex: 1 }}>
+                    {/* Header Section: Icon + Status */}
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
+                      {/* Icon Container */}
+                      <Box
+                        sx={{
+                          width: { xs: 72, sm: 88 },
+                          height: { xs: 72, sm: 88 },
+                          borderRadius: 3.5,
+                          background: agent.iconBgGradient || `linear-gradient(135deg, ${alpha('#FFF', 0.2)} 0%, ${alpha('#FFF', 0.1)} 100%)`,
+                          backdropFilter: 'blur(20px)',
+                          border: `2px solid ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.15)}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          boxShadow: `0 8px 24px ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.12)}, inset 0 1px 0 ${alpha('#FFF', 0.5)}`,
+                          animation: `${floatAnimation} 4s ease-in-out infinite`,
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: '-50%',
+                            left: '-50%',
+                            width: '200%',
+                            height: '200%',
+                            background: `radial-gradient(circle, ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.08)} 0%, transparent 70%)`,
+                            animation: `${pulseGlow} 3s ease-in-out infinite`,
+                          },
+                          '&:hover': {
+                            transform: 'scale(1.03)',
+                            boxShadow: `0 12px 32px ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.2)}, inset 0 1px 0 ${alpha('#FFF', 0.6)}`,
+                          },
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                      >
                         <Box
                           sx={{
-                            width: { xs: 64, sm: 72 },
-                            height: { xs: 64, sm: 72 },
-                            borderRadius: 3,
-                            background: `linear-gradient(135deg, ${alpha('#FFF', 0.2)} 0%, ${alpha('#FFF', 0.1)} 100%)`,
-                            backdropFilter: 'blur(20px)',
-                            border: `1.5px solid ${alpha('#FFF', 0.25)}`,
+                            position: 'relative',
+                            zIndex: 1,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            mb: 3,
-                            boxShadow: `0 4px 16px ${alpha('#000', 0.08)}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
-                            animation: `${floatAnimation} 4s ease-in-out infinite`,
+                            '& svg': {
+                              fontSize: { xs: 40, sm: 48 },
+                              filter: `drop-shadow(0 2px 8px ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.25)})`,
+                            },
                           }}
                         >
                           <Box
@@ -416,38 +378,46 @@ export const AgentsPage = () => {
                               WebkitBackgroundClip: 'text',
                               WebkitTextFillColor: 'transparent',
                               backgroundClip: 'text',
-                              fontSize: { xs: 36, sm: 40 },
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                             }}
                           >
                             {agent.icon}
                           </Box>
                         </Box>
-                        <Typography
-                          variant="h5"
-                          component="h3"
+                        {/* AI Badge */}
+                        <Box
                           sx={{
-                            fontWeight: 700,
-                            color: theme.palette.text.primary,
-                            mb: 0.5,
-                            letterSpacing: '-0.01em',
-                            fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                            position: 'absolute',
+                            top: -6,
+                            right: -6,
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: `linear-gradient(135deg, ${alpha('#FFF', 0.95)} 0%, ${alpha('#FFF', 0.85)} 100%)`,
+                            backdropFilter: 'blur(12px)',
+                            border: `2px solid ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.25)}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: `0 4px 12px ${alpha('#000', 0.12)}, inset 0 1px 0 ${alpha('#FFF', 0.8)}`,
+                            zIndex: 2,
                           }}
                         >
-                          {agent.title}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: theme.palette.text.secondary,
-                            fontWeight: 500,
-                            fontSize: '0.8125rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.08em',
-                          }}
-                        >
-                          {agent.subtitle}
-                        </Typography>
+                          <AutoAwesomeIcon
+                            sx={{
+                              fontSize: 14,
+                              background: agent.iconGradient,
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                            }}
+                          />
+                        </Box>
                       </Box>
+                      
+                      {/* Status Chip */}
                       <Chip
                         label={agent.status}
                         size="small"
@@ -455,17 +425,18 @@ export const AgentsPage = () => {
                           agent.statusColor === 'success' ? (
                             <Box
                               sx={{
-                                width: 6,
-                                height: 6,
+                                width: 7,
+                                height: 7,
                                 borderRadius: '50%',
                                 bgcolor: theme.palette.success.main,
-                                boxShadow: `0 0 8px ${alpha(theme.palette.success.main, 0.6)}`,
+                                boxShadow: `0 0 10px ${alpha(theme.palette.success.main, 0.7)}`,
+                                animation: `${pulseGlow} 2s ease-in-out infinite`,
                               }}
                             />
                           ) : (
                             <SyncIcon
                               sx={{
-                                fontSize: 12,
+                                fontSize: 13,
                                 animation: 'spin 1s linear infinite',
                                 '@keyframes spin': {
                                   to: { transform: 'rotate(360deg)' },
@@ -477,35 +448,83 @@ export const AgentsPage = () => {
                         sx={{
                           bgcolor: alpha(
                             agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
-                            0.12
+                            0.1
                           ),
-                          border: `1px solid ${alpha(
+                          border: `1.5px solid ${alpha(
                             agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
-                            0.25
+                            0.3
                           )}`,
                           color: agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
                           fontSize: '0.75rem',
                           fontWeight: 600,
-                          height: 28,
+                          height: 30,
+                          px: 0.5,
                           '& .MuiChip-icon': {
                             color: agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
+                            marginLeft: '8px',
                           },
                         }}
                       />
                     </Box>
+
+                    {/* Title Section */}
+                    <Box sx={{ mb: 2.5 }}>
+                      <Typography
+                        variant="h5"
+                        component="h3"
+                        sx={{
+                          fontWeight: 700,
+                          color: theme.palette.text.primary,
+                          mb: 0.75,
+                          letterSpacing: '-0.02em',
+                          fontSize: { xs: '1.375rem', sm: '1.625rem' },
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {agent.title}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: theme.palette.text.secondary,
+                          fontWeight: 500,
+                          fontSize: '0.8125rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.1em',
+                          opacity: 0.8,
+                        }}
+                      >
+                        {agent.subtitle}
+                      </Typography>
+                    </Box>
+
+                    {/* Divider */}
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: 1,
+                        background: `linear-gradient(90deg, ${alpha(agent.id === 'dfd' ? theme.palette.primary.main : theme.palette.warning.main, 0.2)} 0%, transparent 100%)`,
+                        mb: 3,
+                      }}
+                    />
+
+                    {/* Description */}
                     <Typography
                       variant="body1"
                       sx={{
                         color: theme.palette.text.secondary,
                         mb: 4,
-                        lineHeight: 1.7,
+                        lineHeight: 1.75,
                         fontSize: '0.9375rem',
                         flexGrow: 1,
+                        fontWeight: 400,
                       }}
                     >
                       {agent.description}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mt: 'auto' }}>
+
+                    {/* Action Buttons */}
+                    <Box sx={{ display: 'flex', gap: 2, mt: 'auto', pt: 2 }}>
                       <Button
                         variant="contained"
                         fullWidth
@@ -514,18 +533,19 @@ export const AgentsPage = () => {
                         sx={{
                           bgcolor: theme.palette.primary.main,
                           color: 'white',
-                          py: 1.5,
-                          borderRadius: 2,
+                          py: 1.75,
+                          borderRadius: 2.5,
                           fontWeight: 600,
                           fontSize: '0.875rem',
-                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.35)}, inset 0 1px 0 ${alpha('#FFF', 0.2)}`,
                           textTransform: 'none',
+                          letterSpacing: '0.01em',
                           '&:hover': {
                             bgcolor: theme.palette.primary.dark,
-                            boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
-                            transform: 'translateY(-1px)',
+                            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.45)}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
+                            transform: 'translateY(-2px)',
                           },
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
                       >
                         Iniciar Análise
@@ -534,25 +554,27 @@ export const AgentsPage = () => {
                         variant="outlined"
                         fullWidth
                         sx={{
-                          borderColor: alpha(theme.palette.divider, 0.2),
+                          borderColor: alpha(theme.palette.divider, 0.25),
                           color: theme.palette.text.secondary,
-                          py: 1.5,
-                          borderRadius: 2,
+                          py: 1.75,
+                          borderRadius: 2.5,
                           fontWeight: 500,
                           fontSize: '0.875rem',
                           bgcolor: 'transparent',
-                          borderWidth: '1px',
+                          borderWidth: '1.5px',
                           textTransform: 'none',
+                          letterSpacing: '0.01em',
                           '&:hover': {
                             borderColor: theme.palette.primary.main,
-                            bgcolor: alpha(theme.palette.primary.main, 0.04),
+                            bgcolor: alpha(theme.palette.primary.main, 0.06),
                             color: theme.palette.primary.main,
-                            transform: 'translateY(-1px)',
+                            transform: 'translateY(-2px)',
+                            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.1)}`,
                           },
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
                       >
-                        Ver Relatórios
+                        Relatórios
                       </Button>
                     </Box>
                   </Box>

@@ -17,13 +17,23 @@ import {
   alpha,
   Chip,
   keyframes,
+  InputBase,
+  IconButton,
+  Badge,
+  Menu,
+  MenuItem,
+  Paper,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchemaIcon from '@mui/icons-material/Schema';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
-import SecurityIcon from '@mui/icons-material/Security';
+import SearchIcon from '@mui/icons-material/Search';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LogoutIcon from '@mui/icons-material/Logout';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 const drawerWidth = 280;
 
@@ -57,10 +67,20 @@ const navItems: NavItem[] = [
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [searchValue, setSearchValue] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -89,32 +109,43 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: `linear-gradient(180deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
-        backdropFilter: 'blur(20px)',
-        borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-        boxShadow: `inset -1px 0 0 ${alpha('#000', 0.05)}`,
+        background: theme.palette.background.paper,
+        borderRight: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
       }}
     >
-      <Box sx={{ p: 4, pb: 3 }}>
+      <Box 
+        sx={{ 
+          px: 3,
+          py: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+        }}
+      >
+        <Box
+          component="img"
+          src="/assets/logo-icon.svg"
+          alt="PLANCO"
+          sx={{
+            height: 28,
+            width: 'auto',
+          }}
+        />
         <Typography
-          variant="h5"
+          variant="h6"
           component="div"
           sx={{
-            fontWeight: 900,
-            fontSize: '1.5rem',
-            letterSpacing: '-0.03em',
-            background: 'linear-gradient(135deg, #1877F2 0%, #105BBE 50%, #22D3EE 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            position: 'relative',
+            fontWeight: 600,
+            color: 'text.primary',
+            fontSize: '1rem',
+            letterSpacing: '-0.015em',
           }}
         >
           PLANCO
         </Typography>
       </Box>
-      <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.08) }} />
-      <List sx={{ flexGrow: 1, px: 2, py: 3 }}>
+      <List sx={{ flexGrow: 1, px: 1.5, py: 2 }}>
         {navItems.map((item) => {
           const active = isActive(item.path);
           return (
@@ -122,35 +153,25 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               key={item.text}
               onClick={() => handleNavClick(item.path)}
               sx={{
-                borderRadius: 3,
+                borderRadius: 2,
                 mb: 0.5,
-                px: 2.5,
-                py: 1.5,
+                px: 2,
+                py: 1.25,
                 position: 'relative',
                 background: active
-                  ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.12)} 0%, ${alpha(theme.palette.primary.main, 0.08)} 100%)`
+                  ? alpha(theme.palette.primary.main, 0.08)
                   : 'transparent',
-                border: active
-                  ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-                  : '1px solid transparent',
-                boxShadow: active
-                  ? `0 0 20px ${alpha(theme.palette.primary.main, 0.15)}, inset 0 0 20px ${alpha(theme.palette.primary.main, 0.05)}`
-                  : 'none',
                 color: active ? 'primary.main' : 'text.secondary',
                 '&:hover': {
                   background: active
-                    ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.18)} 0%, ${alpha(theme.palette.primary.main, 0.12)} 100%)`
-                    : `linear-gradient(135deg, ${alpha(theme.palette.action.hover, 0.6)} 0%, ${alpha(theme.palette.action.hover, 0.4)} 100%)`,
-                  borderColor: active
-                    ? alpha(theme.palette.primary.main, 0.3)
-                    : alpha(theme.palette.divider, 0.2),
-                  transform: 'translateX(2px)',
+                    ? alpha(theme.palette.primary.main, 0.12)
+                    : alpha(theme.palette.action.hover, 0.04),
                 },
                 '& .MuiListItemIcon-root': {
                   color: active ? 'primary.main' : 'text.secondary',
-                  minWidth: 44,
+                  minWidth: 40,
                 },
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.2s ease',
               }}
             >
               {active && (
@@ -161,10 +182,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                     top: '50%',
                     transform: 'translateY(-50%)',
                     width: 3,
-                    height: '60%',
-                    borderRadius: '0 3px 3px 0',
-                    background: 'linear-gradient(180deg, #1877F2 0%, #22D3EE 100%)',
-                    boxShadow: `0 0 12px ${alpha(theme.palette.primary.main, 0.6)}`,
+                    height: 24,
+                    borderRadius: '0 2px 2px 0',
+                    background: theme.palette.primary.main,
                   }}
                 />
               )}
@@ -172,8 +192,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               <ListItemText
                 primary={item.text}
                 primaryTypographyProps={{
-                  fontSize: '0.9375rem',
-                  fontWeight: active ? 700 : 500,
+                  fontSize: '0.875rem',
+                  fontWeight: active ? 600 : 500,
                   letterSpacing: '-0.01em',
                 }}
               />
@@ -181,26 +201,22 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           );
         })}
       </List>
-      <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.08) }} />
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`, p: 1.5 }}>
         <ListItemButton
           onClick={() => handleNavClick('#')}
           sx={{
-            borderRadius: 3,
-            px: 2.5,
-            py: 1.5,
+            borderRadius: 2,
+            px: 2,
+            py: 1.25,
             color: 'text.secondary',
-            border: '1px solid transparent',
             '&:hover': {
-              background: `linear-gradient(135deg, ${alpha(theme.palette.action.hover, 0.6)} 0%, ${alpha(theme.palette.action.hover, 0.4)} 100%)`,
-              borderColor: alpha(theme.palette.divider, 0.2),
-              transform: 'translateX(2px)',
+              background: alpha(theme.palette.action.hover, 0.04),
             },
             '& .MuiListItemIcon-root': {
               color: 'text.secondary',
-              minWidth: 44,
+              minWidth: 40,
             },
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'all 0.2s ease',
           }}
         >
           <ListItemIcon>
@@ -209,7 +225,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           <ListItemText
             primary="Configurações"
             primaryTypographyProps={{
-              fontSize: '0.9375rem',
+              fontSize: '0.875rem',
               fontWeight: 500,
               letterSpacing: '-0.01em',
             }}
@@ -273,79 +289,289 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           position="sticky"
           elevation={0}
           sx={{
-            background: `linear-gradient(180deg, ${alpha('#FFFFFF', 0.85)} 0%, ${alpha('#FFFFFF', 0.75)} 100%)`,
-            backdropFilter: 'blur(24px) saturate(180%)',
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-            boxShadow: `0 1px 0 ${alpha('#000', 0.02)}, inset 0 1px 0 ${alpha('#FFF', 0.8)}`,
+            background: theme.palette.background.paper,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
             zIndex: theme.zIndex.drawer + 1,
           }}
         >
-          <Toolbar sx={{ px: { xs: 2, sm: 3, md: 4, lg: 6 }, py: 1.5 }}>
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{
-                flexGrow: 1,
-                fontWeight: 700,
-                color: 'text.primary',
-                fontSize: '1.125rem',
-                letterSpacing: '-0.01em',
+          <Toolbar 
+            sx={{ 
+              px: { xs: 2, sm: 3, md: 4 }, 
+              py: 1,
+              minHeight: { xs: 64, sm: 70 },
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+          >
+            {/* Left Section - Logo/Brand (hidden on mobile) */}
+            <Box 
+              sx={{ 
+                display: { xs: 'none', sm: 'flex' }, 
+                alignItems: 'center', 
+                gap: 1.5,
               }}
             >
-              Intelligence Agents
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Chip
-                icon={<SecurityIcon sx={{ fontSize: 16 }} />}
-                label="IA Secure Cloud"
-                size="small"
+              <Box
+                component="img"
+                src="/assets/logo-icon.svg"
+                alt="PLANCO"
                 sx={{
-                  bgcolor: alpha(theme.palette.success.main, 0.1),
-                  color: 'success.main',
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
                   height: 28,
-                  '& .MuiChip-icon': {
-                    color: 'success.main',
-                  },
+                  width: 'auto',
                 }}
               />
-              <Box
+              <Typography
+                variant="h6"
+                component="div"
                 sx={{
-                  position: 'relative',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 1,
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  fontSize: '1rem',
+                  letterSpacing: '-0.015em',
                 }}
               >
-                <Box
+                PLANCO
+              </Typography>
+            </Box>
+
+            {/* Center Section - Search Bar */}
+            <Box
+              sx={{
+                flexGrow: 1,
+                maxWidth: { xs: '100%', sm: '500px', md: '600px' },
+                mx: { xs: 0, sm: 'auto' },
+                position: 'relative',
+              }}
+            >
+              <Paper
+                component="form"
+                elevation={0}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  height: { xs: 38, sm: 40 },
+                  borderRadius: 2,
+                  border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                  background: alpha(theme.palette.action.hover, 0.02),
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    borderColor: alpha(theme.palette.divider, 0.3),
+                    background: alpha(theme.palette.action.hover, 0.04),
+                  },
+                  '&:focus-within': {
+                    borderColor: theme.palette.primary.main,
+                    background: theme.palette.background.paper,
+                    boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.08)}`,
+                  },
+                }}
+              >
+                <IconButton
+                  type="button"
                   sx={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    bgcolor: 'success.main',
-                    border: `2px solid ${theme.palette.background.paper}`,
-                    boxShadow: `0 0 0 2px ${alpha(theme.palette.success.main, 0.2)}`,
-                    animation: `${pulseGlow} 2s ease-in-out infinite`,
+                    p: 1,
+                    color: 'text.secondary',
+                    '&:hover': {
+                      color: 'primary.main',
+                      bgcolor: 'transparent',
+                    },
                   }}
-                />
-                <Avatar
+                  aria-label="search"
+                >
+                  <SearchIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+                <InputBase
                   sx={{
-                    bgcolor: 'primary.main',
-                    width: 40,
-                    height: 40,
+                    flex: 1,
                     fontSize: '0.875rem',
-                    fontWeight: 700,
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                    color: 'text.primary',
+                    '& .MuiInputBase-input': {
+                      py: 0,
+                      '&::placeholder': {
+                        color: 'text.secondary',
+                        opacity: 0.6,
+                      },
+                    },
+                  }}
+                  placeholder="Buscar agentes, análises, documentos..."
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                />
+              </Paper>
+            </Box>
+
+            {/* Right Section - Notifications & Avatar */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              {/* Notifications */}
+              <IconButton
+                sx={{
+                  position: 'relative',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 2,
+                  color: 'text.secondary',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    background: alpha(theme.palette.action.hover, 0.04),
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                <Badge
+                  badgeContent={3}
+                  color="error"
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      fontSize: '0.6875rem',
+                      fontWeight: 600,
+                      minWidth: 18,
+                      height: 18,
+                      padding: '0 4px',
+                    },
                   }}
                 >
-                  GM
-                </Avatar>
+                  <NotificationsIcon sx={{ fontSize: 20 }} />
+                </Badge>
+              </IconButton>
+
+              {/* Avatar with Menu */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  cursor: 'pointer',
+                  borderRadius: 2,
+                  px: 1,
+                  py: 0.75,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    background: alpha(theme.palette.action.hover, 0.04),
+                  },
+                }}
+                onClick={handleMenuOpen}
+              >
+                <Box sx={{ position: 'relative' }}>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      right: 0,
+                      bottom: 0,
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      bgcolor: theme.palette.success.main,
+                      border: `2px solid ${theme.palette.background.paper}`,
+                      zIndex: 1,
+                    }}
+                  />
+                  <Avatar
+                    sx={{
+                      bgcolor: theme.palette.primary.main,
+                      width: 36,
+                      height: 36,
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    GM
+                  </Avatar>
+                </Box>
+                <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: 'text.primary',
+                      fontSize: '0.8125rem',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Gustavo M.
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: 'text.secondary',
+                      fontSize: '0.6875rem',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    Administrador
+                  </Typography>
+                </Box>
+                <KeyboardArrowDownIcon
+                  sx={{
+                    fontSize: 16,
+                    color: 'text.secondary',
+                    display: { xs: 'none', sm: 'block' },
+                    transition: 'transform 0.2s ease',
+                    transform: anchorEl ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }}
+                />
               </Box>
+
+              {/* User Menu */}
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                PaperProps={{
+                  elevation: 8,
+                  sx: {
+                    mt: 1.5,
+                    minWidth: 220,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                    boxShadow: `0 8px 24px ${alpha('#000', 0.12)}`,
+                    '& .MuiMenuItem-root': {
+                      px: 2.5,
+                      py: 1.25,
+                      fontSize: '0.9375rem',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      },
+                    },
+                  },
+                }}
+              >
+                <MenuItem onClick={handleMenuClose}>
+                  <ListItemIcon>
+                    <AccountCircleIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                  </ListItemIcon>
+                  <Typography variant="body2">Meu Perfil</Typography>
+                </MenuItem>
+                <MenuItem onClick={handleMenuClose}>
+                  <ListItemIcon>
+                    <SettingsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                  </ListItemIcon>
+                  <Typography variant="body2">Configurações</Typography>
+                </MenuItem>
+                <Divider sx={{ my: 0.5 }} />
+                <MenuItem
+                  onClick={handleMenuClose}
+                  sx={{
+                    color: 'error.main',
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.error.main, 0.08),
+                    },
+                  }}
+                >
+                  <ListItemIcon>
+                    <LogoutIcon sx={{ fontSize: 20, color: 'error.main' }} />
+                  </ListItemIcon>
+                  <Typography variant="body2">Sair</Typography>
+                </MenuItem>
+              </Menu>
             </Box>
           </Toolbar>
         </AppBar>

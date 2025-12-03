@@ -1,6 +1,6 @@
-# Frontend Agentes - PLANCO
+# Frontend Agentes - FISCATUS
 
-Frontend do portal de agentes de IA do PLANCO.
+Frontend do portal de agentes de IA do FISCATUS.
 
 ## Stack Tecnológica
 
