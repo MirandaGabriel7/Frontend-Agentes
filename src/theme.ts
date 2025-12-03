@@ -23,5 +23,8 @@ export const theme = createTheme({
       'sans-serif',
     ].join(','),
   },
+  shape: {
+    borderRadius: 12,
+  },
 });
 

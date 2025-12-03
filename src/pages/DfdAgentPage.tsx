@@ -5,12 +5,13 @@ import {
   Button,
   Alert,
   TextField,
+  Container,
 } from '@mui/material';
 import { UploadFile } from '@mui/icons-material';
 
 export const DfdAgentPage = () => {
   return (
-    <Box>
+    <Container maxWidth="lg">
       <Typography variant="h4" component="h1" gutterBottom>
         Analisador de DFD (em construção)
       </Typography>
@@ -49,7 +50,7 @@ export const DfdAgentPage = () => {
           Analisar DFD
         </Button>
       </Paper>
-    </Box>
+    </Container>
   );
 };
 

@@ -9,6 +9,7 @@ import {
   Alert,
   MenuItem,
   CircularProgress,
+  Container,
 } from '@mui/material';
 import { UploadFile } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
@@ -90,7 +91,7 @@ export const TrpAgentPage = () => {
   };
 
   return (
-    <Box>
+    <Container maxWidth="lg">
       <Typography variant="h4" component="h1" gutterBottom>
         Termo de Recebimento Provisório (TRP)
       </Typography>
@@ -277,7 +278,7 @@ export const TrpAgentPage = () => {
           </Paper>
         </Grid>
       </Grid>
-    </Box>
+    </Container>
   );
 };
 
