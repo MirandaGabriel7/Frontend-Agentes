@@ -25,8 +25,8 @@ import {
   Paper,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import SchemaIcon from '@mui/icons-material/Schema';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import DescriptionIcon from '@mui/icons-material/Description';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
@@ -60,8 +60,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/agents' },
-  { text: 'Agente DFD', icon: <SchemaIcon />, path: '/agents/dfd' },
-  { text: 'Agente TRP', icon: <ReceiptLongIcon />, path: '/agents/trp' },
+  { text: 'Agente DFD', icon: <AssessmentIcon />, path: '/agents/dfd' },
+  { text: 'Agente TRP', icon: <DescriptionIcon />, path: '/agents/trp' },
   { text: 'Histórico', icon: <HistoryIcon />, path: '#' },
 ];
 

@@ -5,13 +5,12 @@ import {
   Typography,
   TextField,
   MenuItem,
-  Grid,
   alpha,
   useTheme,
   Select,
   FormControl,
-  InputLabel,
 } from '@mui/material';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -110,11 +109,13 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {/* Campos sempre relevantes */}
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+              Data do Recebimento *
+            </Typography>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
               <DatePicker
-                label="Data do Recebimento"
                 value={parseDateFromDDMMYYYY(value.data_recebimento_nf_real)}
                 onChange={(newValue: Dayjs | null) => {
                   updateField('data_recebimento_nf_real')(formatDateToDDMMYYYY(newValue));
@@ -125,259 +126,507 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   textField: {
                     fullWidth: true,
                     variant: 'outlined',
-                    required: true,
+                    placeholder: 'Selecione a data',
+                    InputLabelProps: { shrink: false },
+                    label: '',
+                    sx: {
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '999px',
+                        backgroundColor: 'background.paper',
+                        '& fieldset': {
+                          borderColor: 'rgba(0,0,0,0.12)',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: 'primary.light',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: 'primary.main',
+                          boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                        },
+                      },
+                      '& .MuiInputBase-input': {
+                        paddingLeft: '16px',
+                        paddingRight: '16px',
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: 'text.secondary',
+                        opacity: 0.7,
+                      },
+                    },
                   },
                 }}
               />
             </LocalizationProvider>
-          </Grid>
-          <Grid item xs={12} sm={6}>
+          </Box>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+              Base para contagem de prazo
+            </Typography>
             <FormControl fullWidth variant="outlined">
-              <InputLabel>Base para contagem de prazo</InputLabel>
               <Select
-                value={value.tipo_base_prazo || 'NF'}
+                value={value.tipo_base_prazo || ''}
                 onChange={(e) => updateField('tipo_base_prazo')(e.target.value as TrpTipoBasePrazo)}
-                label="Base para contagem de prazo"
                 disabled={disabled}
+                displayEmpty
+                renderValue={(selected) => {
+                  if (!selected) {
+                    return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione a base de contagem</Box>;
+                  }
+                  return selected === 'NF' 
+                    ? 'NF – prazo contado a partir da Nota Fiscal'
+                    : 'SERVICO – prazo contado a partir da execução/conclusão do serviço';
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(0,0,0,0.12)',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'primary.light',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'primary.main',
+                    boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '999px',
+                    backgroundColor: 'background.paper',
+                  },
+                  '& .MuiSelect-select': {
+                    paddingLeft: '16px',
+                    paddingRight: '16px',
+                  },
+                }}
               >
                 <MenuItem value="NF">NF – prazo contado a partir da Nota Fiscal</MenuItem>
                 <MenuItem value="SERVICO">SERVICO – prazo contado a partir da execução/conclusão do serviço</MenuItem>
               </Select>
             </FormControl>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/* Condição do Prazo */}
-        <Box>
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontWeight: 600,
-              mb: 2,
-              color: theme.palette.text.primary,
-            }}
-          >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
             Condição do Prazo
           </Typography>
           <FormControl fullWidth variant="outlined">
-            <InputLabel>Condição do Prazo</InputLabel>
             <Select
-              value={value.condicao_prazo || 'NAO_SE_APLICA'}
+              value={value.condicao_prazo || ''}
               onChange={(e) => handleCondicaoPrazoChange(e.target.value as TrpCondicaoPrazo)}
-              label="Condição do Prazo"
               disabled={disabled}
+              displayEmpty
+              renderValue={(selected) => {
+                if (!selected) {
+                  return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione a condição do prazo</Box>;
+                }
+                if (selected === 'NO_PRAZO') return 'No prazo';
+                if (selected === 'FORA_DO_PRAZO') return 'Prazo de entrega atrasado';
+                return 'Não se aplica';
+              }}
+              sx={{
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(0,0,0,0.12)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.light',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.main',
+                  boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '999px',
+                  backgroundColor: 'background.paper',
+                },
+              }}
             >
               <MenuItem value="NO_PRAZO">No prazo</MenuItem>
               <MenuItem value="FORA_DO_PRAZO">Prazo de entrega atrasado</MenuItem>
               <MenuItem value="NAO_SE_APLICA">Não se aplica</MenuItem>
             </Select>
           </FormControl>
+        </Box>
 
-          {/* Campos condicionais quando FORA_DO_PRAZO */}
-          {showAtrasoFields && (
+        {/* Campos condicionais quando FORA_DO_PRAZO */}
+        {showAtrasoFields && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{ mb: 0.5 }}
+            >
+              Detalhes do atraso
+            </Typography>
             <Box
               sx={{
-                mt: 3,
-                p: 3.5,
+                p: 4,
                 borderRadius: 3,
-                bgcolor: alpha(theme.palette.warning.main, 0.04),
-                border: `1px solid ${alpha(theme.palette.warning.main, 0.12)}`,
+                bgcolor: theme.palette.background.paper,
+                border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
                 transition: 'all 0.2s ease',
-                boxShadow: `0 1px 3px ${alpha(theme.palette.warning.main, 0.08)}`,
+                boxShadow: `0 1px 3px ${alpha('#000', 0.04)}`,
               }}
             >
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1.5,
+                  mb: 3.5,
+                  p: 2.5,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.info.main, 0.06),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                }}
+              >
+                <InfoOutlinedIcon
                   sx={{
-                    fontWeight: 600,
-                    mb: 0.75,
+                    color: theme.palette.info.main,
+                    fontSize: 22,
+                    mt: 0.25,
+                    flexShrink: 0,
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
                     color: theme.palette.text.primary,
-                    fontSize: '0.9375rem',
-                    letterSpacing: '-0.01em',
+                    fontSize: '0.875rem',
+                    lineHeight: 1.6,
                   }}
                 >
-                  Detalhes do atraso
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: theme.palette.text.secondary,
-                    fontSize: '0.8125rem',
-                    lineHeight: 1.5,
-                    display: 'block',
-                  }}
-                >
-                  Preencha os detalhes sobre o atraso no recebimento
+                  Este bloco aparece quando você seleciona "Prazo de entrega atrasado". Preencha as informações sobre a data prevista no contrato, a data real da entrega e o motivo do atraso para documentar adequadamente a situação.
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
-                  <DatePicker
-                    label="Data prevista de entrega (contrato)"
-                    value={parseDateFromDDMMYYYY(value.data_prevista_entrega_contrato)}
-                    onChange={(newValue: Dayjs | null) => {
-                      updateField('data_prevista_entrega_contrato')(formatDateToDDMMYYYY(newValue));
-                    }}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                    Data prevista de entrega (contrato)
+                  </Typography>
+                  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                    <DatePicker
+                      value={parseDateFromDDMMYYYY(value.data_prevista_entrega_contrato)}
+                      onChange={(newValue: Dayjs | null) => {
+                        updateField('data_prevista_entrega_contrato')(formatDateToDDMMYYYY(newValue));
+                      }}
+                      disabled={disabled}
+                      format="DD/MM/YYYY"
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          variant: 'outlined',
+                          placeholder: 'Selecione a data',
+                          InputLabelProps: { shrink: false },
+                          label: '',
+                          sx: {
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '999px',
+                              backgroundColor: 'background.paper',
+                              '& fieldset': {
+                                borderColor: 'rgba(0,0,0,0.12)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'primary.light',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'primary.main',
+                                boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              paddingLeft: '16px',
+                              paddingRight: '16px',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'text.secondary',
+                              opacity: 0.7,
+                            },
+                          },
+                        },
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                    Data real da entrega
+                  </Typography>
+                  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                    <DatePicker
+                      value={parseDateFromDDMMYYYY(value.data_entrega_real)}
+                      onChange={(newValue: Dayjs | null) => {
+                        updateField('data_entrega_real')(formatDateToDDMMYYYY(newValue));
+                      }}
+                      disabled={disabled}
+                      format="DD/MM/YYYY"
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          variant: 'outlined',
+                          placeholder: 'Selecione a data',
+                          InputLabelProps: { shrink: false },
+                          label: '',
+                          sx: {
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '999px',
+                              backgroundColor: 'background.paper',
+                              '& fieldset': {
+                                borderColor: 'rgba(0,0,0,0.12)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'primary.light',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'primary.main',
+                                boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              paddingLeft: '16px',
+                              paddingRight: '16px',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'text.secondary',
+                              opacity: 0.7,
+                            },
+                          },
+                        },
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                    Motivo do atraso
+                  </Typography>
+                  <TextField
+                    value={value.motivo_atraso || ''}
+                    onChange={(e) => updateField('motivo_atraso')(e.target.value)}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    variant="outlined"
+                    placeholder="Ex.: Fornecedor atrasou devido a problemas logísticos"
                     disabled={disabled}
-                    format="DD/MM/YYYY"
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        variant: 'outlined',
+                    InputLabelProps={{ shrink: false }}
+                    label=""
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '999px',
+                        backgroundColor: 'background.paper',
+                        '& fieldset': {
+                          borderColor: 'rgba(0,0,0,0.12)',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: 'primary.light',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: 'primary.main',
+                          boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                        },
+                      },
+                      '& .MuiInputBase-input': {
+                        paddingLeft: '16px',
+                        paddingRight: '16px',
+                      },
+                      '& .MuiInputBase-input.MuiInputBase-inputMultiline': {
+                        padding: '16px',
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: 'text.secondary',
+                        opacity: 0.7,
                       },
                     }}
                   />
-                </LocalizationProvider>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
-                  <DatePicker
-                    label="Data real da entrega"
-                    value={parseDateFromDDMMYYYY(value.data_entrega_real)}
-                    onChange={(newValue: Dayjs | null) => {
-                      updateField('data_entrega_real')(formatDateToDDMMYYYY(newValue));
-                    }}
-                    disabled={disabled}
-                    format="DD/MM/YYYY"
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        variant: 'outlined',
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
-                <TextField
-                  label="Motivo do atraso"
-                  value={value.motivo_atraso || ''}
-                  onChange={(e) => updateField('motivo_atraso')(e.target.value)}
-                  fullWidth
-                  multiline
-                  rows={3}
-                  variant="outlined"
-                  placeholder="Ex.: Fornecedor atrasou devido a problemas logísticos"
-                  disabled={disabled}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      bgcolor: theme.palette.background.paper,
-                    },
-                  }}
-                />
+                </Box>
               </Box>
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
 
         {/* Condição da Quantidade */}
-        <Box>
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontWeight: 600,
-              mb: 2,
-              color: theme.palette.text.primary,
-            }}
-          >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
             Condição da Quantidade
           </Typography>
           <FormControl fullWidth variant="outlined">
-            <InputLabel>Condição da Quantidade</InputLabel>
             <Select
-              value={value.condicao_quantidade || 'TOTAL'}
+              value={value.condicao_quantidade || ''}
               onChange={(e) => handleCondicaoQuantidadeChange(e.target.value as TrpCondicaoQuantidade)}
-              label="Condição da Quantidade"
               disabled={disabled}
+              displayEmpty
+              renderValue={(selected) => {
+                if (!selected) {
+                  return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione a condição da quantidade</Box>;
+                }
+                if (selected === 'TOTAL') return 'Quantidade conforme empenho';
+                if (selected === 'PARCIAL') return 'Quantidade inferior ao empenho';
+                return 'Quantidade superior ao empenho';
+              }}
+              sx={{
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(0,0,0,0.12)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.light',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.main',
+                  boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '999px',
+                  backgroundColor: 'background.paper',
+                },
+              }}
             >
               <MenuItem value="TOTAL">Quantidade conforme empenho</MenuItem>
               <MenuItem value="PARCIAL">Quantidade inferior ao empenho</MenuItem>
               <MenuItem value="DIVERGENCIA_SUPERIOR">Quantidade superior ao empenho</MenuItem>
             </Select>
           </FormControl>
-
-          {/* Campos condicionais quando PARCIAL */}
-          {showPendenciasFields && (
-            <Box
-              sx={{
-                mt: 3,
-                p: 3.5,
-                borderRadius: 3,
-                bgcolor: alpha(theme.palette.info.main, 0.04),
-                border: `1px solid ${alpha(theme.palette.info.main, 0.12)}`,
-                transition: 'all 0.2s ease',
-                boxShadow: `0 1px 3px ${alpha(theme.palette.info.main, 0.08)}`,
-              }}
-            >
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    fontWeight: 600,
-                    mb: 0.75,
-                    color: theme.palette.text.primary,
-                    fontSize: '0.9375rem',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Detalhe das pendências / divergências
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: theme.palette.text.secondary,
-                    fontSize: '0.8125rem',
-                    lineHeight: 1.5,
-                    display: 'block',
-                  }}
-                >
-                  Informe os detalhes sobre a divergência de quantidade em relação ao empenho
-                </Typography>
-              </Box>
-              <TextField
-                label="Detalhe das pendências / divergências"
-                value={value.detalhe_pendencias || ''}
-                onChange={(e) => updateField('detalhe_pendencias')(e.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                variant="outlined"
-                placeholder="Ex.: Foram entregues apenas 140 pares de botas de 152 empenhados; saldo será entregue em nova remessa."
-                disabled={disabled}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: theme.palette.background.paper,
-                  },
-                }}
-              />
-            </Box>
-          )}
         </Box>
 
+        {/* Campos condicionais quando PARCIAL ou DIVERGENCIA_SUPERIOR */}
+        {showPendenciasFields && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{ mb: 0.5 }}
+            >
+              Detalhe das pendências / divergências
+            </Typography>
+            <Box
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                bgcolor: theme.palette.background.paper,
+                border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+                transition: 'all 0.2s ease',
+                boxShadow: `0 1px 3px ${alpha('#000', 0.04)}`,
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1.5,
+                  mb: 3.5,
+                  p: 2.5,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.info.main, 0.06),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                }}
+              >
+                <InfoOutlinedIcon
+                  sx={{
+                    color: theme.palette.info.main,
+                    fontSize: 22,
+                    mt: 0.25,
+                    flexShrink: 0,
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Este bloco aparece quando você seleciona "Quantidade inferior ao empenho" ou "Quantidade superior ao empenho". Descreva detalhadamente a divergência entre a quantidade prevista no empenho e a quantidade efetivamente recebida, incluindo informações sobre pendências ou remessas futuras, se aplicável.
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                  Detalhe das pendências / divergências
+                </Typography>
+                <TextField
+                  value={value.detalhe_pendencias || ''}
+                  onChange={(e) => updateField('detalhe_pendencias')(e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={4}
+                  variant="outlined"
+                  placeholder="Ex.: Foram entregues apenas 140 pares de botas de 152 empenhados; saldo será entregue em nova remessa."
+                  disabled={disabled}
+                  InputLabelProps={{ shrink: false }}
+                  label=""
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '999px',
+                      backgroundColor: 'background.paper',
+                      '& fieldset': {
+                        borderColor: 'rgba(0,0,0,0.12)',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'primary.light',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: 'primary.main',
+                        boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      paddingLeft: '16px',
+                      paddingRight: '16px',
+                    },
+                    '& .MuiInputBase-input.MuiInputBase-inputMultiline': {
+                      padding: '16px',
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: 'text.secondary',
+                      opacity: 0.7,
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
+        )}
+
         {/* Observações adicionais */}
-        <Box>
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontWeight: 600,
-              mb: 2,
-              color: theme.palette.text.primary,
-            }}
-          >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
             Observações adicionais do recebimento
           </Typography>
           <TextField
-            label="Observações adicionais do recebimento"
             value={value.observacoes_recebimento || ''}
             onChange={(e) => updateField('observacoes_recebimento')(e.target.value)}
             fullWidth
             multiline
             rows={4}
             variant="outlined"
-            placeholder="Use este campo para registrar qualquer informação extra que o fiscal queira registrar (ex.: embalagem danificada, local de entrega, etc.)"
+            placeholder="Descreva observações relevantes"
             disabled={disabled}
+            InputLabelProps={{ shrink: false }}
+            label=""
             sx={{
               '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
+                borderRadius: '999px',
+                backgroundColor: 'background.paper',
+                '& fieldset': {
+                  borderColor: 'rgba(0,0,0,0.12)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'primary.light',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'primary.main',
+                  boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                },
+              },
+              '& .MuiInputBase-input': {
+                paddingLeft: '16px',
+                paddingRight: '16px',
+              },
+              '& .MuiInputBase-input.MuiInputBase-inputMultiline': {
+                padding: '16px',
+              },
+              '& .MuiInputBase-input::placeholder': {
+                color: 'text.secondary',
+                opacity: 0.7,
               },
             }}
           />

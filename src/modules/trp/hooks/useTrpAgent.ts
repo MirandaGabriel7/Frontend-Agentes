@@ -18,9 +18,9 @@ export interface UseTrpAgentResult {
 
 const initialForm: TrpInputForm = {
   data_recebimento_nf_real: '',
-  tipo_base_prazo: 'NF',
-  condicao_prazo: 'NAO_SE_APLICA',
-  condicao_quantidade: 'TOTAL',
+  tipo_base_prazo: undefined,
+  condicao_prazo: undefined,
+  condicao_quantidade: undefined,
   observacoes_recebimento: '',
   detalhe_pendencias: '',
   arquivoTdrNome: '',
