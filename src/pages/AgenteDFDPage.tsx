@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -52,6 +53,7 @@ type PageState = 'idle' | 'fileSelected' | 'loading' | 'success' | 'error';
  */
 const AgenteDFDPage: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [pageState, setPageState] = useState<PageState>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analiseResult, setAnaliseResult] = useState<DfdAnaliseResponse | null>(null);
@@ -297,8 +299,7 @@ const AgenteDFDPage: React.FC = () => {
           <DfdHistoryCard
             items={getHistoryItems()}
             onView={(id) => {
-              // TODO: Implementar navegação para detalhes
-              console.log('Ver análise:', id);
+              navigate(`/agents/dfd/resultado/${id}`);
             }}
             onDownload={(id) => {
               // TODO: Implementar download

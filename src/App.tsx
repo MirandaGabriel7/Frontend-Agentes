@@ -12,6 +12,7 @@ import { TrpListPage } from './modules/trp/pages/TrpListPage';
 import { TrpNewPage } from './modules/trp/pages/TrpNewPage';
 import { TrpDetailPage } from './modules/trp/pages/TrpDetailPage';
 import { TrpPage } from './modules/trp/pages/TrpPage';
+import AgenteDfdResultado from './pages/AgenteDfdResultado';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="/agents/trp/novo" element={<TrpNewPage />} />
               <Route path="/agents/trp/:id" element={<TrpDetailPage />} />
               <Route path="/agents/dfd" element={<DfdAgentPage />} />
+              <Route path="/agents/dfd/resultado/:id" element={<AgenteDfdResultado />} />
             </Routes>
           </MainLayout>
         </BrowserRouter>
