@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   Alert,
   alpha,
   useTheme,
+  Button,
 } from '@mui/material';
 import { TrpUploadCard } from '../components/TrpUploadCard';
 import { TrpFormCard } from '../components/TrpFormCard';
@@ -15,6 +17,7 @@ import { useTrpAgent } from '../hooks/useTrpAgent';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const {
     form,
     setForm,
@@ -39,8 +42,8 @@ export const TrpPage: React.FC = () => {
   const canExecute = Boolean(selectedFile && form.data_recebimento_nf_real);
 
   /**
-   * Retorna os itens do histórico (mockado por enquanto)
-   * TODO: Integrar com API real
+   * Retorna os itens do histórico
+   * Busca do serviço e adiciona o resultado atual se existir
    */
   const getHistoryItems = (): TrpHistoryItem[] => {
     const items: TrpHistoryItem[] = [];
@@ -50,19 +53,21 @@ export const TrpPage: React.FC = () => {
       items.push({
         id: currentRun.id,
         fileName: selectedFile?.name || currentRun.output.meta.fileName || 'TRP_Gerado.pdf',
-        contractNumber: currentRun.output.campos_trp_normalizados.numero_contrato,
-        invoiceNumber: currentRun.output.campos_trp_normalizados.numero_nf,
+        contractNumber: currentRun.output.campos_trp_normalizados.numero_contrato || undefined,
+        invoiceNumber: currentRun.output.campos_trp_normalizados.numero_nf || undefined,
         status: 'completed',
         createdAt: currentRun.createdAt,
-        totalValue: currentRun.output.campos_trp_normalizados.valor_efetivo_numero,
+        totalValue: currentRun.output.campos_trp_normalizados.valor_efetivo_numero || undefined,
       });
     }
 
-    // Adiciona itens mockados para demonstração
+    // Adiciona outros TRPs do histórico (do serviço)
+    // TODO: Integrar com API real para buscar todos os TRPs
+    // Por enquanto, adiciona itens mockados apenas se não houver resultado atual
     if (items.length === 0) {
       items.push(
         {
-          id: '1',
+          id: 'mock-1',
           fileName: 'TRP_Contrato_12345.pdf',
           contractNumber: '12345/2024',
           invoiceNumber: 'NF-001234',
@@ -71,19 +76,13 @@ export const TrpPage: React.FC = () => {
           totalValue: 125000.50,
         },
         {
-          id: '2',
+          id: 'mock-2',
           fileName: 'TRP_Obra_11B.pdf',
           contractNumber: '11B/2024',
           invoiceNumber: 'NF-005678',
           status: 'completed',
           createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 horas atrás
           totalValue: 85000.00,
-        },
-        {
-          id: '3',
-          fileName: 'TRP_Servicos_ABC.pdf',
-          status: 'processing',
-          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 min atrás
         }
       );
     }
@@ -158,9 +157,23 @@ export const TrpPage: React.FC = () => {
         canExecute={canExecute}
       />
 
-      {currentRun && (
+      {currentRun && currentRun.status === 'COMPLETED' && (
         <Box sx={{ mt: 6 }}>
           <TrpResultPanel run={currentRun} />
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+            <Button
+              variant="contained"
+              onClick={() => navigate(`/agents/trp/resultado/${currentRun.id}`)}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 4,
+                py: 1.5,
+              }}
+            >
+              Ver Resultado Completo
+            </Button>
+          </Box>
         </Box>
       )}
 
@@ -170,8 +183,7 @@ export const TrpPage: React.FC = () => {
           <TrpHistoryCard
             items={getHistoryItems()}
             onView={(id) => {
-              // TODO: Implementar navegação para detalhes
-              console.log('Ver TRP:', id);
+              navigate(`/agents/trp/resultado/${id}`);
             }}
             onDownload={(id) => {
               // TODO: Implementar download

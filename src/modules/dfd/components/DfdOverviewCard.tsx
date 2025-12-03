@@ -4,12 +4,13 @@ import {
   Box,
   Typography,
   Chip,
-  LinearProgress,
   Grid,
   alpha,
   useTheme,
+  Stack,
 } from '@mui/material';
 import { DfdOverview } from '../../../lib/types/dfdResult';
+import { DonutChart, DonutChartSegment } from '../../../components/ui/DonutChart';
 
 interface DfdOverviewCardProps {
   overview: DfdOverview;
@@ -17,6 +18,7 @@ interface DfdOverviewCardProps {
 
 export const DfdOverviewCard: React.FC<DfdOverviewCardProps> = ({ overview }) => {
   const theme = useTheme();
+  const [hoveredSegment, setHoveredSegment] = React.useState<DonutChartSegment | null>(null);
 
   const getSemafaroColor = (semaforo: string) => {
     switch (semaforo) {
@@ -47,6 +49,25 @@ export const DfdOverviewCard: React.FC<DfdOverviewCardProps> = ({ overview }) =>
 
   const semaforoConfig = getSemafaroColor(overview.semaforo_global);
 
+  // Calcular dados para o gráfico donut baseado nos grupos
+  // Vamos usar uma representação simplificada: atendidos vs não atendidos vs parcialmente atendidos
+  // Baseado no percentual de atendimento global
+  const atendidosPercent = overview.percentual_atendimento_global;
+  const naoAtendidosPercent = 100 - atendidosPercent;
+
+  const chartData: DonutChartSegment[] = [
+    {
+      value: atendidosPercent,
+      color: theme.palette.success.main,
+      label: 'Atendidos',
+    },
+    {
+      value: naoAtendidosPercent,
+      color: theme.palette.error.main,
+      label: 'Não atendidos',
+    },
+  ];
+
   return (
     <Paper
       elevation={0}
@@ -70,73 +91,129 @@ export const DfdOverviewCard: React.FC<DfdOverviewCardProps> = ({ overview }) =>
         Visão Geral da Análise
       </Typography>
 
-      {/* Linha 1: Percentual e Chips */}
+      {/* Gráfico Donut e Chips */}
       <Box
         sx={{
           display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
           alignItems: 'center',
-          gap: 3,
+          justifyContent: 'center',
+          gap: 4,
           mb: 4,
-          flexWrap: 'wrap',
         }}
       >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          <Typography
-            variant="h2"
-            sx={{
-              fontWeight: 700,
-              color: theme.palette.primary.main,
-              fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem' },
-              lineHeight: 1,
-            }}
-          >
-            {overview.percentual_atendimento_global.toFixed(2).replace('.', ',')}%
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-          <Chip
-            label={`Semáforo: ${overview.semaforo_global}`}
-            sx={{
-              bgcolor: semaforoConfig.bg,
-              color: semaforoConfig.text,
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              height: 32,
-            }}
-          />
-          <Chip
-            label={`Risco: ${overview.nivel_risco_global}`}
-            color={getRiscoColor(overview.nivel_risco_global) as 'success' | 'warning' | 'error'}
-            sx={{
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              height: 32,
-            }}
-          />
-        </Box>
-      </Box>
-
-      {/* Barra de progresso */}
-      <Box sx={{ mb: 4 }}>
-        <LinearProgress
-          variant="determinate"
-          value={overview.percentual_atendimento_global}
-          sx={{
-            height: 8,
-            borderRadius: 4,
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-            '& .MuiLinearProgress-bar': {
-              borderRadius: 4,
-              bgcolor: theme.palette.primary.main,
-            },
-          }}
+        {/* Gráfico Donut */}
+        <DonutChart
+          data={chartData}
+          size={240}
+          strokeWidth={24}
+          highlightOnHover
+          onSegmentHover={setHoveredSegment}
+          centerContent={
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography
+                variant="h3"
+                sx={{
+                  fontWeight: 700,
+                  color: theme.palette.primary.main,
+                  lineHeight: 1,
+                  mb: 0.5,
+                }}
+              >
+                {overview.percentual_atendimento_global.toFixed(1).replace('.', ',')}%
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: theme.palette.text.secondary,
+                  fontSize: '0.75rem',
+                }}
+              >
+                Atendimento
+              </Typography>
+            </Box>
+          }
         />
+
+        {/* Chips e informações */}
+        <Stack spacing={2} sx={{ alignItems: { xs: 'center', md: 'flex-start' } }}>
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: { xs: 'center', md: 'flex-start' } }}>
+            <Chip
+              label={`Semáforo: ${overview.semaforo_global}`}
+              sx={{
+                bgcolor: semaforoConfig.bg,
+                color: semaforoConfig.text,
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                height: 32,
+              }}
+            />
+            <Chip
+              label={`Risco: ${overview.nivel_risco_global}`}
+              color={getRiscoColor(overview.nivel_risco_global) as 'success' | 'warning' | 'error'}
+              sx={{
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                height: 32,
+              }}
+            />
+          </Box>
+
+          {/* Legenda do gráfico */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 200 }}>
+            {chartData.map((segment) => (
+              <Box
+                key={segment.label}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: hoveredSegment?.label === segment.label
+                    ? alpha(segment.color, 0.1)
+                    : 'transparent',
+                  transition: 'all 0.2s ease',
+                  border: `1px solid ${
+                    hoveredSegment?.label === segment.label
+                      ? alpha(segment.color, 0.3)
+                      : 'transparent'
+                  }`,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    bgcolor: segment.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: hoveredSegment?.label === segment.label ? 600 : 400,
+                      color: theme.palette.text.primary,
+                    }}
+                  >
+                    {segment.label}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    {segment.value.toFixed(1).replace('.', ',')}%
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Stack>
       </Box>
 
       {/* Linha 2: Estatísticas */}

@@ -32,24 +32,24 @@ export interface TrpInputForm {
 }
 
 export interface TrpCamposNormalizados {
-  numero_contrato: string;
-  processo_licitatorio: string;
-  objeto_contrato: string;
-  contratada: string;
-  cnpj: string;
-  vigencia: string;
-  competencia_mes_ano: string;
-  numero_nf: string;
-  vencimento_nf: string;
-  numero_empenho: string;
-  valor_efetivo_numero: number;
-  valor_efetivo_formatado: string;
-  regime_fornecimento: string;
-  tipo_contrato: string;
-  data_entrega: string;
-  condicao_prazo: string;
-  condicao_quantidade: string;
-  observacoes: string;
+  numero_contrato: string | null;
+  processo_licitatorio: string | null;
+  objeto_contrato: string | null;
+  contratada: string | null;
+  cnpj: string | null;
+  vigencia: string | null;
+  competencia_mes_ano: string | null;
+  numero_nf: string | null;
+  vencimento_nf: string | null;
+  numero_empenho: string | null;
+  valor_efetivo_numero: number | null;
+  valor_efetivo_formatado: string | null;
+  regime_fornecimento: string | null;
+  tipo_contrato: string | null;
+  data_entrega: string | null;
+  condicao_prazo: string | null;
+  condicao_quantidade: string | null;
+  observacoes: string | null;
 }
 
 export interface TrpMeta {
@@ -59,6 +59,7 @@ export interface TrpMeta {
 
 export interface TrpAgentOutput {
   documento_markdown_final: string;
+  documento_markdown_prime?: string; // Versão original do PRIME (para debug)
   campos_trp_normalizados: TrpCamposNormalizados;
   meta: TrpMeta;
 }

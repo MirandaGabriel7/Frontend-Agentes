@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Paper,
   Box,
   Typography,
   alpha,
@@ -61,14 +60,28 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
             width: '100%',
             borderCollapse: 'collapse',
             marginBottom: 2,
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
             '& th, & td': {
-              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
               padding: 1.5,
               textAlign: 'left',
+              fontSize: '0.9375rem',
             },
             '& th': {
-              backgroundColor: alpha(theme.palette.primary.main, 0.06),
+              backgroundColor: alpha(theme.palette.grey[500], 0.05),
               fontWeight: 600,
+              color: theme.palette.text.primary,
+              fontSize: '0.875rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+            },
+            '& td': {
+              color: theme.palette.text.primary,
+            },
+            '& tr:nth-of-type(even) td': {
+              backgroundColor: alpha(theme.palette.primary.main, 0.02),
             },
           },
           '& code': {

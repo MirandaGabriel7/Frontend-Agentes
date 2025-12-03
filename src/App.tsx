@@ -6,12 +6,12 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { theme } from './theme';
 import { MainLayout } from './layout/MainLayout';
 import { AgentsPage } from './pages/AgentsPage';
-import { TrpAgentPage } from './pages/TrpAgentPage';
 import { DfdAgentPage } from './pages/DfdAgentPage';
 import { TrpListPage } from './modules/trp/pages/TrpListPage';
 import { TrpNewPage } from './modules/trp/pages/TrpNewPage';
 import { TrpDetailPage } from './modules/trp/pages/TrpDetailPage';
 import { TrpPage } from './modules/trp/pages/TrpPage';
+import { TrpResultPage } from './modules/trp/pages/TrpResultPage';
 import AgenteDfdResultado from './pages/AgenteDfdResultado';
 
 function App() {
@@ -28,6 +28,7 @@ function App() {
               <Route path="/agents/trp/lista" element={<TrpListPage />} />
               <Route path="/agents/trp/novo" element={<TrpNewPage />} />
               <Route path="/agents/trp/:id" element={<TrpDetailPage />} />
+              <Route path="/agents/trp/resultado/:id" element={<TrpResultPage />} />
               <Route path="/agents/dfd" element={<DfdAgentPage />} />
               <Route path="/agents/dfd/resultado/:id" element={<AgenteDfdResultado />} />
             </Routes>
