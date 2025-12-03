@@ -1,3 +1,4 @@
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Grid,
@@ -35,29 +36,18 @@ const floatAnimation = keyframes`
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-10px);
+    transform: translateY(-8px);
   }
 `;
 
-const glowPulse = keyframes`
+const pulseGlow = keyframes`
   0%, 100% {
-    opacity: 0.6;
+    opacity: 0.4;
     filter: blur(20px);
   }
   50% {
-    opacity: 1;
+    opacity: 0.8;
     filter: blur(30px);
-  }
-`;
-
-const neuralPulse = keyframes`
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.05);
   }
 `;
 
@@ -69,38 +59,38 @@ export const AgentsPage = () => {
     {
       label: 'Documentos Processados',
       value: '1.284',
-      change: '+12%',
+      change: '+12% vs. mês anterior',
       changeType: 'up',
       icon: <WysiwygIcon />,
-      gradient: 'linear-gradient(135deg, #1877F2 0%, #22D3EE 100%)',
-      glowColor: '#1877F2',
+      gradient: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+      glowColor: theme.palette.primary.main,
     },
     {
       label: 'Economia Gerada',
       value: 'R$ 4.2M',
-      change: '+R$ 350k',
+      change: '+R$ 350k vs. mês anterior',
       changeType: 'up',
       icon: <SavingsIcon />,
-      gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
-      glowColor: '#10B981',
+      gradient: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`,
+      glowColor: '#667eea',
     },
     {
       label: 'Precisão IA',
       value: '99.7%',
-      change: '+0.2%',
+      change: '+0.2% vs. mês anterior',
       changeType: 'up',
       icon: <TaskAltIcon />,
-      gradient: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-      glowColor: '#8B5CF6',
+      gradient: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${alpha(theme.palette.success.main, 0.8)} 100%)`,
+      glowColor: theme.palette.success.main,
     },
     {
       label: 'Conformidade Legal',
       value: '92%',
-      change: '+1.2%',
+      change: '+1.2% vs. mês anterior',
       changeType: 'up',
       icon: <CheckCircleIcon />,
-      gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
-      glowColor: '#F59E0B',
+      gradient: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${alpha(theme.palette.secondary.main, 0.8)} 100%)`,
+      glowColor: theme.palette.secondary.main,
     },
   ];
 
@@ -109,27 +99,27 @@ export const AgentsPage = () => {
       id: 'dfd',
       title: 'Agente DFD',
       subtitle: 'Auditoria Automatizada',
-      description: 'Analisa e valida a estrutura e o fluxo de documentos técnicos para garantir conformidade e integridade com inteligência artificial avançada.',
+      description: 'Analisa e valida a estrutura e o fluxo de documentos técnicos para garantir conformidade e integridade, utilizando IA avançada.',
       status: 'Online',
       statusColor: 'success',
       route: '/agents/dfd',
       icon: <SchemaIcon />,
-      gradient: 'linear-gradient(135deg, rgba(24, 119, 242, 0.15) 0%, rgba(34, 211, 238, 0.1) 100%)',
-      borderGradient: 'linear-gradient(135deg, rgba(24, 119, 242, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)',
-      iconGradient: 'linear-gradient(135deg, #1877F2 0%, #22D3EE 100%)',
+      iconGradient: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+      gradient: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
+      borderGradient: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.4)} 0%, ${alpha(theme.palette.primary.dark, 0.3)} 100%)`,
     },
     {
       id: 'trp',
       title: 'Agente TRP',
       subtitle: 'Termos Automáticos',
-      description: 'Verifica a conformidade de Termos de Recebimento Provisório com as normas e especificações do edital usando processamento de linguagem natural.',
+      description: 'Gera e verifica a conformidade de Termos de Recebimento Provisório com as normas e especificações do edital, acelerando processos.',
       status: 'Em Análise',
       statusColor: 'warning',
       route: '/agents/trp',
       icon: <ReceiptLongIcon />,
-      gradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)',
-      borderGradient: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(251, 191, 36, 0.3) 100%)',
-      iconGradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
+      iconGradient: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${alpha(theme.palette.warning.main, 0.8)} 100%)`,
+      gradient: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
+      borderGradient: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.4)} 0%, ${alpha(theme.palette.warning.main, 0.3)} 100%)`,
     },
   ];
 
@@ -141,7 +131,6 @@ export const AgentsPage = () => {
       time: '2 horas atrás',
       icon: <CheckCircleIcon />,
       color: 'success',
-      status: 'concluído',
     },
     {
       title: 'Análise TRP iniciada',
@@ -150,7 +139,6 @@ export const AgentsPage = () => {
       time: '5 horas atrás',
       icon: <SyncIcon />,
       color: 'warning',
-      status: 'em análise',
     },
     {
       title: 'Análise DFD agendada',
@@ -159,575 +147,556 @@ export const AgentsPage = () => {
       time: '1 dia atrás',
       icon: <AddTaskIcon />,
       color: 'primary',
-      status: 'agendado',
     },
   ];
 
   return (
-    <Container
-      maxWidth="xl"
+    <Box
+      component="main"
       sx={{
+        flexGrow: 1,
+        bgcolor: (theme) => theme.palette.background.default,
+        minHeight: '100vh',
         width: '100%',
-        maxWidth: { xs: '100%', sm: '1200px', md: '1400px', lg: '1600px' },
-        mx: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      {/* Hero Section */}
-      <Box
+      <Container
+        maxWidth="lg"
         sx={{
-          position: 'relative',
-          mb: 8,
-          textAlign: 'center',
-          overflow: 'hidden',
+          width: '100%',
+          maxWidth: { xs: '100%', sm: '1200px', md: '1400px', lg: '1600px' },
+          mx: 'auto',
+          px: { xs: 3, sm: 4, md: 5, lg: 6 },
+          py: { xs: 4, sm: 5, md: 6 },
+          display: 'flex',
+          flexDirection: 'column',
+          gap: { xs: 6, md: 8 },
         }}
       >
-        {/* Animated background elements */}
+        {/* Hero Section */}
         <Box
           sx={{
-            position: 'absolute',
-            top: '-50%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '800px',
-            height: '800px',
-            borderRadius: '50%',
-            background: `radial-gradient(ellipse 40% 60% at 50% 50%, ${alpha('#1877F2', 0.15)} 0%, transparent 70%)`,
-            filter: 'blur(80px)',
-            animation: `${glowPulse} 4s ease-in-out infinite`,
-            zIndex: 0,
+            position: 'relative',
+            textAlign: 'center',
+            overflow: 'hidden',
+            py: { xs: 4, md: 6 },
+            px: { xs: 2, sm: 3 },
           }}
-        />
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '-30%',
-            right: '10%',
-            width: '600px',
-            height: '600px',
-            borderRadius: '50%',
-            background: `radial-gradient(ellipse 30% 50% at 50% 50%, ${alpha('#22D3EE', 0.12)} 0%, transparent 70%)`,
-            filter: 'blur(60px)',
-            animation: `${neuralPulse} 3s ease-in-out infinite`,
-            zIndex: 0,
-          }}
-        />
+        >
+          {/* Subtle background gradient */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: '100%', md: '1200px' },
+              height: { xs: '400px', md: '600px' },
+              borderRadius: '50%',
+              background: `radial-gradient(ellipse 60% 40% at 50% 50%, ${alpha(theme.palette.primary.main, 0.08)} 0%, transparent 70%)`,
+              filter: 'blur(60px)',
+              animation: `${pulseGlow} 6s ease-in-out infinite`,
+              zIndex: 0,
+            }}
+          />
 
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          <Typography
-            variant="h1"
-            sx={{
-              fontSize: { xs: '2.5rem', sm: '3.5rem', md: '4.5rem', lg: '5.5rem' },
-              fontWeight: 900,
-              letterSpacing: '-0.04em',
-              mb: 2,
-              lineHeight: 1.1,
-              background: `linear-gradient(180deg, ${theme.palette.text.primary} 0%, ${alpha(theme.palette.text.primary, 0.7)} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            Plataforma Global de Agentes de IA para Licitações
-          </Typography>
-          <Typography
-            variant="h5"
-            sx={{
-              fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' },
-              fontWeight: 600,
-              color: 'text.secondary',
-              mb: 3,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            Automação Inteligente · Conformidade 14.133 · Auditoria em Alta Precisão
-          </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              maxWidth: '700px',
-              mx: 'auto',
-              color: 'text.secondary',
-              fontSize: '1.125rem',
-              lineHeight: 1.8,
-              mb: 4,
-            }}
-          >
-            Infraestrutura avançada que integra agentes de inteligência artificial para análise documental, verificação de conformidade e otimização completa dos processos de compras públicas.
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* KPI Metrics */}
-      <Grid container spacing={3} sx={{ mb: 8, justifyContent: 'center' }}>
-        {stats.map((stat, index) => (
-          <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={index}>
-            <Paper
+          <Box sx={{ position: 'relative', zIndex: 1 }}>
+            <Typography
+              variant="h1"
               sx={{
-                p: 4,
-                borderRadius: 4,
-                position: 'relative',
-                overflow: 'hidden',
-                background: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
-                backdropFilter: 'blur(20px) saturate(180%)',
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                boxShadow: `0 8px 32px ${alpha('#000', 0.06)}, 0 2px 8px ${alpha('#000', 0.04)}, inset 0 1px 0 ${alpha('#FFF', 0.8)}`,
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: `0 16px 48px ${alpha(stat.glowColor, 0.2)}, 0 4px 16px ${alpha('#000', 0.08)}, inset 0 1px 0 ${alpha('#FFF', 0.9)}`,
-                  borderColor: alpha(stat.glowColor, 0.3),
-                },
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: stat.gradient,
-                  borderRadius: '4px 4px 0 0',
-                },
+                fontSize: { xs: '2.25rem', sm: '3rem', md: '4rem', lg: '4.75rem' },
+                fontWeight: 800,
+                letterSpacing: '-0.03em',
+                mb: 3,
+                lineHeight: 1.1,
+                color: theme.palette.text.primary,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Box
-                  sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 3,
-                    background: stat.gradient,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: `0 8px 24px ${alpha(stat.glowColor, 0.3)}, inset 0 1px 0 ${alpha('#FFF', 0.2)}`,
-                    animation: `${floatAnimation} 3s ease-in-out infinite`,
-                    animationDelay: `${index * 0.2}s`,
-                  }}
-                >
-                  <Box sx={{ color: 'white', fontSize: 28 }}>{stat.icon}</Box>
-                </Box>
-                {stat.changeType === 'up' ? (
-                  <TrendingUpIcon sx={{ color: 'success.main', fontSize: 24 }} />
-                ) : (
-                  <TrendingDownIcon sx={{ color: 'error.main', fontSize: 24 }} />
-                )}
-              </Box>
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 900,
-                  color: 'text.primary',
-                  letterSpacing: '-0.04em',
-                  lineHeight: 1,
-                  mb: 1.5,
-                  fontSize: { xs: '2rem', sm: '2.5rem' },
-                }}
-              >
-                {stat.value}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: 'text.secondary',
-                  fontWeight: 600,
-                  mb: 2,
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                {stat.label}
-              </Typography>
-              <Chip
-                label={stat.change}
-                size="small"
-                icon={stat.changeType === 'up' ? <TrendingUpIcon sx={{ fontSize: 14 }} /> : <TrendingDownIcon sx={{ fontSize: 14 }} />}
-                sx={{
-                  bgcolor: stat.changeType === 'up' ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
-                  color: stat.changeType === 'up' ? 'success.main' : 'error.main',
-                  border: `1px solid ${stat.changeType === 'up' ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.error.main, 0.2)}`,
-                  fontWeight: 700,
-                  fontSize: '0.75rem',
-                  height: 26,
-                  '& .MuiChip-icon': {
-                    color: stat.changeType === 'up' ? 'success.main' : 'error.main',
-                  },
-                }}
-              />
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+              Plataforma Global de Agentes de IA para Licitações
+            </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontSize: { xs: '0.9375rem', sm: '1.125rem', md: '1.25rem' },
+                fontWeight: 500,
+                color: theme.palette.text.secondary,
+                mb: 4,
+                letterSpacing: '-0.01em',
+                maxWidth: '800px',
+                mx: 'auto',
+              }}
+            >
+              Automação Inteligente · Conformidade 14.133 · Auditoria em Alta Precisão
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                maxWidth: '720px',
+                mx: 'auto',
+                color: theme.palette.text.secondary,
+                fontSize: { xs: '0.9375rem', sm: '1.0625rem' },
+                lineHeight: 1.75,
+                fontWeight: 400,
+              }}
+            >
+              Infraestrutura avançada que integra agentes de inteligência artificial para análise documental, verificação de conformidade e otimização completa dos processos de compras públicas.
+            </Typography>
+          </Box>
+        </Box>
 
-      {/* Agents Section */}
-      <Box sx={{ mb: 8 }}>
-        <Typography
-          variant="h4"
-          component="h2"
-          sx={{
-            fontWeight: 800,
-            color: 'text.primary',
-            mb: 5,
-            letterSpacing: '-0.02em',
-            textAlign: 'center',
-          }}
-        >
-          Agentes de IA Disponíveis
-        </Typography>
-        <Grid container spacing={4} sx={{ justifyContent: 'center' }}>
-          {agents.map((agent) => (
-            <Grid size={{ xs: 12, lg: 6 }} key={agent.id}>
-              <GlowCard
-                glowColor={agent.id === 'dfd' ? 'blue' : 'orange'}
-                customSize
-                sx={{
-                  width: '100%',
-                  minHeight: '400px',
-                  background: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
-                  p: 5,
-                  borderRadius: 5,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '--backdrop': alpha(theme.palette.text.primary, 0.08),
-                  '--backup-border': alpha(theme.palette.divider, 0.2),
-                }}
-              >
-                <Box sx={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Box
-                        sx={{
-                          width: 80,
-                          height: 80,
-                          borderRadius: 4,
-                          background: `linear-gradient(135deg, ${alpha('#FFF', 0.25)} 0%, ${alpha('#FFF', 0.15)} 100%)`,
-                          backdropFilter: 'blur(20px)',
-                          border: `1.5px solid ${alpha('#FFF', 0.3)}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mb: 3,
-                          boxShadow: `0 8px 32px ${alpha('#000', 0.1)}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
-                          animation: `${floatAnimation} 4s ease-in-out infinite`,
-                        }}
-                      >
-                        <Box sx={{ background: agent.iconGradient, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontSize: 40 }}>
-                          {agent.icon}
-                        </Box>
-                      </Box>
-                      <Typography
-                        variant="h5"
-                        component="h3"
-                        sx={{
-                          fontWeight: 800,
-                          color: 'text.primary',
-                          mb: 0.5,
-                          letterSpacing: '-0.02em',
-                        }}
-                      >
-                        {agent.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: 'text.secondary',
-                          fontWeight: 600,
-                          fontSize: '0.875rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.1em',
-                        }}
-                      >
-                        {agent.subtitle}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      label={agent.status}
-                      size="small"
-                      icon={
-                        agent.statusColor === 'success' ? (
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              bgcolor: 'success.main',
-                              boxShadow: `0 0 12px ${alpha(theme.palette.success.main, 0.8)}`,
-                              animation: `${glowPulse} 2s ease-in-out infinite`,
-                            }}
-                          />
-                        ) : (
-                          <SyncIcon
-                            sx={{
-                              fontSize: 14,
-                              animation: 'spin 1s linear infinite',
-                              '@keyframes spin': {
-                                to: { transform: 'rotate(360deg)' },
-                              },
-                            }}
-                          />
-                        )
-                      }
-                      sx={{
-                        bgcolor: alpha(
-                          agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
-                          0.15
-                        ),
-                        border: `1.5px solid ${alpha(
-                          agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
-                          0.3
-                        )}`,
-                        color: agent.statusColor === 'success' ? 'success.main' : 'warning.main',
-                        fontSize: '0.8125rem',
-                        fontWeight: 700,
-                        height: 32,
-                        backdropFilter: 'blur(10px)',
-                        boxShadow: `0 4px 12px ${alpha(
-                          agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
-                  </Box>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      color: 'text.secondary',
-                      mb: 4,
-                      lineHeight: 1.8,
-                      fontSize: '0.9375rem',
-                    }}
-                  >
-                    {agent.description}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      onClick={() => navigate(agent.route)}
-                      startIcon={<PsychologyIcon />}
-                      sx={{
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                        py: 1.75,
-                        borderRadius: 2.5,
-                        fontWeight: 700,
-                        fontSize: '0.9375rem',
-                        boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}, inset 0 1px 0 ${alpha('#FFF', 0.2)}`,
-                        '&:hover': {
-                          bgcolor: 'primary.dark',
-                          boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.5)}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
-                          transform: 'translateY(-2px)',
-                        },
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                    >
-                      Iniciar Análise
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      sx={{
-                        borderColor: alpha(theme.palette.divider, 0.3),
-                        color: 'text.secondary',
-                        py: 1.75,
-                        borderRadius: 2.5,
-                        fontWeight: 600,
-                        fontSize: '0.9375rem',
-                        bgcolor: alpha('#FFFFFF', 0.6),
-                        backdropFilter: 'blur(20px)',
-                        borderWidth: '1.5px',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: alpha('#FFFFFF', 0.9),
-                          color: 'primary.main',
-                          transform: 'translateY(-2px)',
-                        },
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                    >
-                      Ver Relatórios
-                    </Button>
-                  </Box>
-                </Box>
-              </GlowCard>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-
-      {/* AI Activity Timeline */}
-      <Box>
-        <Typography
-          variant="h4"
-          component="h2"
-          sx={{
-            fontWeight: 800,
-            color: 'text.primary',
-            mb: 5,
-            letterSpacing: '-0.02em',
-            textAlign: 'center',
-          }}
-        >
-          Timeline de Atividades
-        </Typography>
-        <Paper
-          sx={{
-            borderRadius: 5,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            background: `linear-gradient(135deg, ${alpha('#FFFFFF', 0.95)} 0%, ${alpha('#FAFBFC', 0.98)} 100%)`,
-            backdropFilter: 'blur(20px) saturate(180%)',
-            overflow: 'hidden',
-            boxShadow: `0 8px 32px ${alpha('#000', 0.06)}, 0 2px 8px ${alpha('#000', 0.04)}, inset 0 1px 0 ${alpha('#FFF', 0.8)}`,
-            maxWidth: { xs: '100%', md: '900px' },
-            mx: 'auto',
-          }}
-        >
-          <List sx={{ p: 2 }}>
-            {activities.map((activity, index) => (
-              <Box key={index}>
-                <ListItem
+        {/* KPI Metrics */}
+        <Box>
+          <Grid container spacing={{ xs: 2.5, sm: 3, md: 3.5 }} sx={{ justifyContent: 'center' }}>
+            {stats.map((stat, index) => (
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={index}>
+                <Paper
+                  elevation={0}
                   sx={{
+                    p: { xs: 3, sm: 3.5, md: 4 },
                     borderRadius: 3,
-                    mb: 1,
-                    px: 4,
-                    py: 3,
                     position: 'relative',
+                    overflow: 'hidden',
+                    background: theme.palette.background.paper,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                    boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 8px 24px ${alpha('#000', 0.04)}`,
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.04),
-                      transform: 'translateX(8px)',
-                      '& .timeline-line': {
-                        opacity: 1,
-                      },
+                      transform: 'translateY(-4px)',
+                      boxShadow: `0 4px 12px ${alpha(stat.glowColor, 0.15)}, 0 12px 32px ${alpha('#000', 0.08)}`,
+                      borderColor: alpha(stat.glowColor, 0.2),
+                    },
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '3px',
+                      background: stat.gradient,
+                      borderRadius: '3px 3px 0 0',
                     },
                   }}
                 >
-                  {/* Timeline line */}
-                  {index < activities.length - 1 && (
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
                     <Box
-                      className="timeline-line"
                       sx={{
-                        position: 'absolute',
-                        left: 48,
-                        top: 64,
-                        bottom: -16,
-                        width: 2,
-                        background: `linear-gradient(180deg, ${alpha(theme.palette.divider, 0.3)} 0%, transparent 100%)`,
-                        opacity: 0.3,
-                        transition: 'opacity 0.3s ease',
-                      }}
-                    />
-                  )}
-                  <ListItemAvatar>
-                    <Avatar
-                      sx={{
-                        bgcolor: alpha(
-                          activity.color === 'success'
-                            ? theme.palette.success.main
-                            : activity.color === 'warning'
-                            ? theme.palette.warning.main
-                            : theme.palette.primary.main,
-                          0.15
-                        ),
-                        border: `2.5px solid ${alpha(
-                          activity.color === 'success'
-                            ? theme.palette.success.main
-                            : activity.color === 'warning'
-                            ? theme.palette.warning.main
-                            : theme.palette.primary.main,
-                          0.3
-                        )}`,
-                        width: 56,
-                        height: 56,
-                        boxShadow: `0 8px 24px ${alpha(
-                          activity.color === 'success'
-                            ? theme.palette.success.main
-                            : activity.color === 'warning'
-                            ? theme.palette.warning.main
-                            : theme.palette.primary.main,
-                          0.25
-                        )}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
-                        position: 'relative',
-                        zIndex: 2,
+                        width: { xs: 52, sm: 56 },
+                        height: { xs: 52, sm: 56 },
+                        borderRadius: 2.5,
+                        background: stat.gradient,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: `0 4px 16px ${alpha(stat.glowColor, 0.25)}`,
+                        animation: `${floatAnimation} 3s ease-in-out infinite`,
+                        animationDelay: `${index * 0.15}s`,
                       }}
                     >
-                      <Box
+                      <Box sx={{ color: 'white', fontSize: { xs: 24, sm: 26 } }}>{stat.icon}</Box>
+                    </Box>
+                    {stat.changeType === 'up' ? (
+                      <TrendingUpIcon sx={{ color: theme.palette.success.main, fontSize: 20, opacity: 0.8 }} />
+                    ) : (
+                      <TrendingDownIcon sx={{ color: theme.palette.error.main, fontSize: 20, opacity: 0.8 }} />
+                    )}
+                  </Box>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 700,
+                      color: theme.palette.text.primary,
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1,
+                      mb: 1.5,
+                      fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+                    }}
+                  >
+                    {stat.value}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      fontWeight: 500,
+                      mb: 2,
+                      fontSize: '0.8125rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {stat.label}
+                  </Typography>
+                  <Chip
+                    label={stat.change}
+                    size="small"
+                    icon={stat.changeType === 'up' ? <TrendingUpIcon sx={{ fontSize: 12 }} /> : <TrendingDownIcon sx={{ fontSize: 12 }} />}
+                    sx={{
+                      bgcolor: stat.changeType === 'up' ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                      color: stat.changeType === 'up' ? theme.palette.success.main : theme.palette.error.main,
+                      border: `1px solid ${stat.changeType === 'up' ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.error.main, 0.2)}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 24,
+                      '& .MuiChip-icon': {
+                        color: stat.changeType === 'up' ? theme.palette.success.main : theme.palette.error.main,
+                      },
+                    }}
+                  />
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Agents Section */}
+        <Box>
+          <Typography
+            variant="h4"
+            component="h2"
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.text.primary,
+              mb: { xs: 4, md: 5 },
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+            }}
+          >
+            Agentes de IA Disponíveis
+          </Typography>
+          <Grid container spacing={{ xs: 3, md: 4 }} sx={{ justifyContent: 'center' }}>
+            {agents.map((agent) => (
+              <Grid size={{ xs: 12, lg: 6 }} key={agent.id}>
+                <GlowCard
+                  glowColor={agent.id === 'dfd' ? 'blue' : 'orange'}
+                  customSize
+                  sx={{
+                    width: '100%',
+                    minHeight: { xs: '380px', md: '420px' },
+                    background: theme.palette.background.paper,
+                    p: { xs: 4, sm: 4.5, md: 5 },
+                    borderRadius: 4,
+                    position: 'relative',
+                    overflow: 'visible',
+                    '--backdrop': alpha(theme.palette.text.primary, 0.06),
+                    '--backup-border': alpha(theme.palette.divider, 0.12),
+                    border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                    boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 8px 24px ${alpha('#000', 0.04)}`,
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-6px)',
+                      boxShadow: `0 4px 12px ${alpha('#000', 0.08)}, 0 16px 48px ${alpha('#000', 0.08)}`,
+                    },
+                  }}
+                >
+                  <Box sx={{ position: 'relative', zIndex: 10, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Box
+                          sx={{
+                            width: { xs: 64, sm: 72 },
+                            height: { xs: 64, sm: 72 },
+                            borderRadius: 3,
+                            background: `linear-gradient(135deg, ${alpha('#FFF', 0.2)} 0%, ${alpha('#FFF', 0.1)} 100%)`,
+                            backdropFilter: 'blur(20px)',
+                            border: `1.5px solid ${alpha('#FFF', 0.25)}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 3,
+                            boxShadow: `0 4px 16px ${alpha('#000', 0.08)}, inset 0 1px 0 ${alpha('#FFF', 0.3)}`,
+                            animation: `${floatAnimation} 4s ease-in-out infinite`,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              background: agent.iconGradient,
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              backgroundClip: 'text',
+                              fontSize: { xs: 36, sm: 40 },
+                            }}
+                          >
+                            {agent.icon}
+                          </Box>
+                        </Box>
+                        <Typography
+                          variant="h5"
+                          component="h3"
+                          sx={{
+                            fontWeight: 700,
+                            color: theme.palette.text.primary,
+                            mb: 0.5,
+                            letterSpacing: '-0.01em',
+                            fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                          }}
+                        >
+                          {agent.title}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: theme.palette.text.secondary,
+                            fontWeight: 500,
+                            fontSize: '0.8125rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                          }}
+                        >
+                          {agent.subtitle}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={agent.status}
+                        size="small"
+                        icon={
+                          agent.statusColor === 'success' ? (
+                            <Box
+                              sx={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                bgcolor: theme.palette.success.main,
+                                boxShadow: `0 0 8px ${alpha(theme.palette.success.main, 0.6)}`,
+                              }}
+                            />
+                          ) : (
+                            <SyncIcon
+                              sx={{
+                                fontSize: 12,
+                                animation: 'spin 1s linear infinite',
+                                '@keyframes spin': {
+                                  to: { transform: 'rotate(360deg)' },
+                                },
+                              }}
+                            />
+                          )
+                        }
                         sx={{
-                          color:
-                            activity.color === 'success'
-                              ? 'success.main'
-                              : activity.color === 'warning'
-                              ? 'warning.main'
-                              : 'primary.main',
-                          fontSize: 28,
+                          bgcolor: alpha(
+                            agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
+                            0.12
+                          ),
+                          border: `1px solid ${alpha(
+                            agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
+                            0.25
+                          )}`,
+                          color: agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          height: 28,
+                          '& .MuiChip-icon': {
+                            color: agent.statusColor === 'success' ? theme.palette.success.main : theme.palette.warning.main,
+                          },
+                        }}
+                      />
+                    </Box>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        color: theme.palette.text.secondary,
+                        mb: 4,
+                        lineHeight: 1.7,
+                        fontSize: '0.9375rem',
+                        flexGrow: 1,
+                      }}
+                    >
+                      {agent.description}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, mt: 'auto' }}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        onClick={() => navigate(agent.route)}
+                        startIcon={<PsychologyIcon sx={{ fontSize: 18 }} />}
+                        sx={{
+                          bgcolor: theme.palette.primary.main,
+                          color: 'white',
+                          py: 1.5,
+                          borderRadius: 2,
+                          fontWeight: 600,
+                          fontSize: '0.875rem',
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                          textTransform: 'none',
+                          '&:hover': {
+                            bgcolor: theme.palette.primary.dark,
+                            boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                            transform: 'translateY(-1px)',
+                          },
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
                       >
-                        {activity.icon}
-                      </Box>
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 700, fontSize: '1rem' }}>
-                          {activity.title}
-                        </Typography>
-                        <Typography component="span" sx={{ color: 'text.secondary', fontWeight: 400, fontSize: '0.875rem' }}>
-                          - {activity.file}
-                        </Typography>
-                        <Chip
-                          label={activity.status}
-                          size="small"
+                        Iniciar Análise
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        sx={{
+                          borderColor: alpha(theme.palette.divider, 0.2),
+                          color: theme.palette.text.secondary,
+                          py: 1.5,
+                          borderRadius: 2,
+                          fontWeight: 500,
+                          fontSize: '0.875rem',
+                          bgcolor: 'transparent',
+                          borderWidth: '1px',
+                          textTransform: 'none',
+                          '&:hover': {
+                            borderColor: theme.palette.primary.main,
+                            bgcolor: alpha(theme.palette.primary.main, 0.04),
+                            color: theme.palette.primary.main,
+                            transform: 'translateY(-1px)',
+                          },
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                      >
+                        Ver Relatórios
+                      </Button>
+                    </Box>
+                  </Box>
+                </GlowCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* AI Activity Timeline */}
+        <Box>
+          <Typography
+            variant="h4"
+            component="h2"
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.text.primary,
+              mb: { xs: 4, md: 5 },
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+            }}
+          >
+            Atividades Recentes
+          </Typography>
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 4,
+              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              background: theme.palette.background.paper,
+              boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 8px 24px ${alpha('#000', 0.04)}`,
+              overflow: 'hidden',
+              maxWidth: { xs: '100%', md: '900px' },
+              mx: 'auto',
+            }}
+          >
+            <List sx={{ p: 0 }}>
+              {activities.map((activity, index) => (
+                <React.Fragment key={index}>
+                  <ListItem
+                    sx={{
+                      px: { xs: 3, sm: 4 },
+                      py: 3,
+                      position: 'relative',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.03),
+                      },
+                    }}
+                  >
+                    <ListItemAvatar sx={{ minWidth: 56 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(
+                            activity.color === 'success'
+                              ? theme.palette.success.main
+                              : activity.color === 'warning'
+                              ? theme.palette.warning.main
+                              : theme.palette.primary.main,
+                            0.12
+                          ),
+                          border: `1.5px solid ${alpha(
+                            activity.color === 'success'
+                              ? theme.palette.success.main
+                              : activity.color === 'warning'
+                              ? theme.palette.warning.main
+                              : theme.palette.primary.main,
+                            0.2
+                          )}`,
+                          width: 48,
+                          height: 48,
+                          boxShadow: `0 2px 8px ${alpha(
+                            activity.color === 'success'
+                              ? theme.palette.success.main
+                              : activity.color === 'warning'
+                              ? theme.palette.warning.main
+                              : theme.palette.primary.main,
+                            0.15
+                          )}`,
+                        }}
+                      >
+                        <Box
                           sx={{
-                            ml: 1,
-                            bgcolor: alpha(
+                            color:
                               activity.color === 'success'
                                 ? theme.palette.success.main
                                 : activity.color === 'warning'
                                 ? theme.palette.warning.main
                                 : theme.palette.primary.main,
-                              0.1
-                            ),
-                            color:
-                              activity.color === 'success'
-                                ? 'success.main'
-                                : activity.color === 'warning'
-                                ? 'warning.main'
-                                : 'primary.main',
-                            fontSize: '0.6875rem',
-                            height: 20,
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
+                            fontSize: 24,
                           }}
-                        />
-                      </Box>
-                    }
-                    secondary={
-                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                        {activity.description}
-                      </Typography>
-                    }
-                  />
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: 'text.secondary',
-                      fontSize: '0.8125rem',
-                      ml: 2,
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {activity.time}
-                  </Typography>
-                </ListItem>
-                {index < activities.length - 1 && <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.08), mx: 4 }} />}
-              </Box>
-            ))}
-          </List>
-        </Paper>
-      </Box>
-    </Container>
+                        >
+                          {activity.icon}
+                        </Box>
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                          <Typography variant="body1" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: '0.9375rem' }}>
+                            {activity.title}
+                          </Typography>
+                          <Typography component="span" sx={{ color: theme.palette.text.secondary, fontWeight: 400, fontSize: '0.8125rem' }}>
+                            — {activity.file}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.8125rem', lineHeight: 1.6 }}>
+                          {activity.description}
+                        </Typography>
+                      }
+                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.75rem',
+                        ml: 2,
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        opacity: 0.7,
+                      }}
+                    >
+                      {activity.time}
+                    </Typography>
+                  </ListItem>
+                  {index < activities.length - 1 && (
+                    <Divider
+                      variant="inset"
+                      component="li"
+                      sx={{
+                        ml: { xs: 20, sm: 22 },
+                        borderColor: alpha(theme.palette.divider, 0.06),
+                      }}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </List>
+          </Paper>
+        </Box>
+      </Container>
+    </Box>
   );
 };
