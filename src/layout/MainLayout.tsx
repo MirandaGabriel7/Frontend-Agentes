@@ -8,20 +8,21 @@ import {
   List,
   Typography,
   Divider,
-  IconButton,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Avatar,
   useTheme,
   useMediaQuery,
+  Avatar,
+  alpha,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SchemaIcon from '@mui/icons-material/Schema';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
 
-const drawerWidth = 260;
+const drawerWidth = 280;
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -34,9 +35,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { text: 'Visão Geral', icon: <DashboardIcon />, path: '/agents' },
-  { text: 'Agentes de IA', icon: <SmartToyIcon />, path: '/agents' },
-  { text: 'Configurações', icon: <SettingsIcon />, path: '#' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/agents' },
+  { text: 'Agente DFD', icon: <SchemaIcon />, path: '/agents/dfd' },
+  { text: 'Agente TRP', icon: <ReceiptLongIcon />, path: '/agents/trp' },
+  { text: 'Histórico', icon: <HistoryIcon />, path: '#' },
 ];
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
@@ -53,9 +55,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const isActive = (path: string) => {
     if (path === '#') return false;
     if (path === '/agents') {
-      return location.pathname === '/agents' || 
-             location.pathname.startsWith('/agents/trp') || 
-             location.pathname.startsWith('/agents/dfd');
+      return location.pathname === '/agents';
     }
     return location.pathname === path;
   };
@@ -70,99 +70,124 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   };
 
   const drawer = (
-    <Box>
-      <Toolbar
-        sx={{
-          px: 2,
-          py: 2,
-          backgroundColor: 'primary.main',
-          color: 'white',
-        }}
-      >
-        <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'background.paper',
+        borderRight: '1px solid',
+        borderColor: alpha(theme.palette.divider, 0.1),
+        background: 'linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%)',
+      }}
+    >
+      <Box sx={{ p: 4, pb: 3 }}>
+        <Typography
+          variant="h5"
+          component="div"
+          sx={{
+            fontWeight: 800,
+            background: 'linear-gradient(135deg, #1877F2 0%, #105BBE 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            letterSpacing: '-0.02em',
+          }}
+        >
           PLANCO
         </Typography>
-      </Toolbar>
-      <Divider />
-      <List sx={{ px: 1, py: 2 }}>
-        {navItems.map((item) => (
-          <ListItemButton
-            key={item.text}
-            selected={isActive(item.path)}
-            onClick={() => handleNavClick(item.path)}
-            sx={{
-              borderRadius: 2,
-              mb: 0.5,
-              '&.Mui-selected': {
-                backgroundColor: 'primary.main',
-                color: 'white',
+      </Box>
+      <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.1) }} />
+      <List sx={{ flexGrow: 1, px: 2, py: 3 }}>
+        {navItems.map((item) => {
+          const active = isActive(item.path);
+          return (
+            <ListItemButton
+              key={item.text}
+              onClick={() => handleNavClick(item.path)}
+              sx={{
+                borderRadius: 3,
+                mb: 0.5,
+                px: 2.5,
+                py: 1.5,
+                backgroundColor: active
+                  ? alpha(theme.palette.primary.main, 0.1)
+                  : 'transparent',
+                color: active ? 'primary.main' : 'text.secondary',
+                border: active
+                  ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+                  : '1px solid transparent',
                 '&:hover': {
-                  backgroundColor: 'primary.dark',
+                  backgroundColor: active
+                    ? alpha(theme.palette.primary.main, 0.15)
+                    : alpha(theme.palette.action.hover, 0.5),
+                  borderColor: active
+                    ? alpha(theme.palette.primary.main, 0.3)
+                    : alpha(theme.palette.divider, 0.2),
                 },
                 '& .MuiListItemIcon-root': {
-                  color: 'white',
+                  color: active ? 'primary.main' : 'text.secondary',
+                  minWidth: 44,
                 },
-              },
-              '&:hover': {
-                backgroundColor: 'action.hover',
-              },
-            }}
-          >
-            <ListItemIcon
-              sx={{
-                color: isActive(item.path) ? 'white' : 'inherit',
-                minWidth: 40,
+                transition: 'all 0.2s ease',
               }}
             >
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItemButton>
-        ))}
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText
+                primary={item.text}
+                primaryTypographyProps={{
+                  fontSize: '0.9375rem',
+                  fontWeight: active ? 600 : 500,
+                }}
+              />
+            </ListItemButton>
+          );
+        })}
       </List>
+      <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.1) }} />
+      <Box sx={{ p: 2 }}>
+        <ListItemButton
+          onClick={() => handleNavClick('#')}
+          sx={{
+            borderRadius: 3,
+            px: 2.5,
+            py: 1.5,
+            color: 'text.secondary',
+            border: '1px solid transparent',
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.action.hover, 0.5),
+              borderColor: alpha(theme.palette.divider, 0.2),
+            },
+            '& .MuiListItemIcon-root': {
+              color: 'text.secondary',
+              minWidth: 44,
+            },
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <ListItemIcon>
+            <SettingsIcon />
+          </ListItemIcon>
+          <ListItemText
+            primary="Configurações"
+            primaryTypographyProps={{
+              fontSize: '0.9375rem',
+              fontWeight: 500,
+            }}
+          />
+        </ListItemButton>
+      </Box>
     </Box>
   );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: 'background.default' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
-          backgroundColor: 'primary.main',
-          boxShadow: 1,
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            PLANCO
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Agentes de IA
-            </Typography>
-            <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32, fontSize: '0.875rem' }}>
-              GM
-            </Avatar>
-            <Typography variant="body2" sx={{ display: { xs: 'none', md: 'block' }, ml: 1 }}>
-              Gabriel
-            </Typography>
-          </Box>
-        </Toolbar>
-      </AppBar>
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{
+          width: { md: drawerWidth },
+          flexShrink: { md: 0 },
+        }}
       >
         <Drawer
           variant="temporary"
@@ -201,11 +226,57 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          backgroundColor: 'background.default',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Toolbar />
-        <Box sx={{ p: 3 }}>
+        <AppBar
+          position="sticky"
+          elevation={0}
+          sx={{
+            backgroundColor: alpha('#FFFFFF', 0.8),
+            backdropFilter: 'blur(20px)',
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            zIndex: theme.zIndex.drawer + 1,
+          }}
+        >
+          <Toolbar sx={{ px: { xs: 2, sm: 3, md: 4, lg: 6 } }}>
+            <Typography
+              variant="h6"
+              component="div"
+              sx={{
+                flexGrow: 1,
+                fontWeight: 600,
+                color: 'text.primary',
+                fontSize: '1.125rem',
+              }}
+            >
+              Agentes de IA
+            </Typography>
+            <Avatar
+              sx={{
+                bgcolor: 'primary.main',
+                width: 36,
+                height: 36,
+                fontSize: '0.875rem',
+                fontWeight: 600,
+              }}
+            >
+              GM
+            </Avatar>
+          </Toolbar>
+        </AppBar>
+        <Box
+          sx={{
+            flexGrow: 1,
+            backgroundColor: 'background.default',
+            overflowY: 'auto',
+            display: 'flex',
+            justifyContent: 'center',
+            px: { xs: 2, sm: 3, md: 4, lg: 6 },
+            py: { xs: 3, sm: 4, md: 5 },
+          }}
+        >
           {children}
         </Box>
       </Box>

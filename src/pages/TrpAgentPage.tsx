@@ -9,7 +9,6 @@ import {
   Alert,
   MenuItem,
   CircularProgress,
-  Container,
 } from '@mui/material';
 import { UploadFile } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
@@ -91,23 +90,32 @@ export const TrpAgentPage = () => {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Typography variant="h4" component="h1" gutterBottom>
-        Termo de Recebimento Provisório (TRP)
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem de Fornecimento.
-      </Typography>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: { xs: '100%', sm: '900px', md: '1200px', lg: '1400px' },
+        mx: 'auto',
+        py: { xs: 2, sm: 3, md: 4 },
+      }}
+    >
+      <Box sx={{ mb: 4, textAlign: { xs: 'left', sm: 'center' } }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Termo de Recebimento Provisório (TRP)
+        </Typography>
+        <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: '600px', mx: { xs: 0, sm: 'auto' } }}>
+          Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem de Fornecimento.
+        </Typography>
+      </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 3, maxWidth: { xs: '100%', md: '800px' }, mx: 'auto' }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={3} sx={{ justifyContent: 'center' }}>
         {/* Left Column: Form */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} sx={{ maxWidth: { md: '600px' } }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Dados do Recebimento
@@ -225,7 +233,7 @@ export const TrpAgentPage = () => {
         </Grid>
 
         {/* Right Column: Results */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} sx={{ maxWidth: { md: '600px' } }}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               Resultado
@@ -278,7 +286,7 @@ export const TrpAgentPage = () => {
           </Paper>
         </Grid>
       </Grid>
-    </Container>
+    </Box>
   );
 };
 
