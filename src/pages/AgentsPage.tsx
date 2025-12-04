@@ -12,6 +12,7 @@ import {
   Tab,
   Button,
   IconButton,
+  Stack,
 } from '@mui/material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -98,9 +99,10 @@ export const AgentsPage = () => {
           maxWidth: { xs: '100%', sm: '1200px', md: '1400px', lg: '1600px' },
           mx: 'auto',
           px: { xs: 3, sm: 4, md: 5, lg: 6 },
-          py: { xs: 6, sm: 8, md: 10 },
+          py: { xs: 4, sm: 5, md: 6 },
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}
       >
         {/* Agents Section with Tabs */}
@@ -110,42 +112,60 @@ export const AgentsPage = () => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 2,
+              gap: 3,
               textAlign: 'center',
-              mb: 6,
+              mb: { xs: 8, md: 10 },
+              position: 'relative',
             }}
           >
-            <Chip
-              label="PLANCO AI"
-              variant="outlined"
+            {/* Título principal com logo */}
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="center"
+              spacing={2}
               sx={{
-                borderColor: alpha(theme.palette.primary.main, 0.3),
-                color: theme.palette.primary.main,
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                height: 28,
-                px: 1.5,
-              }}
-            />
-            <Typography
-              variant="h3"
-              component="h1"
-              sx={{
-                fontWeight: 600,
-                color: theme.palette.text.primary,
-                maxWidth: '800px',
-                fontSize: { xs: '1.75rem', sm: '2.25rem', md: '2.75rem' },
-                lineHeight: 1.2,
+                mb: 1,
               }}
             >
-              Agentes de IA para Licitações e Contratos
-            </Typography>
+              <Box
+                component="img"
+                src="/assets/logo-icon.svg"
+                alt="PLANCO"
+                sx={{
+                  width: { xs: 48, sm: 56, md: 64 },
+                  height: { xs: 48, sm: 56, md: 64 },
+                  flexShrink: 0,
+                }}
+              />
+              <Typography
+                variant="h2"
+                component="h1"
+                sx={{
+                  fontWeight: 800,
+                  background: `linear-gradient(135deg, ${theme.palette.text.primary} 0%, ${alpha(theme.palette.primary.main, 0.8)} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontSize: { xs: '2rem', sm: '2.75rem', md: '3.5rem', lg: '4rem' },
+                  lineHeight: 1.1,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Planco AI
+              </Typography>
+            </Stack>
+            
+            {/* Subtítulo com melhor espaçamento */}
             <Typography
-              variant="body1"
+              variant="h6"
               sx={{
                 color: theme.palette.text.secondary,
-                maxWidth: '600px',
-                fontSize: { xs: '0.9375rem', md: '1rem' },
+                maxWidth: '700px',
+                fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' },
+                lineHeight: 1.7,
+                fontWeight: 400,
+                opacity: 0.85,
               }}
             >
               Plataforma avançada de inteligência artificial para automação de processos governamentais e análise documental.

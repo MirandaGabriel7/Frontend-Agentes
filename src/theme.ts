@@ -12,7 +12,7 @@ export const theme = createTheme({
       main: '#22d3ee', // Accent cyan
     },
     background: {
-      default: '#F3F4F6', // Soft gray
+      default: '#f8fafc', // Very light blue-gray
       paper: '#ffffff',
     },
     text: {
@@ -101,8 +101,8 @@ export const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundColor: '#F3F4F6',
-          backgroundImage: 'linear-gradient(180deg, #F3F4F6 0%, #FFFFFF 100%)',
+          backgroundColor: '#f8fafc',
+          backgroundImage: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #ffffff 100%)',
         },
       },
     },

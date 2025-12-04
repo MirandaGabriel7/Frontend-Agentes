@@ -277,6 +277,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         component="main"
         sx={{
           flexGrow: 1,
+          bgcolor: 'background.default',
+          background: `linear-gradient(180deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.background.default, 0.98)} 100%)`,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           display: 'flex',
@@ -288,7 +290,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           elevation={0}
           sx={{
             background: theme.palette.background.paper,
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
             zIndex: theme.zIndex.drawer + 1,
           }}
         >
@@ -302,37 +303,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               gap: 3,
             }}
           >
-            {/* Left Section - Logo/Brand (hidden on mobile) */}
-            <Box 
-              sx={{ 
-                display: { xs: 'none', sm: 'flex' }, 
-                alignItems: 'center', 
-                gap: 1.5,
-              }}
-            >
-              <Box
-                component="img"
-                src="/assets/logo-icon.svg"
-                alt="PLANCO"
-                sx={{
-                  height: 28,
-                  width: 'auto',
-                }}
-              />
-              <Typography
-                variant="h6"
-                component="div"
-                sx={{
-                  fontWeight: 600,
-                  color: 'text.primary',
-                  fontSize: '1rem',
-                  letterSpacing: '-0.015em',
-                }}
-              >
-                PLANCO
-              </Typography>
-            </Box>
-
             {/* Center Section - Search Bar */}
             <Box
               sx={{
@@ -438,14 +408,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.5,
                   cursor: 'pointer',
-                  borderRadius: 2,
-                  px: 1,
-                  py: 0.75,
+                  borderRadius: '50%',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    background: alpha(theme.palette.action.hover, 0.04),
+                    opacity: 0.8,
                   },
                 }}
                 onClick={handleMenuOpen}
@@ -476,38 +443,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                     GM
                   </Avatar>
                 </Box>
-                <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 600,
-                      color: 'text.primary',
-                      fontSize: '0.8125rem',
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Gustavo M.
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: 'text.secondary',
-                      fontSize: '0.6875rem',
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Administrador
-                  </Typography>
-                </Box>
-                <KeyboardArrowDownIcon
-                  sx={{
-                    fontSize: 16,
-                    color: 'text.secondary',
-                    display: { xs: 'none', sm: 'block' },
-                    transition: 'transform 0.2s ease',
-                    transform: anchorEl ? 'rotate(180deg)' : 'rotate(0deg)',
-                  }}
-                />
               </Box>
 
               {/* User Menu */}
