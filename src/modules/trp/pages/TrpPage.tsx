@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -7,39 +7,107 @@ import {
   alpha,
   useTheme,
   Button,
+  Paper,
 } from '@mui/material';
 import { TrpUploadCard } from '../components/TrpUploadCard';
 import { TrpFormCard } from '../components/TrpFormCard';
 import { TrpActionsBar } from '../components/TrpActionsBar';
 import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
-import { useTrpAgent } from '../hooks/useTrpAgent';
+import { TrpInputForm } from '../../../lib/types/trp';
+import { generateTrpDocument } from '../../../api/trp';
+import type { DadosRecebimentoPayload, TrpApiResponse } from '../../../types/trp';
+import { TrpMarkdownView } from '../components/TrpMarkdownView';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const {
-    form,
-    setForm,
-    currentRun,
-    isExecuting,
-    error,
-    executeAgent,
-    resetCurrent,
-  } = useTrpAgent();
 
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  // Estados dos arquivos
+  const [fichaContratualizacaoFile, setFichaContratualizacaoFile] = useState<File | null>(null);
+  const [notaFiscalFile, setNotaFiscalFile] = useState<File | null>(null);
+  const [ordemFornecimentoFile, setOrdemFornecimentoFile] = useState<File | null>(null);
 
-  const handleFileSelect = (file: File | null) => {
-    setSelectedFile(file);
-    if (file) {
-      setForm(prev => ({ ...prev, arquivoTdrNome: file.name }));
-    } else {
-      setForm(prev => ({ ...prev, arquivoTdrNome: '' }));
+  // Estados do formulário
+  const [form, setForm] = useState<TrpInputForm>({
+    data_recebimento_nf_real: '',
+    tipo_base_prazo: undefined,
+    condicao_prazo: undefined,
+    condicao_quantidade: undefined,
+    observacoes_recebimento: '',
+    detalhe_pendencias: '',
+    arquivoTdrNome: '',
+  });
+
+  // Estados de resultado e controle
+  const [trpMarkdown, setTrpMarkdown] = useState<string | null>(null);
+  const [trpCampos, setTrpCampos] = useState<TrpApiResponse['campos_trp_normalizados'] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const canExecute = Boolean(
+    (fichaContratualizacaoFile || notaFiscalFile || ordemFornecimentoFile) &&
+    form.data_recebimento_nf_real
+  );
+
+  const handleGenerateTrp = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      // Mapear campos do formulário para o payload da API
+      const payload: DadosRecebimentoPayload = {
+        dataRecebimento: form.data_recebimento_nf_real || '',
+        tipoBasePrazo: (form.tipo_base_prazo || 'NF') as 'NF' | 'SERVICO',
+        condicaoPrazo: (form.condicao_prazo || 'NO_PRAZO') as 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'NAO_SE_APLICA',
+        condicaoQuantidade: (form.condicao_quantidade || 'TOTAL') as 'TOTAL' | 'PARCIAL',
+        dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || undefined,
+        dataEntregaReal: form.data_entrega_real || undefined,
+        motivoAtraso: form.motivo_atraso || undefined,
+        detalhePendencias: form.detalhe_pendencias || undefined,
+        observacoesRecebimento: form.observacoes_recebimento || undefined,
+      };
+
+      // Remover campos opcionais vazios
+      if (!payload.dataPrevistaEntregaContrato) delete payload.dataPrevistaEntregaContrato;
+      if (!payload.dataEntregaReal) delete payload.dataEntregaReal;
+      if (!payload.motivoAtraso) delete payload.motivoAtraso;
+      if (!payload.detalhePendencias) delete payload.detalhePendencias;
+      if (!payload.observacoesRecebimento) delete payload.observacoesRecebimento;
+
+      const response = await generateTrpDocument(payload, {
+        fichaContratualizacaoFile,
+        notaFiscalFile,
+        ordemFornecimentoFile,
+      });
+
+      setTrpMarkdown(response.documento_markdown_final);
+      setTrpCampos(response.campos_trp_normalizados);
+    } catch (err: any) {
+      console.error('Erro ao gerar TRP:', err);
+      setErrorMessage(err?.message || 'Erro inesperado ao gerar o Termo de Recebimento Provisório.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const canExecute = Boolean(selectedFile && form.data_recebimento_nf_real);
+  const handleReset = () => {
+    setFichaContratualizacaoFile(null);
+    setNotaFiscalFile(null);
+    setOrdemFornecimentoFile(null);
+    setForm({
+      data_recebimento_nf_real: '',
+      tipo_base_prazo: undefined,
+      condicao_prazo: undefined,
+      condicao_quantidade: undefined,
+      observacoes_recebimento: '',
+      detalhe_pendencias: '',
+      arquivoTdrNome: '',
+    });
+    setTrpMarkdown(null);
+    setTrpCampos(null);
+    setErrorMessage(null);
+  };
 
   /**
    * Retorna os itens do histórico
@@ -49,15 +117,19 @@ export const TrpPage: React.FC = () => {
     const items: TrpHistoryItem[] = [];
 
     // Adiciona o resultado atual se existir
-    if (currentRun && currentRun.status === 'COMPLETED' && currentRun.output) {
+    if (trpMarkdown && trpCampos) {
+      const fileName = fichaContratualizacaoFile?.name || 
+                      notaFiscalFile?.name || 
+                      ordemFornecimentoFile?.name || 
+                      'TRP_Gerado.pdf';
       items.push({
-        id: currentRun.id,
-        fileName: selectedFile?.name || currentRun.output.meta.fileName || 'TRP_Gerado.pdf',
-        contractNumber: currentRun.output.campos_trp_normalizados.numero_contrato || undefined,
-        invoiceNumber: currentRun.output.campos_trp_normalizados.numero_nf || undefined,
+        id: `current-${Date.now()}`,
+        fileName: fileName,
+        contractNumber: trpCampos.numero_contrato || undefined,
+        invoiceNumber: trpCampos.numero_nf || undefined,
         status: 'completed',
-        createdAt: currentRun.createdAt,
-        totalValue: currentRun.output.campos_trp_normalizados.valor_efetivo_numero || undefined,
+        createdAt: new Date().toISOString(),
+        totalValue: trpCampos.valor_efetivo_numero || undefined,
       });
     }
 
@@ -127,58 +199,173 @@ export const TrpPage: React.FC = () => {
         </Typography>
       </Box>
 
-      {error && (
+      {errorMessage && (
         <Alert severity="error" sx={{ mb: 4 }}>
-          {error}
+          {errorMessage}
         </Alert>
       )}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4.5, mb: 4 }}>
         <TrpUploadCard
-          onFileSelect={handleFileSelect}
-          selectedFile={selectedFile}
-          fileName={form.arquivoTdrNome}
-          onFileNameChange={(name) => setForm(prev => ({ ...prev, arquivoTdrNome: name }))}
+          fichaContratualizacaoFile={fichaContratualizacaoFile}
+          notaFiscalFile={notaFiscalFile}
+          ordemFornecimentoFile={ordemFornecimentoFile}
+          onFichaContratualizacaoChange={setFichaContratualizacaoFile}
+          onNotaFiscalChange={setNotaFiscalFile}
+          onOrdemFornecimentoChange={setOrdemFornecimentoFile}
+          disabled={isLoading}
         />
         <TrpFormCard
           value={form}
           onChange={(next) => setForm(() => next)}
-          disabled={isExecuting}
+          disabled={isLoading}
         />
       </Box>
 
       <TrpActionsBar
-        onExecute={executeAgent}
-        onReset={() => {
-          resetCurrent();
-          setSelectedFile(null);
-        }}
-        isExecuting={isExecuting}
+        onExecute={handleGenerateTrp}
+        onReset={handleReset}
+        isExecuting={isLoading}
         canExecute={canExecute}
       />
 
-      {currentRun && currentRun.status === 'COMPLETED' && (
+      {/* Seção de Resultado */}
+      {trpMarkdown ? (
         <Box sx={{ mt: 6 }}>
-          <TrpResultPanel run={currentRun} />
-          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-            <Button
-              variant="contained"
-              onClick={() => navigate(`/agents/trp/resultado/${currentRun.id}`)}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 4,
-                py: 1.5,
-              }}
-            >
-              Ver Resultado Completo
-            </Button>
-          </Box>
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              background: theme.palette.background.paper,
+              overflow: 'hidden',
+            }}
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  mb: 3,
+                  color: theme.palette.text.primary,
+                }}
+              >
+                3. Resultado da Geração
+              </Typography>
+
+              {/* Preview do Markdown */}
+              <Box sx={{ mb: 4 }}>
+                <TrpMarkdownView content={trpMarkdown} showTitle={false} />
+              </Box>
+
+              {/* Resumo dos Dados Normalizados */}
+              {trpCampos && (
+                <Box sx={{ mt: 4 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 600,
+                      mb: 2,
+                      color: theme.palette.text.primary,
+                      fontSize: '1.125rem',
+                    }}
+                  >
+                    Resumo dos Dados Normalizados
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                      gap: 2,
+                    }}
+                  >
+                    {trpCampos.numero_contrato && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Número do Contrato
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.numero_contrato}
+                        </Typography>
+                      </Box>
+                    )}
+                    {trpCampos.processo_licitatorio && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Processo Licitatório
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.processo_licitatorio}
+                        </Typography>
+                      </Box>
+                    )}
+                    {trpCampos.numero_nf && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Nota Fiscal
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.numero_nf}
+                        </Typography>
+                      </Box>
+                    )}
+                    {trpCampos.valor_efetivo_formatado && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Valor Efetivo
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.valor_efetivo_formatado}
+                        </Typography>
+                      </Box>
+                    )}
+                    {trpCampos.condicao_prazo && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Condição do Prazo
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.condicao_prazo}
+                        </Typography>
+                      </Box>
+                    )}
+                    {trpCampos.condicao_quantidade && (
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Condição da Quantidade
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {trpCampos.condicao_quantidade}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Paper>
         </Box>
-      )}
+      ) : !isLoading && !errorMessage ? (
+        <Box sx={{ mt: 6 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 6,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              background: theme.palette.background.paper,
+              textAlign: 'center',
+            }}
+          >
+            <Typography variant="body1" color="text.secondary">
+              Nenhum Termo de Recebimento Provisório gerado ainda. Preencha os dados, anexe os documentos e clique em "Gerar Termo".
+            </Typography>
+          </Paper>
+        </Box>
+      ) : null}
 
       {/* Histórico de TRPs */}
-      {!isExecuting && (
+      {!isLoading && (
         <Box sx={{ mt: 6 }}>
           <TrpHistoryCard
             items={getHistoryItems()}

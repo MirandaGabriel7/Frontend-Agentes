@@ -7,51 +7,215 @@ import {
   Alert,
   alpha,
   useTheme,
+  Grid,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface TrpUploadCardProps {
-  onFileSelect: (file: File | null) => void;
-  selectedFile: File | null;
-  fileName?: string;
-  onFileNameChange?: (fileName: string) => void;
+  fichaContratualizacaoFile: File | null;
+  notaFiscalFile: File | null;
+  ordemFornecimentoFile: File | null;
+  onFichaContratualizacaoChange: (file: File | null) => void;
+  onNotaFiscalChange: (file: File | null) => void;
+  onOrdemFornecimentoChange: (file: File | null) => void;
+  disabled?: boolean;
 }
 
 export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
-  onFileSelect,
-  selectedFile,
-  fileName,
-  onFileNameChange,
+  fichaContratualizacaoFile,
+  notaFiscalFile,
+  ordemFornecimentoFile,
+  onFichaContratualizacaoChange,
+  onNotaFiscalChange,
+  onOrdemFornecimentoChange,
+  disabled = false,
 }) => {
   const theme = useTheme();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const fichaInputRef = useRef<HTMLInputElement>(null);
+  const notaFiscalInputRef = useRef<HTMLInputElement>(null);
+  const ordemFornecimentoInputRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<{
+    ficha?: string;
+    notaFiscal?: string;
+    ordemFornecimento?: string;
+  }>({});
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const validateFile = (file: File): string | null => {
+    if (file.type !== 'application/pdf') {
+      return 'Apenas arquivos PDF são permitidos';
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return 'O arquivo deve ter no máximo 10MB';
+    }
+    return null;
+  };
+
+  const handleFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    type: 'ficha' | 'notaFiscal' | 'ordemFornecimento'
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      setError('Apenas arquivos PDF são permitidos');
+    const error = validateFile(file);
+    if (error) {
+      setErrors((prev) => ({ ...prev, [type]: error }));
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError('O arquivo deve ter no máximo 10MB');
-      return;
-    }
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[type];
+      return newErrors;
+    });
 
-    setError(null);
-    onFileSelect(file);
-    if (onFileNameChange) {
-      onFileNameChange(file.name);
+    if (type === 'ficha') {
+      onFichaContratualizacaoChange(file);
+    } else if (type === 'notaFiscal') {
+      onNotaFiscalChange(file);
+    } else {
+      onOrdemFornecimentoChange(file);
     }
   };
 
-  const handleClick = () => {
-    fileInputRef.current?.click();
+  const handleRemove = (type: 'ficha' | 'notaFiscal' | 'ordemFornecimento') => {
+    if (type === 'ficha') {
+      if (fichaInputRef.current) fichaInputRef.current.value = '';
+      onFichaContratualizacaoChange(null);
+    } else if (type === 'notaFiscal') {
+      if (notaFiscalInputRef.current) notaFiscalInputRef.current.value = '';
+      onNotaFiscalChange(null);
+    } else {
+      if (ordemFornecimentoInputRef.current) ordemFornecimentoInputRef.current.value = '';
+      onOrdemFornecimentoChange(null);
+    }
+  };
+
+  const renderFileUpload = (
+    type: 'ficha' | 'notaFiscal' | 'ordemFornecimento',
+    label: string,
+    description: string,
+    file: File | null,
+    inputRef: React.RefObject<HTMLInputElement>,
+    error?: string
+  ) => {
+    const handleClick = () => {
+      if (!disabled) {
+        inputRef.current?.click();
+      }
+    };
+
+    return (
+      <Box>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{ mb: 1, color: theme.palette.text.primary }}
+        >
+          {label}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ mb: 2, color: theme.palette.text.secondary, fontSize: '0.8125rem' }}
+        >
+          {description}
+        </Typography>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf"
+          onChange={(e) => handleFileChange(e, type)}
+          style={{ display: 'none' }}
+          disabled={disabled}
+        />
+        {!file ? (
+          <Box
+            onClick={handleClick}
+            sx={{
+              border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
+              borderRadius: 3,
+              p: 3,
+              textAlign: 'center',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              bgcolor: alpha(theme.palette.primary.main, 0.02),
+              opacity: disabled ? 0.6 : 1,
+              '&:hover': disabled
+                ? {}
+                : {
+                    borderColor: theme.palette.primary.main,
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    transform: 'translateY(-2px)',
+                  },
+            }}
+          >
+            <UploadFileIcon
+              sx={{
+                fontSize: 32,
+                color: theme.palette.primary.main,
+                mb: 1,
+              }}
+            />
+            <Typography
+              variant="body2"
+              sx={{
+                color: theme.palette.text.secondary,
+                fontSize: '0.875rem',
+              }}
+            >
+              Clique para selecionar PDF
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+              borderRadius: 3,
+              p: 2.5,
+              bgcolor: alpha(theme.palette.success.main, 0.04),
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 24 }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {file.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              onClick={() => handleRemove(type)}
+              disabled={disabled}
+              startIcon={<DeleteIcon />}
+              sx={{ textTransform: 'none', minWidth: 'auto' }}
+            >
+              Remover
+            </Button>
+          </Box>
+        )}
+      </Box>
+    );
   };
 
   return (
@@ -85,7 +249,7 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
           display: 'flex',
           alignItems: 'flex-start',
           gap: 1.5,
-          mb: 3,
+          mb: 4,
           p: 2.5,
           borderRadius: 2,
           bgcolor: alpha(theme.palette.info.main, 0.06),
@@ -108,122 +272,42 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
             lineHeight: 1.6,
           }}
         >
-          <strong>Importante:</strong> O PDF enviado deve conter os três documentos juntados em um único arquivo: <strong>Ficha Contratual</strong>, <strong>Nota Fiscal</strong> e <strong>Ordem de Fornecimento</strong>. Não envie os documentos separadamente.
+          <strong>Importante:</strong> Envie os três documentos em PDF separadamente. Todos os arquivos são opcionais, mas recomendamos enviar pelo menos um deles para melhor análise.
         </Typography>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-      />
-
-      {!selectedFile ? (
-        <Box
-          onClick={handleClick}
-          sx={{
-            border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
-            borderRadius: 4,
-            p: 6,
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            bgcolor: alpha(theme.palette.primary.main, 0.02),
-            '&:hover': {
-              borderColor: theme.palette.primary.main,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              transform: 'translateY(-2px)',
-            },
-          }}
-        >
-          <Box
-            sx={{
-              mx: 'auto',
-              width: 80,
-              height: 80,
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mb: 3,
-              boxShadow: `0 0 0 8px ${alpha('#FFF', 1)}`,
-            }}
-          >
-            <UploadFileIcon
-              sx={{
-                fontSize: 40,
-                color: theme.palette.primary.main,
-              }}
-            />
-          </Box>
-          <Typography
-            variant="body1"
-            sx={{
-              fontWeight: 600,
-              color: theme.palette.primary.main,
-              mb: 1,
-              fontSize: '1rem',
-            }}
-          >
-            Clique para selecionar ou arraste os arquivos
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: theme.palette.text.secondary,
-              fontSize: '0.875rem',
-            }}
-          >
-            Envie a Ficha Contratual, Nota Fiscal e Ordem de Fornecimento em PDF (até 10MB)
-          </Typography>
-        </Box>
-      ) : (
-        <Box
-          sx={{
-            border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-            borderRadius: 3,
-            p: 3.5,
-            bgcolor: alpha(theme.palette.success.main, 0.04),
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2.5,
-          }}
-        >
-          <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 32 }} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" fontWeight={600} mb={0.5}>
-              {selectedFile.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-            </Typography>
-          </Box>
-          <Button
-            size="small"
-            onClick={() => {
-              if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-                onFileSelect(null);
-                if (onFileNameChange) {
-                  onFileNameChange('');
-                }
-              }
-            }}
-            sx={{ textTransform: 'none' }}
-          >
-            Remover
-          </Button>
-        </Box>
-      )}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          {renderFileUpload(
+            'ficha',
+            'Ficha de Contratualização',
+            'PDF da ficha de contratualização (opcional)',
+            fichaContratualizacaoFile,
+            fichaInputRef,
+            errors.ficha
+          )}
+        </Grid>
+        <Grid item xs={12} md={4}>
+          {renderFileUpload(
+            'notaFiscal',
+            'Nota Fiscal',
+            'PDF da nota fiscal (opcional)',
+            notaFiscalFile,
+            notaFiscalInputRef,
+            errors.notaFiscal
+          )}
+        </Grid>
+        <Grid item xs={12} md={4}>
+          {renderFileUpload(
+            'ordemFornecimento',
+            'Ordem de Fornecimento',
+            'PDF da ordem de fornecimento (opcional)',
+            ordemFornecimentoFile,
+            ordemFornecimentoInputRef,
+            errors.ordemFornecimento
+          )}
+        </Grid>
+      </Grid>
     </Paper>
   );
 };
