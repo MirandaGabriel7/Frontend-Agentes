@@ -13,12 +13,18 @@ import {
 import { UploadFile } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { uploadFile, runTrpAgent, TrpRunResponse } from '../services/api';
 
 type CondicaoPrazo = 'NO_PRAZO' | 'ATRASADO';
 type CondicaoQuantidade = 'CONFORME_EMPENHO' | 'MENOR' | 'MAIOR';
 
-interface FormData {
+// Resultado que o backend TRP devolve em data
+interface TrpResult {
+  documento_markdown_final: string;
+  documento_markdown_prime: string;
+  campos_trp_normalizados: any;
+}
+
+interface FormDataState {
   file: File | null;
   dataRecebimento: string;
   condicaoPrazo: CondicaoPrazo;
@@ -26,8 +32,11 @@ interface FormData {
   observacoes: string;
 }
 
+// ajuste aqui se você usa proxy no Vite/Next
+const API_BASE_URL = 'http://localhost:4000';
+
 export const TrpAgentPage = () => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormDataState>({
     file: null,
     dataRecebimento: '',
     condicaoPrazo: 'NO_PRAZO',
@@ -36,7 +45,7 @@ export const TrpAgentPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TrpRunResponse | null>(null);
+  const [result, setResult] = useState<TrpResult | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -45,7 +54,7 @@ export const TrpAgentPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.file) {
       setError('Por favor, selecione um arquivo PDF');
       return;
@@ -61,28 +70,61 @@ export const TrpAgentPage = () => {
     setResult(null);
 
     try {
-      // Step 1: Upload file
-      const uploadResponse = await uploadFile(formData.file);
-      const fileId = uploadResponse.fileId;
+      // 🔁 1) Montar o payload de dadosRecebimento no formato do backend
+      const dadosRecebimentoPayload = {
+        dataRecebimento: formData.dataRecebimento,
+        // por enquanto fixamos NF como base, você pode expor isso em um select depois
+        tipoBasePrazo: 'NF' as const,
+        condicaoPrazo:
+          formData.condicaoPrazo === 'NO_PRAZO' ? 'NO_PRAZO' : 'FORA_DO_PRAZO',
+        condicaoQuantidade:
+          formData.condicaoQuantidade === 'CONFORME_EMPENHO'
+            ? 'TOTAL'
+            : 'PARCIAL',
+        dataPrevistaEntregaContrato: null as string | null,
+        dataEntregaReal: null as string | null,
+        // se quiser, pode separar depois “motivo do atraso” em um campo próprio
+        motivoAtraso:
+          formData.condicaoPrazo === 'ATRASADO'
+            ? formData.observacoes || null
+            : null,
+        detalhePendencias: null as string | null,
+        observacoesRecebimento: formData.observacoes || null,
+      };
 
-      // Step 2: Run TRP agent
-      const trpResponse = await runTrpAgent({
-        fileId,
-        dadosRecebimento: {
-          dataRecebimento: formData.dataRecebimento,
-          condicaoPrazo: formData.condicaoPrazo,
-          condicaoQuantidade: formData.condicaoQuantidade,
-          observacoes: formData.observacoes || null,
-        },
+      // 🔁 2) Montar FormData exatamente como o backend espera
+      const body = new FormData();
+      body.append('fichaContratualizacao', formData.file); // usamos o único PDF como ficha
+      // NF e Ordem de Fornecimento ficam vazios/ausentes aqui. N8N trata como opcional.
+      body.append('dadosRecebimento', JSON.stringify(dadosRecebimentoPayload));
+
+      // 🔁 3) Chamar o backend TRP novo
+      const response = await fetch(`${API_BASE_URL}/api/trp/generate`, {
+        method: 'POST',
+        body,
       });
 
-      setResult(trpResponse);
+      const json = await response.json();
+
+      if (!response.ok) {
+        // erro HTTP (400/500 etc)
+        throw new Error(json?.message || 'Erro ao gerar TRP no servidor.');
+      }
+
+      if (!json || json.success !== true || !json.data) {
+        throw new Error(
+          json?.message || 'Resposta inválida do servidor ao gerar o TRP.'
+        );
+      }
+
+      // json.data tem exatamente o que precisamos
+      const data = json.data as TrpResult;
+      setResult(data);
     } catch (err: any) {
       console.error('Erro ao processar TRP:', err);
       setError(
-        err.response?.data?.message || 
-        err.message || 
-        'Erro ao processar o TRP. Por favor, tente novamente.'
+        err.message ||
+          'Erro ao processar o TRP. Por favor, tente novamente.'
       );
     } finally {
       setLoading(false);
@@ -102,13 +144,23 @@ export const TrpAgentPage = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Termo de Recebimento Provisório (TRP)
         </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: '600px', mx: { xs: 0, sm: 'auto' } }}>
-          Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem de Fornecimento.
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          paragraph
+          sx={{ maxWidth: '600px', mx: { xs: 0, sm: 'auto' } }}
+        >
+          Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem
+          de Fornecimento.
         </Typography>
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3, maxWidth: { xs: '100%', md: '800px' }, mx: 'auto' }} onClose={() => setError(null)}>
+        <Alert
+          severity="error"
+          sx={{ mb: 3, maxWidth: { xs: '100%', md: '800px' }, mx: 'auto' }}
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
@@ -138,7 +190,9 @@ export const TrpAgentPage = () => {
                     fullWidth
                     disabled={loading}
                   >
-                    {formData.file ? formData.file.name : 'Upload PDF (Ficha + NF + Ordem de Fornecimento)'}
+                    {formData.file
+                      ? formData.file.name
+                      : 'Upload PDF (Ficha + NF + Ordem de Fornecimento)'}
                   </Button>
                 </label>
               </Box>
@@ -151,7 +205,10 @@ export const TrpAgentPage = () => {
                 margin="normal"
                 value={formData.dataRecebimento}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, dataRecebimento: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    dataRecebimento: e.target.value,
+                  }))
                 }
                 InputLabelProps={{
                   shrink: true,
@@ -188,12 +245,15 @@ export const TrpAgentPage = () => {
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    condicaoQuantidade: e.target.value as CondicaoQuantidade,
+                    condicaoQuantidade:
+                      e.target.value as CondicaoQuantidade,
                   }))
                 }
                 disabled={loading}
               >
-                <MenuItem value="CONFORME_EMPENHO">Conforme Empenho</MenuItem>
+                <MenuItem value="CONFORME_EMPENHO">
+                  Conforme Empenho
+                </MenuItem>
                 <MenuItem value="MENOR">Menor</MenuItem>
                 <MenuItem value="MAIOR">Maior</MenuItem>
               </TextField>
@@ -206,7 +266,10 @@ export const TrpAgentPage = () => {
                 margin="normal"
                 value={formData.observacoes}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, observacoes: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    observacoes: e.target.value,
+                  }))
                 }
                 disabled={loading}
               />
@@ -240,7 +303,8 @@ export const TrpAgentPage = () => {
             </Typography>
             {!result ? (
               <Typography variant="body2" color="text.secondary">
-                O documento TRP aparecerá aqui após você preencher o formulário e clicar em "Gerar TRP".
+                O documento TRP aparecerá aqui após você preencher o formulário
+                e clicar em &quot;Gerar TRP&quot;.
               </Typography>
             ) : (
               <Grid container spacing={2}>
@@ -277,7 +341,11 @@ export const TrpAgentPage = () => {
                     }}
                   >
                     <pre style={{ margin: 0, fontSize: '0.875rem' }}>
-                      {JSON.stringify(result.campos_trp_normalizados, null, 2)}
+                      {JSON.stringify(
+                        result.campos_trp_normalizados,
+                        null,
+                        2
+                      )}
                     </pre>
                   </Paper>
                 </Grid>
@@ -289,4 +357,3 @@ export const TrpAgentPage = () => {
     </Box>
   );
 };
-
