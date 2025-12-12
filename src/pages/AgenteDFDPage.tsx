@@ -561,9 +561,10 @@ const ParecerExecutivoTab: React.FC<ParecerExecutivoTabProps> = ({ parecer }) =>
               <React.Fragment key={index}>
                 <ListItem alignItems="flex-start" sx={{ px: 0 }}>
                   <ListItemText
+                    disableTypography
                     primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      <Box component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="body1" component="div" sx={{ fontWeight: 600 }}>
                           {rec.ordem ? `${rec.ordem}.` : `${index + 1}.`} {rec.descricao}
                         </Typography>
                         {rec.nivel_criticidade && (
@@ -576,14 +577,14 @@ const ParecerExecutivoTab: React.FC<ParecerExecutivoTabProps> = ({ parecer }) =>
                       </Box>
                     }
                     secondary={
-                      <Box sx={{ mt: 1 }}>
+                      <Box component="div" sx={{ mt: 1 }}>
                         {rec.grupo_impactado && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" component="div" color="text.secondary">
                             Grupo impactado: {rec.grupo_impactado}
                           </Typography>
                         )}
                         {rec.percentual_atendimento !== undefined && (
-                          <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                          <Typography variant="caption" component="div" color="text.secondary" sx={{ ml: 2 }}>
                             Atendimento: {rec.percentual_atendimento.toFixed(1)}%
                           </Typography>
                         )}
@@ -622,8 +623,9 @@ const ParecerExecutivoTab: React.FC<ParecerExecutivoTabProps> = ({ parecer }) =>
                 {parecer.destaques.pontos_positivos?.map((ponto, index) => (
                   <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
                     <ListItemText
+                      disableTypography
                       primary={
-                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                           <CheckCircle sx={{ fontSize: 16, color: 'success.main', mt: 0.25, flexShrink: 0 }} />
                           {ponto}
                         </Typography>
@@ -643,8 +645,9 @@ const ParecerExecutivoTab: React.FC<ParecerExecutivoTabProps> = ({ parecer }) =>
                 {parecer.destaques.pontos_de_atencao?.map((ponto, index) => (
                   <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
                     <ListItemText
+                      disableTypography
                       primary={
-                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                           <Warning sx={{ fontSize: 16, color: 'warning.main', mt: 0.25, flexShrink: 0 }} />
                           {ponto}
                         </Typography>
@@ -664,8 +667,9 @@ const ParecerExecutivoTab: React.FC<ParecerExecutivoTabProps> = ({ parecer }) =>
                 {parecer.destaques.riscos_relevantes?.map((risco, index) => (
                   <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
                     <ListItemText
+                      disableTypography
                       primary={
-                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                           <ErrorIcon sx={{ fontSize: 16, color: 'error.main', mt: 0.25, flexShrink: 0 }} />
                           {risco}
                         </Typography>

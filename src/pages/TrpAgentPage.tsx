@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// src/pages/TrpAgentPage.tsx
+import { useMemo, useRef, useState } from 'react';
 import {
   Grid,
   Paper,
@@ -13,55 +14,67 @@ import {
 import { UploadFile } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { generateTrp, TrpRunResult } from '../services/api';
 
-type CondicaoPrazo = 'NO_PRAZO' | 'ATRASADO';
-type CondicaoQuantidade = 'CONFORME_EMPENHO' | 'MENOR' | 'MAIOR';
+type CondicaoPrazoUI = 'NO_PRAZO' | 'ATRASADO';
+type CondicaoQuantidadeUI = 'CONFORME_EMPENHO' | 'MENOR' | 'MAIOR';
 
-// Resultado que o backend TRP devolve em data
-interface TrpResult {
-  documento_markdown_final: string;
-  documento_markdown_prime: string;
-  campos_trp_normalizados: any;
-}
+interface FormState {
+  fichaContratualizacao: File | null;
+  notaFiscal: File | null;
+  ordemFornecimento: File | null;
 
-interface FormDataState {
-  file: File | null;
-  dataRecebimento: string;
-  condicaoPrazo: CondicaoPrazo;
-  condicaoQuantidade: CondicaoQuantidade;
+  dataRecebimento: string; // yyyy-mm-dd (input date)
+  condicaoPrazo: CondicaoPrazoUI;
+  condicaoQuantidade: CondicaoQuantidadeUI;
   observacoes: string;
 }
 
-// ajuste aqui se você usa proxy no Vite/Next
-const API_BASE_URL = 'http://localhost:4000';
-
 export const TrpAgentPage = () => {
-  const [formData, setFormData] = useState<FormDataState>({
-    file: null,
+  const [formData, setFormData] = useState<FormState>({
+    fichaContratualizacao: null,
+    notaFiscal: null,
+    ordemFornecimento: null,
     dataRecebimento: '',
     condicaoPrazo: 'NO_PRAZO',
     condicaoQuantidade: 'CONFORME_EMPENHO',
     observacoes: '',
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TrpResult | null>(null);
+  const [result, setResult] = useState<TrpRunResult | null>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    setFormData((prev) => ({ ...prev, file }));
-  };
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // mapeamento UI -> backend
+  const mapped = useMemo(() => {
+    const condicaoPrazo =
+      formData.condicaoPrazo === 'ATRASADO' ? 'FORA_DO_PRAZO' : 'NO_PRAZO';
+
+    const condicaoQuantidade =
+      formData.condicaoQuantidade === 'CONFORME_EMPENHO' ? 'TOTAL' : 'PARCIAL';
+
+    return { condicaoPrazo, condicaoQuantidade };
+  }, [formData.condicaoPrazo, formData.condicaoQuantidade]);
+
+  const handleFileChange =
+    (field: 'fichaContratualizacao' | 'notaFiscal' | 'ordemFornecimento') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0] || null;
+      setFormData((prev) => ({ ...prev, [field]: file }));
+    };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.file) {
-      setError('Por favor, selecione um arquivo PDF');
+    // validação mínima
+    if (!formData.fichaContratualizacao || !formData.notaFiscal || !formData.ordemFornecimento) {
+      setError('Envie os 3 PDFs: Ficha de Contratualização, Nota Fiscal e Ordem de Fornecimento.');
       return;
     }
-
     if (!formData.dataRecebimento) {
-      setError('Por favor, informe a data de recebimento');
+      setError('Por favor, informe a data de recebimento.');
       return;
     }
 
@@ -70,60 +83,33 @@ export const TrpAgentPage = () => {
     setResult(null);
 
     try {
-      // 🔁 1) Montar o payload de dadosRecebimento no formato do backend
-      const dadosRecebimentoPayload = {
-        dataRecebimento: formData.dataRecebimento,
-        // por enquanto fixamos NF como base, você pode expor isso em um select depois
-        tipoBasePrazo: 'NF' as const,
-        condicaoPrazo:
-          formData.condicaoPrazo === 'NO_PRAZO' ? 'NO_PRAZO' : 'FORA_DO_PRAZO',
-        condicaoQuantidade:
-          formData.condicaoQuantidade === 'CONFORME_EMPENHO'
-            ? 'TOTAL'
-            : 'PARCIAL',
-        dataPrevistaEntregaContrato: null as string | null,
-        dataEntregaReal: null as string | null,
-        // se quiser, pode separar depois “motivo do atraso” em um campo próprio
-        motivoAtraso:
-          formData.condicaoPrazo === 'ATRASADO'
-            ? formData.observacoes || null
-            : null,
-        detalhePendencias: null as string | null,
-        observacoesRecebimento: formData.observacoes || null,
-      };
-
-      // 🔁 2) Montar FormData exatamente como o backend espera
-      const body = new FormData();
-      body.append('fichaContratualizacao', formData.file); // usamos o único PDF como ficha
-      // NF e Ordem de Fornecimento ficam vazios/ausentes aqui. N8N trata como opcional.
-      body.append('dadosRecebimento', JSON.stringify(dadosRecebimentoPayload));
-
-      // 🔁 3) Chamar o backend TRP novo
-      const response = await fetch(`${API_BASE_URL}/api/trp/generate`, {
-        method: 'POST',
-        body,
+      // ✅ chama direto o endpoint novo
+      const trp = await generateTrp({
+        dadosRecebimento: {
+          dataRecebimento: formData.dataRecebimento,
+          condicaoPrazo: mapped.condicaoPrazo,
+          condicaoQuantidade: mapped.condicaoQuantidade,
+          observacoes: formData.observacoes || null,
+        },
+        files: {
+          fichaContratualizacao: formData.fichaContratualizacao,
+          notaFiscal: formData.notaFiscal,
+          ordemFornecimento: formData.ordemFornecimento,
+        },
       });
 
-      const json = await response.json();
+      console.log('TRP_RESULT (INNER DATA):', trp);
+      setResult(trp);
 
-      if (!response.ok) {
-        // erro HTTP (400/500 etc)
-        throw new Error(json?.message || 'Erro ao gerar TRP no servidor.');
-      }
-
-      if (!json || json.success !== true || !json.data) {
-        throw new Error(
-          json?.message || 'Resposta inválida do servidor ao gerar o TRP.'
-        );
-      }
-
-      // json.data tem exatamente o que precisamos
-      const data = json.data as TrpResult;
-      setResult(data);
+      // scroll pro resultado
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
     } catch (err: any) {
       console.error('Erro ao processar TRP:', err);
       setError(
-        err.message ||
+        err?.response?.data?.message ||
+          err?.message ||
           'Erro ao processar o TRP. Por favor, tente novamente.'
       );
     } finally {
@@ -131,15 +117,10 @@ export const TrpAgentPage = () => {
     }
   };
 
+  const hasResult = !!result?.documento_markdown_final?.trim();
+
   return (
-    <Box
-      sx={{
-        width: '100%',
-        maxWidth: { xs: '100%', sm: '900px', md: '1200px', lg: '1400px' },
-        mx: 'auto',
-        py: { xs: 2, sm: 3, md: 4 },
-      }}
-    >
+    <Box sx={{ width: '100%', mx: 'auto', py: { xs: 2, sm: 3, md: 4 } }}>
       <Box sx={{ mb: 4, textAlign: { xs: 'left', sm: 'center' } }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Termo de Recebimento Provisório (TRP)
@@ -148,41 +129,38 @@ export const TrpAgentPage = () => {
           variant="body1"
           color="text.secondary"
           paragraph
-          sx={{ maxWidth: '600px', mx: { xs: 0, sm: 'auto' } }}
+          sx={{ maxWidth: '700px', mx: { xs: 0, sm: 'auto' } }}
         >
-          Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem
-          de Fornecimento.
+          Gere o TRP a partir da Ficha de Contratualização, Nota Fiscal e Ordem de Fornecimento.
         </Typography>
       </Box>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 3, maxWidth: { xs: '100%', md: '800px' }, mx: 'auto' }}
-          onClose={() => setError(null)}
-        >
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
       <Grid container spacing={3} sx={{ justifyContent: 'center' }}>
-        {/* Left Column: Form */}
-        <Grid item xs={12} md={6} sx={{ maxWidth: { md: '600px' } }}>
+        {/* Form */}
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Dados do Recebimento
             </Typography>
+
             <form onSubmit={handleSubmit}>
+              {/* Ficha */}
               <Box sx={{ mb: 2 }}>
                 <input
                   accept="application/pdf"
                   style={{ display: 'none' }}
-                  id="trp-file-upload"
+                  id="trp-upload-ficha"
                   type="file"
-                  onChange={handleFileChange}
+                  onChange={handleFileChange('fichaContratualizacao')}
                   disabled={loading}
                 />
-                <label htmlFor="trp-file-upload">
+                <label htmlFor="trp-upload-ficha">
                   <Button
                     variant="outlined"
                     component="span"
@@ -190,9 +168,57 @@ export const TrpAgentPage = () => {
                     fullWidth
                     disabled={loading}
                   >
-                    {formData.file
-                      ? formData.file.name
-                      : 'Upload PDF (Ficha + NF + Ordem de Fornecimento)'}
+                    {formData.fichaContratualizacao
+                      ? formData.fichaContratualizacao.name
+                      : 'Upload PDF — Ficha de Contratualização'}
+                  </Button>
+                </label>
+              </Box>
+
+              {/* NF */}
+              <Box sx={{ mb: 2 }}>
+                <input
+                  accept="application/pdf"
+                  style={{ display: 'none' }}
+                  id="trp-upload-nf"
+                  type="file"
+                  onChange={handleFileChange('notaFiscal')}
+                  disabled={loading}
+                />
+                <label htmlFor="trp-upload-nf">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<UploadFile />}
+                    fullWidth
+                    disabled={loading}
+                  >
+                    {formData.notaFiscal ? formData.notaFiscal.name : 'Upload PDF — Nota Fiscal'}
+                  </Button>
+                </label>
+              </Box>
+
+              {/* Ordem */}
+              <Box sx={{ mb: 2 }}>
+                <input
+                  accept="application/pdf"
+                  style={{ display: 'none' }}
+                  id="trp-upload-oc"
+                  type="file"
+                  onChange={handleFileChange('ordemFornecimento')}
+                  disabled={loading}
+                />
+                <label htmlFor="trp-upload-oc">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<UploadFile />}
+                    fullWidth
+                    disabled={loading}
+                  >
+                    {formData.ordemFornecimento
+                      ? formData.ordemFornecimento.name
+                      : 'Upload PDF — Ordem de Fornecimento'}
                   </Button>
                 </label>
               </Box>
@@ -204,15 +230,8 @@ export const TrpAgentPage = () => {
                 required
                 margin="normal"
                 value={formData.dataRecebimento}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    dataRecebimento: e.target.value,
-                  }))
-                }
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                onChange={(e) => setFormData((prev) => ({ ...prev, dataRecebimento: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
                 disabled={loading}
               />
 
@@ -224,10 +243,7 @@ export const TrpAgentPage = () => {
                 margin="normal"
                 value={formData.condicaoPrazo}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    condicaoPrazo: e.target.value as CondicaoPrazo,
-                  }))
+                  setFormData((prev) => ({ ...prev, condicaoPrazo: e.target.value as CondicaoPrazoUI }))
                 }
                 disabled={loading}
               >
@@ -245,15 +261,12 @@ export const TrpAgentPage = () => {
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    condicaoQuantidade:
-                      e.target.value as CondicaoQuantidade,
+                    condicaoQuantidade: e.target.value as CondicaoQuantidadeUI,
                   }))
                 }
                 disabled={loading}
               >
-                <MenuItem value="CONFORME_EMPENHO">
-                  Conforme Empenho
-                </MenuItem>
+                <MenuItem value="CONFORME_EMPENHO">Conforme Empenho</MenuItem>
                 <MenuItem value="MENOR">Menor</MenuItem>
                 <MenuItem value="MAIOR">Maior</MenuItem>
               </TextField>
@@ -265,12 +278,7 @@ export const TrpAgentPage = () => {
                 fullWidth
                 margin="normal"
                 value={formData.observacoes}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    observacoes: e.target.value,
-                  }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, observacoes: e.target.value }))}
                 disabled={loading}
               />
 
@@ -295,21 +303,20 @@ export const TrpAgentPage = () => {
           </Paper>
         </Grid>
 
-        {/* Right Column: Results */}
-        <Grid item xs={12} md={6} sx={{ maxWidth: { md: '600px' } }}>
-          <Paper sx={{ p: 3, height: '100%' }}>
+        {/* Results */}
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper sx={{ p: 3, height: '100%' }} ref={resultRef}>
             <Typography variant="h6" gutterBottom>
               Resultado
             </Typography>
-            {!result ? (
+
+            {!hasResult ? (
               <Typography variant="body2" color="text.secondary">
-                O documento TRP aparecerá aqui após você preencher o formulário
-                e clicar em &quot;Gerar TRP&quot;.
+                O documento TRP aparecerá aqui após você preencher o formulário e clicar em "Gerar TRP".
               </Typography>
             ) : (
               <Grid container spacing={2}>
-                {/* Markdown Preview */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Documento Markdown Final
                   </Typography>
@@ -322,13 +329,12 @@ export const TrpAgentPage = () => {
                     }}
                   >
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {result.documento_markdown_final}
+                      {result!.documento_markdown_final}
                     </ReactMarkdown>
                   </Paper>
                 </Grid>
 
-                {/* Structured Fields */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Campos Estruturados
                   </Typography>
@@ -341,11 +347,7 @@ export const TrpAgentPage = () => {
                     }}
                   >
                     <pre style={{ margin: 0, fontSize: '0.875rem' }}>
-                      {JSON.stringify(
-                        result.campos_trp_normalizados,
-                        null,
-                        2
-                      )}
+                      {JSON.stringify(result!.campos_trp_normalizados, null, 2)}
                     </pre>
                   </Paper>
                 </Grid>

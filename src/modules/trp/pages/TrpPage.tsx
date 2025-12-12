@@ -15,7 +15,7 @@ import { TrpActionsBar } from '../components/TrpActionsBar';
 import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
 import { TrpInputForm } from '../../../lib/types/trp';
-import { generateTrpDocument } from '../../../api/trp';
+import { generateTrp } from '../../../services/api';
 import type { DadosRecebimentoPayload, TrpApiResponse } from '../../../types/trp';
 import { TrpMarkdownView } from '../components/TrpMarkdownView';
 
@@ -75,14 +75,29 @@ export const TrpPage: React.FC = () => {
       if (!payload.detalhePendencias) delete payload.detalhePendencias;
       if (!payload.observacoesRecebimento) delete payload.observacoesRecebimento;
 
-      const response = await generateTrpDocument(payload, {
-        fichaContratualizacaoFile,
-        notaFiscalFile,
-        ordemFornecimentoFile,
+      // ✅ Usa generateTrp do services/api.ts (usa api instance com proxy)
+      const result = await generateTrp({
+        dadosRecebimento: {
+          dataRecebimento: payload.dataRecebimento,
+          condicaoPrazo: payload.condicaoPrazo,
+          condicaoQuantidade: payload.condicaoQuantidade,
+          observacoes: payload.observacoesRecebimento || null,
+          tipoBasePrazo: payload.tipoBasePrazo,
+          dataPrevistaEntregaContrato: payload.dataPrevistaEntregaContrato || null,
+          dataEntregaReal: payload.dataEntregaReal || null,
+          motivoAtraso: payload.motivoAtraso || null,
+          detalhePendencias: payload.detalhePendencias || null,
+        },
+        files: {
+          fichaContratualizacao: fichaContratualizacaoFile,
+          notaFiscal: notaFiscalFile,
+          ordemFornecimento: ordemFornecimentoFile,
+        },
       });
 
-      setTrpMarkdown(response.documento_markdown_final);
-      setTrpCampos(response.campos_trp_normalizados);
+      // ✅ generateTrp já retorna apenas o data (sem wrapper)
+      setTrpMarkdown(result.documento_markdown_final);
+      setTrpCampos(result.campos_trp_normalizados as TrpApiResponse['campos_trp_normalizados']);
     } catch (err: any) {
       console.error('Erro ao gerar TRP:', err);
       setErrorMessage(err?.message || 'Erro inesperado ao gerar o Termo de Recebimento Provisório.');
