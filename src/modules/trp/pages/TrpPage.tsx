@@ -16,8 +16,8 @@ import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
 import { TrpInputForm } from '../../../lib/types/trp';
 import { generateTrp } from '../../../services/api';
-import type { DadosRecebimentoPayload, TrpApiResponse } from '../../../types/trp';
-import { TrpMarkdownView } from '../components/TrpMarkdownView';
+import type { DadosRecebimentoPayload } from '../../../types/trp';
+import { createTrpRun } from '../../../lib/services/trpService';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
@@ -30,24 +30,25 @@ export const TrpPage: React.FC = () => {
 
   // Estados do formulário
   const [form, setForm] = useState<TrpInputForm>({
+    tipo_contratacao: undefined,
     data_recebimento_nf_real: '',
     tipo_base_prazo: undefined,
     condicao_prazo: undefined,
     condicao_quantidade: undefined,
+    competencia_mes_ano: undefined,
     observacoes_recebimento: '',
     detalhe_pendencias: '',
     arquivoTdrNome: '',
   });
 
-  // Estados de resultado e controle
-  const [trpMarkdown, setTrpMarkdown] = useState<string | null>(null);
-  const [trpCampos, setTrpCampos] = useState<TrpApiResponse['campos_trp_normalizados'] | null>(null);
+  // Estados de controle
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const canExecute = Boolean(
     (fichaContratualizacaoFile || notaFiscalFile || ordemFornecimentoFile) &&
-    form.data_recebimento_nf_real
+    form.data_recebimento_nf_real &&
+    form.tipo_contratacao // Campo obrigatório
   );
 
   const handleGenerateTrp = async () => {
@@ -57,10 +58,12 @@ export const TrpPage: React.FC = () => {
 
       // Mapear campos do formulário para o payload da API
       const payload: DadosRecebimentoPayload = {
+        tipoContratacao: form.tipo_contratacao || undefined,
         dataRecebimento: form.data_recebimento_nf_real || '',
         tipoBasePrazo: (form.tipo_base_prazo || 'NF') as 'NF' | 'SERVICO',
         condicaoPrazo: (form.condicao_prazo || 'NO_PRAZO') as 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'NAO_SE_APLICA',
         condicaoQuantidade: (form.condicao_quantidade || 'TOTAL') as 'TOTAL' | 'PARCIAL',
+        competenciaMesAno: form.competencia_mes_ano || undefined, // Só será enviado se tipo_contratacao == "SERVIÇOS"
         dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || undefined,
         dataEntregaReal: form.data_entrega_real || undefined,
         motivoAtraso: form.motivo_atraso || undefined,
@@ -69,6 +72,8 @@ export const TrpPage: React.FC = () => {
       };
 
       // Remover campos opcionais vazios
+      if (!payload.tipoContratacao) delete payload.tipoContratacao;
+      if (!payload.competenciaMesAno) delete payload.competenciaMesAno;
       if (!payload.dataPrevistaEntregaContrato) delete payload.dataPrevistaEntregaContrato;
       if (!payload.dataEntregaReal) delete payload.dataEntregaReal;
       if (!payload.motivoAtraso) delete payload.motivoAtraso;
@@ -81,8 +86,10 @@ export const TrpPage: React.FC = () => {
           dataRecebimento: payload.dataRecebimento,
           condicaoPrazo: payload.condicaoPrazo,
           condicaoQuantidade: payload.condicaoQuantidade,
-          observacoes: payload.observacoesRecebimento || null,
+          observacoesRecebimento: payload.observacoesRecebimento || null,
           tipoBasePrazo: payload.tipoBasePrazo,
+          tipoContratacao: payload.tipoContratacao || null,
+          competenciaMesAno: payload.competenciaMesAno || null,
           dataPrevistaEntregaContrato: payload.dataPrevistaEntregaContrato || null,
           dataEntregaReal: payload.dataEntregaReal || null,
           motivoAtraso: payload.motivoAtraso || null,
@@ -96,8 +103,40 @@ export const TrpPage: React.FC = () => {
       });
 
       // ✅ generateTrp já retorna apenas o data (sem wrapper)
-      setTrpMarkdown(result.documento_markdown_final);
-      setTrpCampos(result.campos_trp_normalizados as TrpApiResponse['campos_trp_normalizados']);
+      // Salvar resultado e navegar para página de resultado
+      const fileName = fichaContratualizacaoFile?.name || 
+                      notaFiscalFile?.name || 
+                      ordemFornecimentoFile?.name || 
+                      'TRP_Gerado.pdf';
+      
+      // Criar um run para salvar o resultado
+      const run = await createTrpRun(form);
+      
+      // Preparar o output com os dados reais do backend
+      const trpOutput = {
+        documento_markdown_final: result.documento_markdown_final,
+        documento_markdown_prime: result.documento_markdown_prime || result.documento_markdown_final,
+        campos_trp_normalizados: result.campos_trp_normalizados as any,
+        meta: {
+          fileName: fileName,
+          hash_tdr: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        },
+      };
+      
+      // Salvar o output diretamente no localStorage
+      const stored = localStorage.getItem('trp_runs');
+      if (stored) {
+        const runs = JSON.parse(stored);
+        const runIndex = runs.findIndex((r: any) => r.id === run.id);
+        if (runIndex !== -1) {
+          runs[runIndex].output = trpOutput;
+          runs[runIndex].status = 'COMPLETED';
+          localStorage.setItem('trp_runs', JSON.stringify(runs));
+        }
+      }
+      
+      // Navegar para a página de resultado
+      navigate(`/agents/trp/resultado/${run.id}`);
     } catch (err: any) {
       console.error('Erro ao gerar TRP:', err);
       setErrorMessage(err?.message || 'Erro inesperado ao gerar o Termo de Recebimento Provisório.');
@@ -111,46 +150,55 @@ export const TrpPage: React.FC = () => {
     setNotaFiscalFile(null);
     setOrdemFornecimentoFile(null);
     setForm({
+      tipo_contratacao: undefined,
       data_recebimento_nf_real: '',
       tipo_base_prazo: undefined,
       condicao_prazo: undefined,
       condicao_quantidade: undefined,
+      competencia_mes_ano: undefined,
       observacoes_recebimento: '',
       detalhe_pendencias: '',
       arquivoTdrNome: '',
     });
-    setTrpMarkdown(null);
-    setTrpCampos(null);
     setErrorMessage(null);
   };
 
   /**
    * Retorna os itens do histórico
-   * Busca do serviço e adiciona o resultado atual se existir
+   * Busca do serviço de TRPs salvos
    */
   const getHistoryItems = (): TrpHistoryItem[] => {
     const items: TrpHistoryItem[] = [];
 
-    // Adiciona o resultado atual se existir
-    if (trpMarkdown && trpCampos) {
-      const fileName = fichaContratualizacaoFile?.name || 
-                      notaFiscalFile?.name || 
-                      ordemFornecimentoFile?.name || 
-                      'TRP_Gerado.pdf';
-      items.push({
-        id: `current-${Date.now()}`,
-        fileName: fileName,
-        contractNumber: trpCampos.numero_contrato || undefined,
-        invoiceNumber: trpCampos.numero_nf || undefined,
-        status: 'completed',
-        createdAt: new Date().toISOString(),
-        totalValue: trpCampos.valor_efetivo_numero || undefined,
-      });
+    // Buscar TRPs salvos do localStorage
+    try {
+      const stored = localStorage.getItem('trp_runs');
+      if (stored) {
+        const runs = JSON.parse(stored);
+        const completedRuns = runs
+          .filter((run: any) => run.status === 'COMPLETED' && run.output)
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 5); // Limitar a 5 itens mais recentes
+        
+        completedRuns.forEach((run: any) => {
+          if (run.output) {
+            items.push({
+              id: run.id,
+              fileName: run.output.meta?.fileName || 'TRP_Gerado.pdf',
+              contractNumber: run.output.campos_trp_normalizados?.numero_contrato || undefined,
+              invoiceNumber: run.output.campos_trp_normalizados?.numero_nf || undefined,
+              status: 'completed',
+              createdAt: run.createdAt,
+              totalValue: run.output.campos_trp_normalizados?.valor_efetivo_numero || undefined,
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar histórico de TRPs:', err);
     }
 
-    // Adiciona outros TRPs do histórico (do serviço)
-    // TODO: Integrar com API real para buscar todos os TRPs
-    // Por enquanto, adiciona itens mockados apenas se não houver resultado atual
+    // Se não houver itens, adiciona itens mockados para demonstração
     if (items.length === 0) {
       items.push(
         {
@@ -243,141 +291,6 @@ export const TrpPage: React.FC = () => {
         isExecuting={isLoading}
         canExecute={canExecute}
       />
-
-      {/* Seção de Resultado */}
-      {trpMarkdown ? (
-        <Box sx={{ mt: 6 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-              background: theme.palette.background.paper,
-              overflow: 'hidden',
-            }}
-          >
-            <Box sx={{ p: 3 }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 600,
-                  mb: 3,
-                  color: theme.palette.text.primary,
-                }}
-              >
-                3. Resultado da Geração
-              </Typography>
-
-              {/* Preview do Markdown */}
-              <Box sx={{ mb: 4 }}>
-                <TrpMarkdownView content={trpMarkdown} showTitle={false} />
-              </Box>
-
-              {/* Resumo dos Dados Normalizados */}
-              {trpCampos && (
-                <Box sx={{ mt: 4 }}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      mb: 2,
-                      color: theme.palette.text.primary,
-                      fontSize: '1.125rem',
-                    }}
-                  >
-                    Resumo dos Dados Normalizados
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                      gap: 2,
-                    }}
-                  >
-                    {trpCampos.numero_contrato && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Número do Contrato
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.numero_contrato}
-                        </Typography>
-                      </Box>
-                    )}
-                    {trpCampos.processo_licitatorio && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Processo Licitatório
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.processo_licitatorio}
-                        </Typography>
-                      </Box>
-                    )}
-                    {trpCampos.numero_nf && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Nota Fiscal
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.numero_nf}
-                        </Typography>
-                      </Box>
-                    )}
-                    {trpCampos.valor_efetivo_formatado && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Valor Efetivo
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.valor_efetivo_formatado}
-                        </Typography>
-                      </Box>
-                    )}
-                    {trpCampos.condicao_prazo && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Condição do Prazo
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.condicao_prazo}
-                        </Typography>
-                      </Box>
-                    )}
-                    {trpCampos.condicao_quantidade && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Condição da Quantidade
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {trpCampos.condicao_quantidade}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        </Box>
-      ) : !isLoading && !errorMessage ? (
-        <Box sx={{ mt: 6 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 6,
-              borderRadius: 3,
-              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-              background: theme.palette.background.paper,
-              textAlign: 'center',
-            }}
-          >
-            <Typography variant="body1" color="text.secondary">
-              Nenhum Termo de Recebimento Provisório gerado ainda. Preencha os dados, anexe os documentos e clique em "Gerar Termo".
-            </Typography>
-          </Paper>
-        </Box>
-      ) : null}
 
       {/* Histórico de TRPs */}
       {!isLoading && (

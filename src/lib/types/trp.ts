@@ -7,11 +7,17 @@ export type TrpCondicaoQuantidade = 'TOTAL' | 'PARCIAL' | 'DIVERGENCIA_SUPERIOR'
 
 export type TrpTipoBasePrazo = 'NF' | 'SERVICO';
 
+export type TrpTipoContrato = 'BENS' | 'SERVIÇOS' | 'OBRA';
+
 export interface TrpInputForm {
   // Campos sempre relevantes
+  tipo_contratacao?: TrpTipoContrato; // "BENS" | "SERVIÇOS" | "OBRA" - obrigatório
   data_recebimento_nf_real?: string; // DD/MM/AAAA
   tipo_base_prazo?: TrpTipoBasePrazo; // "NF" ou "SERVICO"
   observacoes_recebimento?: string;
+  
+  // Campo condicional: competência (só quando tipo_contratacao == "SERVIÇOS")
+  competencia_mes_ano?: string; // MM/AAAA
   
   // Condição do Prazo
   condicao_prazo?: TrpCondicaoPrazo; // "NO_PRAZO" | "FORA_DO_PRAZO" | "NAO_SE_APLICA"

@@ -22,8 +22,10 @@ export interface GenerateTrpParams {
     dataRecebimento: string;
     condicaoPrazo: string;
     condicaoQuantidade: string;
-    observacoes?: string | null;
+    observacoesRecebimento?: string | null;
     tipoBasePrazo?: string;
+    tipoContratacao?: string | null; // "BENS" | "SERVIÇOS" | "OBRA"
+    competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
     dataPrevistaEntregaContrato?: string | null;
     dataEntregaReal?: string | null;
     motivoAtraso?: string | null;

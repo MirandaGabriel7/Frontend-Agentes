@@ -5,10 +5,17 @@ export type CondicaoQuantidade = 'TOTAL' | 'PARCIAL';
 export type TipoBasePrazo = 'NF' | 'SERVICO';
 
 export interface DadosRecebimentoPayload {
+  // Novo campo obrigatório
+  tipoContratacao?: string; // "BENS" | "SERVIÇOS" | "OBRA" - será enviado como contrato.tipo_contratacao
+  
   dataRecebimento: string; // DD/MM/AAAA
   tipoBasePrazo: TipoBasePrazo;
   condicaoPrazo: CondicaoPrazo;
   condicaoQuantidade: CondicaoQuantidade;
+  
+  // Campo condicional (só quando tipoContratacao == "SERVIÇOS")
+  competenciaMesAno?: string; // MM/AAAA - será enviado como recebimento.competencia_mes_ano
+  
   dataPrevistaEntregaContrato?: string; // DD/MM/AAAA ou vazio
   dataEntregaReal?: string; // DD/MM/AAAA ou vazio
   motivoAtraso?: string;

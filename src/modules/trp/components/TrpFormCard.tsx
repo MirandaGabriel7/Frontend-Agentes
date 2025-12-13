@@ -16,7 +16,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { TrpInputForm, TrpCondicaoPrazo, TrpCondicaoQuantidade, TrpTipoBasePrazo } from '../../../lib/types/trp';
+import { TrpInputForm, TrpCondicaoPrazo, TrpCondicaoQuantidade, TrpTipoBasePrazo, TrpTipoContrato } from '../../../lib/types/trp';
 
 dayjs.locale('pt-br');
 
@@ -78,6 +78,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
   const showAtrasoFields = value.condicao_prazo === 'FORA_DO_PRAZO';
   const showPendenciasFields = value.condicao_quantidade === 'PARCIAL' || value.condicao_quantidade === 'DIVERGENCIA_SUPERIOR';
+  const showCompetenciaField = value.tipo_contratacao === 'SERVIÇOS';
 
   return (
     <Paper
@@ -108,6 +109,117 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {/* Tipo de Contrato - Campo obrigatório no início */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+            Tipo de contrato *
+          </Typography>
+          <FormControl fullWidth variant="outlined" required>
+            <Select
+              value={value.tipo_contratacao || ''}
+              onChange={(e) => {
+                const newTipo = e.target.value as TrpTipoContrato;
+                const updates: Partial<TrpInputForm> = { tipo_contratacao: newTipo };
+                // Limpar competência se mudar de SERVIÇOS para outro tipo
+                if (newTipo !== 'SERVIÇOS') {
+                  updates.competencia_mes_ano = undefined;
+                }
+                onChange({ ...value, ...updates });
+              }}
+              disabled={disabled}
+              displayEmpty
+              renderValue={(selected) => {
+                if (!selected) {
+                  return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione o tipo de contrato</Box>;
+                }
+                return selected;
+              }}
+              sx={{
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(0,0,0,0.12)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.light',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'primary.main',
+                  boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '999px',
+                  backgroundColor: 'background.paper',
+                },
+                '& .MuiSelect-select': {
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
+                },
+              }}
+            >
+              <MenuItem value="BENS">BENS</MenuItem>
+              <MenuItem value="SERVIÇOS">SERVIÇOS</MenuItem>
+              <MenuItem value="OBRA">OBRA</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Campo condicional: Competência (Mês/Ano) - só aparece quando tipo == SERVIÇOS */}
+        {showCompetenciaField && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+              Mês/Ano de competência
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.75rem' }}>
+              Relação do mês da prestação do serviço
+            </Typography>
+            <TextField
+              value={value.competencia_mes_ano || ''}
+              onChange={(e) => {
+                let input = e.target.value;
+                // Permitir apenas números e barra
+                input = input.replace(/[^\d/]/g, '');
+                // Limitar formato MM/AAAA
+                if (input.length <= 7) {
+                  // Adicionar barra automaticamente após 2 dígitos
+                  if (input.length === 2 && !input.includes('/')) {
+                    input = input + '/';
+                  }
+                  updateField('competencia_mes_ano')(input);
+                }
+              }}
+              fullWidth
+              variant="outlined"
+              placeholder="Ex: 12/2025"
+              disabled={disabled}
+              InputLabelProps={{ shrink: false }}
+              label=""
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '999px',
+                  backgroundColor: 'background.paper',
+                  '& fieldset': {
+                    borderColor: 'rgba(0,0,0,0.12)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'primary.light',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'primary.main',
+                    boxShadow: (theme) => `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)}`,
+                  },
+                },
+                '& .MuiInputBase-input': {
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
+                },
+                '& .MuiInputBase-input::placeholder': {
+                  color: 'text.secondary',
+                  opacity: 0.7,
+                },
+              }}
+            />
+          </Box>
+        )}
+
         {/* Campos sempre relevantes */}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -447,7 +559,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
         {/* Condição da Quantidade */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
           <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-            Condição da Quantidade
+            Quantidade conforme Ordem de Fornecimento
           </Typography>
           <FormControl fullWidth variant="outlined">
             <Select
@@ -459,9 +571,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 if (!selected) {
                   return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione a condição da quantidade</Box>;
                 }
-                if (selected === 'TOTAL') return 'Quantidade conforme empenho';
-                if (selected === 'PARCIAL') return 'Quantidade inferior ao empenho';
-                return 'Quantidade superior ao empenho';
+                if (selected === 'TOTAL') return 'TOTAL';
+                if (selected === 'PARCIAL') return 'PARCIAL';
+                return 'PARCIAL'; // DIVERGENCIA_SUPERIOR mapeado para PARCIAL conforme instruções
               }}
               sx={{
                 '& .MuiOutlinedInput-notchedOutline': {
@@ -480,9 +592,8 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 },
               }}
             >
-              <MenuItem value="TOTAL">Quantidade conforme empenho</MenuItem>
-              <MenuItem value="PARCIAL">Quantidade inferior ao empenho</MenuItem>
-              <MenuItem value="DIVERGENCIA_SUPERIOR">Quantidade superior ao empenho</MenuItem>
+              <MenuItem value="TOTAL">TOTAL</MenuItem>
+              <MenuItem value="PARCIAL">PARCIAL</MenuItem>
             </Select>
           </FormControl>
         </Box>

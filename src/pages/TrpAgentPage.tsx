@@ -89,7 +89,7 @@ export const TrpAgentPage = () => {
           dataRecebimento: formData.dataRecebimento,
           condicaoPrazo: mapped.condicaoPrazo,
           condicaoQuantidade: mapped.condicaoQuantidade,
-          observacoes: formData.observacoes || null,
+          observacoesRecebimento: formData.observacoes || null,
         },
         files: {
           fichaContratualizacao: formData.fichaContratualizacao,
