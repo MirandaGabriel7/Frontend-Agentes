@@ -19,17 +19,23 @@ export interface TrpGenerateApiResponse {
 
 export interface GenerateTrpParams {
   dadosRecebimento: {
-    dataRecebimento: string;
-    condicaoPrazo: string;
-    condicaoQuantidade: string;
-    observacoesRecebimento?: string | null;
-    tipoBasePrazo?: string;
-    tipoContratacao?: string | null; // "BENS" | "SERVIÇOS" | "OBRA"
+    tipoContratacao: string; // "BENS" | "SERVIÇOS" | "OBRA"
     competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
-    dataPrevistaEntregaContrato?: string | null;
-    dataEntregaReal?: string | null;
-    motivoAtraso?: string | null;
-    detalhePendencias?: string | null;
+    tipoBasePrazo: string; // "DATA_RECEBIMENTO" | "SERVICO"
+    dataRecebimento?: string | null; // DD/MM/AAAA ou YYYY-MM-DD (quando base = DATA_RECEBIMENTO)
+    dataConclusaoServico?: string | null; // DD/MM/AAAA ou YYYY-MM-DD (quando base = SERVICO)
+    dataPrevistaEntregaContrato?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
+    dataEntregaReal?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
+    condicaoPrazo: string; // "NO_PRAZO" | "FORA_DO_PRAZO"
+    motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
+    detalhePendencias?: string | null; // (quando FORA_DO_PRAZO)
+    condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
+    comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
+    condicaoQuantidadeNF: string; // "TOTAL" | "PARCIAL"
+    comentariosQuantidadeNF?: string | null; // (quando PARCIAL)
+    observacoesRecebimento?: string | null;
+    // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
+    // serão preenchidas automaticamente pelo sistema a partir dos documentos
   };
   files: {
     fichaContratualizacao: File | null;

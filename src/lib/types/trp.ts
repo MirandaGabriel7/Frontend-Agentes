@@ -1,37 +1,56 @@
 export type TrpStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 
 // Valores permitidos pelo backend (node TDR 03)
-export type TrpCondicaoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'NAO_SE_APLICA';
+export type TrpCondicaoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO';
 
-export type TrpCondicaoQuantidade = 'TOTAL' | 'PARCIAL' | 'DIVERGENCIA_SUPERIOR';
+export type TrpCondicaoQuantidade = 'TOTAL' | 'PARCIAL';
 
-export type TrpTipoBasePrazo = 'NF' | 'SERVICO';
+export type TrpTipoBasePrazo = 'DATA_RECEBIMENTO' | 'SERVICO';
 
 export type TrpTipoContrato = 'BENS' | 'SERVIÇOS' | 'OBRA';
 
 export interface TrpInputForm {
-  // Campos sempre relevantes
+  // Campo obrigatório no início
   tipo_contratacao?: TrpTipoContrato; // "BENS" | "SERVIÇOS" | "OBRA" - obrigatório
-  data_recebimento_nf_real?: string; // DD/MM/AAAA
-  tipo_base_prazo?: TrpTipoBasePrazo; // "NF" ou "SERVICO"
-  observacoes_recebimento?: string;
   
   // Campo condicional: competência (só quando tipo_contratacao == "SERVIÇOS")
   competencia_mes_ano?: string; // MM/AAAA
   
+  // Base para contagem de prazo
+  tipo_base_prazo?: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
+  
+  // Data de recebimento (quando base = DATA_RECEBIMENTO)
+  data_recebimento_nf_real?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
+  // Data de conclusão do serviço (quando base = SERVICO)
+  data_conclusao_servico?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
+  // Datas de entrega
+  data_prevista_entrega_contrato?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  data_entrega_real?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
   // Condição do Prazo
-  condicao_prazo?: TrpCondicaoPrazo; // "NO_PRAZO" | "FORA_DO_PRAZO" | "NAO_SE_APLICA"
+  condicao_prazo?: TrpCondicaoPrazo; // "NO_PRAZO" | "FORA_DO_PRAZO"
   
   // Campos condicionais quando condicao_prazo = "FORA_DO_PRAZO"
-  data_prevista_entrega_contrato?: string; // DD/MM/AAAA
-  data_entrega_real?: string; // DD/MM/AAAA
   motivo_atraso?: string;
+  detalhe_pendencias?: string; // Detalhes/evidências do atraso
   
-  // Condição da Quantidade
-  condicao_quantidade?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL" | "DIVERGENCIA_SUPERIOR"
+  // Condição da Quantidade - Ordem de Fornecimento
+  condicao_quantidade?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
+  comentarios_quantidade_ordem?: string; // Obrigatório quando PARCIAL
   
-  // Detalhe de pendências (quando há divergência: PARCIAL ou DIVERGENCIA_SUPERIOR)
-  detalhe_pendencias?: string;
+  // Condição da Quantidade - Nota Fiscal (NOVO)
+  condicao_quantidade_nf?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
+  comentarios_quantidade_nf?: string; // Obrigatório quando PARCIAL
+  
+  // Observações do recebimento
+  observacoes_recebimento?: string;
+  
+  // Assinaturas (NOVO)
+  fiscal_contrato_nome?: string; // Obrigatório
+  data_assinatura?: string; // DD/MM/AAAA ou YYYY-MM-DD - Obrigatório
+  area_demandante_nome?: string; // Opcional
   
   // Campo auxiliar para upload
   arquivoTdrNome?: string;

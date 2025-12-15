@@ -1,26 +1,49 @@
-export type CondicaoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'NAO_SE_APLICA';
+export type CondicaoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO';
 
 export type CondicaoQuantidade = 'TOTAL' | 'PARCIAL';
 
-export type TipoBasePrazo = 'NF' | 'SERVICO';
+export type TipoBasePrazo = 'DATA_RECEBIMENTO' | 'SERVICO';
 
 export interface DadosRecebimentoPayload {
-  // Novo campo obrigatório
-  tipoContratacao?: string; // "BENS" | "SERVIÇOS" | "OBRA" - será enviado como contrato.tipo_contratacao
-  
-  dataRecebimento: string; // DD/MM/AAAA
-  tipoBasePrazo: TipoBasePrazo;
-  condicaoPrazo: CondicaoPrazo;
-  condicaoQuantidade: CondicaoQuantidade;
+  // Campo obrigatório
+  tipoContratacao: string; // "BENS" | "SERVIÇOS" | "OBRA"
   
   // Campo condicional (só quando tipoContratacao == "SERVIÇOS")
-  competenciaMesAno?: string; // MM/AAAA - será enviado como recebimento.competencia_mes_ano
+  competenciaMesAno?: string; // MM/AAAA
   
-  dataPrevistaEntregaContrato?: string; // DD/MM/AAAA ou vazio
-  dataEntregaReal?: string; // DD/MM/AAAA ou vazio
+  // Base para contagem de prazo
+  tipoBasePrazo: TipoBasePrazo;
+  
+  // Data de recebimento (quando base = DATA_RECEBIMENTO)
+  dataRecebimento?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
+  // Data de conclusão do serviço (quando base = SERVICO)
+  dataConclusaoServico?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
+  // Datas de entrega
+  dataPrevistaEntregaContrato?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  dataEntregaReal?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  
+  // Condição do Prazo
+  condicaoPrazo: CondicaoPrazo;
+  
+  // Campos condicionais quando condicaoPrazo = "FORA_DO_PRAZO"
   motivoAtraso?: string;
   detalhePendencias?: string;
+  
+  // Condição da Quantidade - Ordem de Fornecimento
+  condicaoQuantidadeOrdem: CondicaoQuantidade;
+  comentariosQuantidadeOrdem?: string; // Obrigatório quando PARCIAL
+  
+  // Condição da Quantidade - Nota Fiscal
+  condicaoQuantidadeNF: CondicaoQuantidade;
+  comentariosQuantidadeNF?: string; // Obrigatório quando PARCIAL
+  
+  // Observações do recebimento
   observacoesRecebimento?: string;
+  
+  // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
+  // serão preenchidas automaticamente pelo sistema a partir dos documentos
 }
 
 export interface TrpApiResponse {

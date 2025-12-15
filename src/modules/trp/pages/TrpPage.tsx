@@ -31,13 +31,23 @@ export const TrpPage: React.FC = () => {
   // Estados do formulário
   const [form, setForm] = useState<TrpInputForm>({
     tipo_contratacao: undefined,
-    data_recebimento_nf_real: '',
+    data_recebimento_nf_real: undefined,
+    data_conclusao_servico: undefined,
     tipo_base_prazo: undefined,
     condicao_prazo: undefined,
     condicao_quantidade: undefined,
+    condicao_quantidade_nf: undefined,
     competencia_mes_ano: undefined,
-    observacoes_recebimento: '',
-    detalhe_pendencias: '',
+    observacoes_recebimento: undefined,
+    detalhe_pendencias: undefined,
+    motivo_atraso: undefined,
+    comentarios_quantidade_ordem: undefined,
+    comentarios_quantidade_nf: undefined,
+    data_prevista_entrega_contrato: undefined,
+    data_entrega_real: undefined,
+    fiscal_contrato_nome: undefined,
+    data_assinatura: undefined,
+    area_demandante_nome: undefined,
     arquivoTdrNome: '',
   });
 
@@ -45,10 +55,79 @@ export const TrpPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Validação completa do formulário
+  const validateForm = (): string | null => {
+    // Arquivos obrigatórios
+    if (!fichaContratualizacaoFile && !notaFiscalFile && !ordemFornecimentoFile) {
+      return 'É necessário enviar pelo menos um arquivo (Ficha de Contratualização, Nota Fiscal ou Ordem de Fornecimento).';
+    }
+
+    // Campos obrigatórios
+    if (!form.tipo_contratacao) {
+      return 'O campo "Tipo de contrato" é obrigatório.';
+    }
+
+    // Competência obrigatória para SERVIÇOS
+    if (form.tipo_contratacao === 'SERVIÇOS' && !form.competencia_mes_ano) {
+      return 'O campo "Mês/Ano de competência" é obrigatório quando o tipo de contrato é SERVIÇOS.';
+    }
+
+    // Validação de formato MM/AAAA
+    if (form.competencia_mes_ano && !/^\d{2}\/\d{4}$/.test(form.competencia_mes_ano)) {
+      return 'O campo "Mês/Ano de competência" deve estar no formato MM/AAAA (ex: 12/2025).';
+    }
+
+    // Base de prazo obrigatória
+    if (!form.tipo_base_prazo) {
+      return 'O campo "Base para contagem de Prazo" é obrigatório.';
+    }
+
+    // Data de recebimento obrigatória quando base = DATA_RECEBIMENTO
+    if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && !form.data_recebimento_nf_real) {
+      return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
+    }
+
+    // Data de conclusão obrigatória quando base = SERVICO
+    if (form.tipo_base_prazo === 'SERVICO' && !form.data_conclusao_servico) {
+      return 'O campo "Data de Conclusão do Serviço" é obrigatório quando a base de prazo é SERVICO.';
+    }
+
+    // Condição de prazo obrigatória
+    if (!form.condicao_prazo) {
+      return 'O campo "Condição quanto ao prazo" é obrigatório.';
+    }
+
+    // Motivo do atraso obrigatório quando FORA_DO_PRAZO
+    if (form.condicao_prazo === 'FORA_DO_PRAZO' && !form.motivo_atraso) {
+      return 'O campo "Motivo do atraso" é obrigatório quando a condição de prazo é FORA_DO_PRAZO.';
+    }
+
+    // Condição de quantidade Ordem obrigatória
+    if (!form.condicao_quantidade) {
+      return 'O campo "Quantidade conforme Ordem de Fornecimento" é obrigatório.';
+    }
+
+    // Comentários obrigatórios quando PARCIAL na Ordem
+    if (form.condicao_quantidade === 'PARCIAL' && !form.comentarios_quantidade_ordem) {
+      return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Ordem de Fornecimento é PARCIAL.';
+    }
+
+    // Condição de quantidade NF obrigatória
+    if (!form.condicao_quantidade_nf) {
+      return 'O campo "Quantidade conforme Nota Fiscal" é obrigatório.';
+    }
+
+    // Comentários obrigatórios quando PARCIAL na NF
+    if (form.condicao_quantidade_nf === 'PARCIAL' && !form.comentarios_quantidade_nf) {
+      return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Nota Fiscal é PARCIAL.';
+    }
+
+    return null;
+  };
+
   const canExecute = Boolean(
     (fichaContratualizacaoFile || notaFiscalFile || ordemFornecimentoFile) &&
-    form.data_recebimento_nf_real &&
-    form.tipo_contratacao // Campo obrigatório
+    validateForm() === null
   );
 
   const handleGenerateTrp = async () => {
@@ -56,44 +135,89 @@ export const TrpPage: React.FC = () => {
       setIsLoading(true);
       setErrorMessage(null);
 
+      // Validar formulário antes de enviar
+      const validationError = validateForm();
+      if (validationError) {
+        setErrorMessage(validationError);
+        setIsLoading(false);
+        return;
+      }
+
       // Mapear campos do formulário para o payload da API
       const payload: DadosRecebimentoPayload = {
-        tipoContratacao: form.tipo_contratacao || undefined,
-        dataRecebimento: form.data_recebimento_nf_real || '',
-        tipoBasePrazo: (form.tipo_base_prazo || 'NF') as 'NF' | 'SERVICO',
-        condicaoPrazo: (form.condicao_prazo || 'NO_PRAZO') as 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'NAO_SE_APLICA',
-        condicaoQuantidade: (form.condicao_quantidade || 'TOTAL') as 'TOTAL' | 'PARCIAL',
-        competenciaMesAno: form.competencia_mes_ano || undefined, // Só será enviado se tipo_contratacao == "SERVIÇOS"
-        dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || undefined,
-        dataEntregaReal: form.data_entrega_real || undefined,
-        motivoAtraso: form.motivo_atraso || undefined,
-        detalhePendencias: form.detalhe_pendencias || undefined,
-        observacoesRecebimento: form.observacoes_recebimento || undefined,
+        tipoContratacao: form.tipo_contratacao!,
+        tipoBasePrazo: form.tipo_base_prazo!,
+        condicaoPrazo: form.condicao_prazo!,
+        condicaoQuantidadeOrdem: form.condicao_quantidade!,
+        condicaoQuantidadeNF: form.condicao_quantidade_nf!,
+        // Assinaturas serão preenchidas automaticamente pelo sistema
       };
 
-      // Remover campos opcionais vazios
-      if (!payload.tipoContratacao) delete payload.tipoContratacao;
-      if (!payload.competenciaMesAno) delete payload.competenciaMesAno;
-      if (!payload.dataPrevistaEntregaContrato) delete payload.dataPrevistaEntregaContrato;
-      if (!payload.dataEntregaReal) delete payload.dataEntregaReal;
-      if (!payload.motivoAtraso) delete payload.motivoAtraso;
-      if (!payload.detalhePendencias) delete payload.detalhePendencias;
-      if (!payload.observacoesRecebimento) delete payload.observacoesRecebimento;
+      // Campos condicionais
+      if (form.tipo_contratacao === 'SERVIÇOS' && form.competencia_mes_ano) {
+        payload.competenciaMesAno = form.competencia_mes_ano;
+      }
+
+      if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && form.data_recebimento_nf_real) {
+        payload.dataRecebimento = form.data_recebimento_nf_real;
+      }
+
+      if (form.tipo_base_prazo === 'SERVICO' && form.data_conclusao_servico) {
+        payload.dataConclusaoServico = form.data_conclusao_servico;
+      }
+
+      if (form.data_prevista_entrega_contrato) {
+        payload.dataPrevistaEntregaContrato = form.data_prevista_entrega_contrato;
+      }
+
+      if (form.data_entrega_real) {
+        payload.dataEntregaReal = form.data_entrega_real;
+      }
+
+      if (form.condicao_prazo === 'FORA_DO_PRAZO') {
+        if (form.motivo_atraso) {
+          payload.motivoAtraso = form.motivo_atraso;
+        }
+        if (form.detalhe_pendencias) {
+          payload.detalhePendencias = form.detalhe_pendencias;
+        }
+      }
+
+      if (form.condicao_quantidade === 'PARCIAL' && form.comentarios_quantidade_ordem) {
+        payload.comentariosQuantidadeOrdem = form.comentarios_quantidade_ordem;
+      }
+
+      if (form.condicao_quantidade_nf === 'PARCIAL' && form.comentarios_quantidade_nf) {
+        payload.comentariosQuantidadeNF = form.comentarios_quantidade_nf;
+      }
+
+      if (form.observacoes_recebimento) {
+        payload.observacoesRecebimento = form.observacoes_recebimento;
+      }
+
+      // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
+      // serão preenchidas automaticamente pelo sistema a partir dos documentos
 
       // ✅ Usa generateTrp do services/api.ts (usa api instance com proxy)
+      // Nota: Assinaturas serão preenchidas automaticamente pelo sistema
       const result = await generateTrp({
         dadosRecebimento: {
-          dataRecebimento: payload.dataRecebimento,
-          condicaoPrazo: payload.condicaoPrazo,
-          condicaoQuantidade: payload.condicaoQuantidade,
-          observacoesRecebimento: payload.observacoesRecebimento || null,
-          tipoBasePrazo: payload.tipoBasePrazo,
-          tipoContratacao: payload.tipoContratacao || null,
+          tipoContratacao: payload.tipoContratacao,
           competenciaMesAno: payload.competenciaMesAno || null,
+          tipoBasePrazo: payload.tipoBasePrazo,
+          dataRecebimento: payload.dataRecebimento || null,
+          dataConclusaoServico: payload.dataConclusaoServico || null,
           dataPrevistaEntregaContrato: payload.dataPrevistaEntregaContrato || null,
           dataEntregaReal: payload.dataEntregaReal || null,
+          condicaoPrazo: payload.condicaoPrazo,
           motivoAtraso: payload.motivoAtraso || null,
           detalhePendencias: payload.detalhePendencias || null,
+          condicaoQuantidadeOrdem: payload.condicaoQuantidadeOrdem,
+          comentariosQuantidadeOrdem: payload.comentariosQuantidadeOrdem || null,
+          condicaoQuantidadeNF: payload.condicaoQuantidadeNF,
+          comentariosQuantidadeNF: payload.comentariosQuantidadeNF || null,
+          observacoesRecebimento: payload.observacoesRecebimento || null,
+          // Assinaturas serão preenchidas automaticamente pelo sistema a partir dos documentos
         },
         files: {
           fichaContratualizacao: fichaContratualizacaoFile,
@@ -151,13 +275,20 @@ export const TrpPage: React.FC = () => {
     setOrdemFornecimentoFile(null);
     setForm({
       tipo_contratacao: undefined,
-      data_recebimento_nf_real: '',
+      data_recebimento_nf_real: undefined,
+      data_conclusao_servico: undefined,
       tipo_base_prazo: undefined,
       condicao_prazo: undefined,
       condicao_quantidade: undefined,
+      condicao_quantidade_nf: undefined,
       competencia_mes_ano: undefined,
-      observacoes_recebimento: '',
-      detalhe_pendencias: '',
+      observacoes_recebimento: undefined,
+      detalhe_pendencias: undefined,
+      motivo_atraso: undefined,
+      comentarios_quantidade_ordem: undefined,
+      comentarios_quantidade_nf: undefined,
+      data_prevista_entrega_contrato: undefined,
+      data_entrega_real: undefined,
       arquivoTdrNome: '',
     });
     setErrorMessage(null);
