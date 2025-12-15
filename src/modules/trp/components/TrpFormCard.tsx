@@ -81,7 +81,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     if (newValue === 'DATA_RECEBIMENTO') {
       updates.data_conclusao_servico = undefined;
     } else if (newValue === 'SERVICO') {
-      updates.data_recebimento_nf_real = undefined;
+      updates.data_recebimento = undefined;
     }
     onChange({ ...value, ...updates });
   };
@@ -90,7 +90,6 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     const updates: Partial<TrpInputForm> = { condicao_prazo: newValue };
     if (newValue !== 'FORA_DO_PRAZO') {
       updates.motivo_atraso = undefined;
-      updates.detalhe_pendencias = undefined;
       updates.data_prevista_entrega_contrato = undefined;
       updates.data_entrega_real = undefined;
     }
@@ -98,7 +97,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   };
 
   const handleCondicaoQuantidadeOrdemChange = (newValue: TrpCondicaoQuantidade) => {
-    const updates: Partial<TrpInputForm> = { condicao_quantidade: newValue };
+    const updates: Partial<TrpInputForm> = { condicao_quantidade_ordem: newValue };
     if (newValue === 'TOTAL') {
       updates.comentarios_quantidade_ordem = undefined;
     }
@@ -117,7 +116,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   const showDataRecebimento = value.tipo_base_prazo === 'DATA_RECEBIMENTO';
   const showDataConclusaoServico = value.tipo_base_prazo === 'SERVICO';
   const showAtrasoFields = value.condicao_prazo === 'FORA_DO_PRAZO';
-  const showPendenciasOrdem = value.condicao_quantidade === 'PARCIAL';
+  const showPendenciasOrdem = value.condicao_quantidade_ordem === 'PARCIAL';
   const showPendenciasNF = value.condicao_quantidade_nf === 'PARCIAL';
 
   const inputSx = {
@@ -363,9 +362,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               </Typography>
               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                 <DatePicker
-                  value={parseDateFromDDMMYYYY(value.data_recebimento_nf_real)}
+                  value={parseDateFromDDMMYYYY(value.data_recebimento)}
                   onChange={(newValue: Dayjs | null) => {
-                    updateField('data_recebimento_nf_real')(formatDateToDDMMYYYY(newValue));
+                    updateField('data_recebimento')(formatDateToDDMMYYYY(newValue));
                   }}
                   disabled={disabled}
                   format="DD/MM/YYYY"
@@ -605,7 +604,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             </Typography>
             <FormControl fullWidth variant="outlined" required>
               <Select
-                value={value.condicao_quantidade || ''}
+                value={value.condicao_quantidade_ordem || ''}
                 onChange={(e) => handleCondicaoQuantidadeOrdemChange(e.target.value as TrpCondicaoQuantidade)}
                 disabled={disabled}
                 displayEmpty

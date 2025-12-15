@@ -29,7 +29,6 @@ export interface DadosRecebimentoPayload {
   
   // Campos condicionais quando condicaoPrazo = "FORA_DO_PRAZO"
   motivoAtraso?: string;
-  detalhePendencias?: string;
   
   // Condição da Quantidade - Ordem de Fornecimento
   condicaoQuantidadeOrdem: CondicaoQuantidade;

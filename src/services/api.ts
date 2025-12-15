@@ -28,7 +28,6 @@ export interface GenerateTrpParams {
     dataEntregaReal?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
     condicaoPrazo: string; // "NO_PRAZO" | "FORA_DO_PRAZO"
     motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
-    detalhePendencias?: string | null; // (quando FORA_DO_PRAZO)
     condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
     comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
     condicaoQuantidadeNF: string; // "TOTAL" | "PARCIAL"

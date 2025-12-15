@@ -88,7 +88,8 @@ Atesto o recebimento provisório do objeto, conforme condições estabelecidas e
 
 const generateCamposNormalizados = (input: TrpInputForm): TrpCamposNormalizados => {
   const condicaoPrazo = input.condicao_prazo || 'NAO_SE_APLICA';
-  const condicaoQuantidade = input.condicao_quantidade || 'TOTAL';
+  const condicaoQuantidadeOrdem = input.condicao_quantidade_ordem || 'TOTAL';
+  const condicaoQuantidadeNF = input.condicao_quantidade_nf || 'TOTAL';
   
   // Formatar condição do prazo
   let condicaoPrazoLabel = 'Não se aplica';
@@ -104,25 +105,27 @@ const generateCamposNormalizados = (input: TrpInputForm): TrpCamposNormalizados 
     }
   }
 
-  // Formatar condição da quantidade
+  // Formatar condição da quantidade (combinando Ordem e NF)
   let condicaoQuantidadeLabel = 'Total conforme empenho';
-  if (condicaoQuantidade === 'PARCIAL') {
-    condicaoQuantidadeLabel = 'Quantidade parcial (inferior ao empenho)';
-    if (input.detalhe_pendencias) {
-      condicaoQuantidadeLabel += ` - ${input.detalhe_pendencias}`;
+  if (condicaoQuantidadeOrdem === 'PARCIAL' || condicaoQuantidadeNF === 'PARCIAL') {
+    const partes: string[] = [];
+    if (condicaoQuantidadeOrdem === 'PARCIAL') {
+      partes.push('Quantidade parcial na Ordem de Fornecimento');
+      if (input.comentarios_quantidade_ordem) {
+        partes.push(`Ordem: ${input.comentarios_quantidade_ordem}`);
+      }
     }
-  } else if (condicaoQuantidade === 'DIVERGENCIA_SUPERIOR') {
-    condicaoQuantidadeLabel = 'Quantidade divergente (superior ao empenho)';
-    if (input.detalhe_pendencias) {
-      condicaoQuantidadeLabel += ` - ${input.detalhe_pendencias}`;
+    if (condicaoQuantidadeNF === 'PARCIAL') {
+      partes.push('Quantidade parcial na Nota Fiscal');
+      if (input.comentarios_quantidade_nf) {
+        partes.push(`NF: ${input.comentarios_quantidade_nf}`);
+      }
     }
+    condicaoQuantidadeLabel = partes.join('; ');
   }
 
-  // Combinar observações
+  // Observações
   let observacoes = input.observacoes_recebimento || '';
-  if (input.detalhe_pendencias && (condicaoQuantidade === 'PARCIAL' || condicaoQuantidade === 'DIVERGENCIA_SUPERIOR')) {
-    observacoes += observacoes ? `\n\nDetalhe das pendências: ${input.detalhe_pendencias}` : `Detalhe das pendências: ${input.detalhe_pendencias}`;
-  }
 
   // Converter data de DD/MM/YYYY para Date se necessário
   const parseDate = (dateStr: string | undefined): Date => {
@@ -134,8 +137,8 @@ const generateCamposNormalizados = (input: TrpInputForm): TrpCamposNormalizados 
     return new Date(dateStr);
   };
 
-  const dataRecebimento = input.data_recebimento_nf_real 
-    ? parseDate(input.data_recebimento_nf_real)
+  const dataRecebimento = input.data_recebimento 
+    ? parseDate(input.data_recebimento)
     : new Date();
   
   return {
@@ -153,7 +156,7 @@ const generateCamposNormalizados = (input: TrpInputForm): TrpCamposNormalizados 
     valor_efetivo_formatado: 'R$ 1.250.000,00',
     regime_fornecimento: 'Contínuo',
     tipo_contrato: 'Contrato de Fornecimento',
-    data_entrega: input.data_entrega_real || input.data_recebimento_nf_real || dataRecebimento.toISOString().split('T')[0],
+    data_entrega: input.data_entrega_real || input.data_recebimento || dataRecebimento.toISOString().split('T')[0],
     condicao_prazo: condicaoPrazoLabel,
     condicao_quantidade: condicaoQuantidadeLabel,
     observacoes: observacoes,

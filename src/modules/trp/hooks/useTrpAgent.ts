@@ -17,12 +17,12 @@ export interface UseTrpAgentResult {
 }
 
 const initialForm: TrpInputForm = {
-  data_recebimento_nf_real: '',
+  data_recebimento: '',
   tipo_base_prazo: undefined,
   condicao_prazo: undefined,
-  condicao_quantidade: undefined,
+  condicao_quantidade_ordem: undefined,
+  condicao_quantidade_nf: undefined,
   observacoes_recebimento: '',
-  detalhe_pendencias: '',
   arquivoTdrNome: '',
 };
 

@@ -20,7 +20,7 @@ export interface TrpInputForm {
   tipo_base_prazo?: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
   
   // Data de recebimento (quando base = DATA_RECEBIMENTO)
-  data_recebimento_nf_real?: string; // DD/MM/AAAA ou YYYY-MM-DD
+  data_recebimento?: string; // DD/MM/AAAA ou YYYY-MM-DD
   
   // Data de conclusão do serviço (quando base = SERVICO)
   data_conclusao_servico?: string; // DD/MM/AAAA ou YYYY-MM-DD
@@ -34,10 +34,9 @@ export interface TrpInputForm {
   
   // Campos condicionais quando condicao_prazo = "FORA_DO_PRAZO"
   motivo_atraso?: string;
-  detalhe_pendencias?: string; // Detalhes/evidências do atraso
-  
+
   // Condição da Quantidade - Ordem de Fornecimento
-  condicao_quantidade?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
+  condicao_quantidade_ordem?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
   comentarios_quantidade_ordem?: string; // Obrigatório quando PARCIAL
   
   // Condição da Quantidade - Nota Fiscal (NOVO)

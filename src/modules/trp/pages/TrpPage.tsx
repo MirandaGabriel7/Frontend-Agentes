@@ -31,15 +31,14 @@ export const TrpPage: React.FC = () => {
   // Estados do formulário
   const [form, setForm] = useState<TrpInputForm>({
     tipo_contratacao: undefined,
-    data_recebimento_nf_real: undefined,
+    data_recebimento: undefined,
     data_conclusao_servico: undefined,
     tipo_base_prazo: undefined,
     condicao_prazo: undefined,
-    condicao_quantidade: undefined,
+    condicao_quantidade_ordem: undefined,
     condicao_quantidade_nf: undefined,
     competencia_mes_ano: undefined,
     observacoes_recebimento: undefined,
-    detalhe_pendencias: undefined,
     motivo_atraso: undefined,
     comentarios_quantidade_ordem: undefined,
     comentarios_quantidade_nf: undefined,
@@ -83,7 +82,7 @@ export const TrpPage: React.FC = () => {
     }
 
     // Data de recebimento obrigatória quando base = DATA_RECEBIMENTO
-    if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && !form.data_recebimento_nf_real) {
+    if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && !form.data_recebimento) {
       return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
     }
 
@@ -103,12 +102,12 @@ export const TrpPage: React.FC = () => {
     }
 
     // Condição de quantidade Ordem obrigatória
-    if (!form.condicao_quantidade) {
+    if (!form.condicao_quantidade_ordem) {
       return 'O campo "Quantidade conforme Ordem de Fornecimento" é obrigatório.';
     }
 
     // Comentários obrigatórios quando PARCIAL na Ordem
-    if (form.condicao_quantidade === 'PARCIAL' && !form.comentarios_quantidade_ordem) {
+    if (form.condicao_quantidade_ordem === 'PARCIAL' && !form.comentarios_quantidade_ordem) {
       return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Ordem de Fornecimento é PARCIAL.';
     }
 
@@ -148,7 +147,7 @@ export const TrpPage: React.FC = () => {
         tipoContratacao: form.tipo_contratacao!,
         tipoBasePrazo: form.tipo_base_prazo!,
         condicaoPrazo: form.condicao_prazo!,
-        condicaoQuantidadeOrdem: form.condicao_quantidade!,
+        condicaoQuantidadeOrdem: form.condicao_quantidade_ordem!,
         condicaoQuantidadeNF: form.condicao_quantidade_nf!,
         // Assinaturas serão preenchidas automaticamente pelo sistema
       };
@@ -158,8 +157,8 @@ export const TrpPage: React.FC = () => {
         payload.competenciaMesAno = form.competencia_mes_ano;
       }
 
-      if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && form.data_recebimento_nf_real) {
-        payload.dataRecebimento = form.data_recebimento_nf_real;
+      if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && form.data_recebimento) {
+        payload.dataRecebimento = form.data_recebimento;
       }
 
       if (form.tipo_base_prazo === 'SERVICO' && form.data_conclusao_servico) {
@@ -178,12 +177,9 @@ export const TrpPage: React.FC = () => {
         if (form.motivo_atraso) {
           payload.motivoAtraso = form.motivo_atraso;
         }
-        if (form.detalhe_pendencias) {
-          payload.detalhePendencias = form.detalhe_pendencias;
-        }
       }
 
-      if (form.condicao_quantidade === 'PARCIAL' && form.comentarios_quantidade_ordem) {
+      if (form.condicao_quantidade_ordem === 'PARCIAL' && form.comentarios_quantidade_ordem) {
         payload.comentariosQuantidadeOrdem = form.comentarios_quantidade_ordem;
       }
 
@@ -211,7 +207,6 @@ export const TrpPage: React.FC = () => {
           dataEntregaReal: payload.dataEntregaReal || null,
           condicaoPrazo: payload.condicaoPrazo,
           motivoAtraso: payload.motivoAtraso || null,
-          detalhePendencias: payload.detalhePendencias || null,
           condicaoQuantidadeOrdem: payload.condicaoQuantidadeOrdem,
           comentariosQuantidadeOrdem: payload.comentariosQuantidadeOrdem || null,
           condicaoQuantidadeNF: payload.condicaoQuantidadeNF,
@@ -275,15 +270,14 @@ export const TrpPage: React.FC = () => {
     setOrdemFornecimentoFile(null);
     setForm({
       tipo_contratacao: undefined,
-      data_recebimento_nf_real: undefined,
+      data_recebimento: undefined,
       data_conclusao_servico: undefined,
       tipo_base_prazo: undefined,
       condicao_prazo: undefined,
-      condicao_quantidade: undefined,
+      condicao_quantidade_ordem: undefined,
       condicao_quantidade_nf: undefined,
       competencia_mes_ano: undefined,
       observacoes_recebimento: undefined,
-      detalhe_pendencias: undefined,
       motivo_atraso: undefined,
       comentarios_quantidade_ordem: undefined,
       comentarios_quantidade_nf: undefined,
