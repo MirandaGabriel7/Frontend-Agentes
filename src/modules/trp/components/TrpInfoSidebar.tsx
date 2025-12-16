@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { TrpRunResponse } from '../types/trp.types';
+import { formatCondicaoPrazo, formatCondicaoQuantidade } from '../utils/formatTrpValues';
 
 interface TrpInfoSidebarProps {
   data: TrpRunResponse;
@@ -76,17 +77,11 @@ export const TrpInfoSidebar: React.FC<TrpInfoSidebarProps> = ({ data }) => {
       <InfoRow label="Data" value={new Date(campos.data).toLocaleDateString('pt-BR')} />
       <InfoRow
         label="Condição de Prazo"
-        value={campos.condicao_prazo === 'NO_PRAZO' ? 'No Prazo' : 'Atrasado'}
+        value={formatCondicaoPrazo(campos.condicao_prazo)}
       />
       <InfoRow
         label="Condição de Quantidade"
-        value={
-          campos.condicao_quantidade === 'CONFORME_EMPENHO'
-            ? 'Conforme Empenho'
-            : campos.condicao_quantidade === 'MENOR'
-            ? 'Menor'
-            : 'Maior'
-        }
+        value={formatCondicaoQuantidade(campos.condicao_quantidade)}
       />
       {campos.observacoes && (
         <InfoRow label="Observações" value={campos.observacoes} />

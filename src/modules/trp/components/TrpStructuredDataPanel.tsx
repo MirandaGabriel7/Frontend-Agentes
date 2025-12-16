@@ -8,6 +8,7 @@ import {
   Divider,
 } from '@mui/material';
 import { TrpCamposNormalizados } from '../../../lib/types/trp';
+import { formatCondicaoPrazo, formatCondicaoQuantidade } from '../utils/formatTrpValues';
 
 interface TrpStructuredDataPanelProps {
   campos: TrpCamposNormalizados;
@@ -123,8 +124,8 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
       title: 'Recebimento',
       fields: [
         { label: 'Data da entrega', value: normalizeField(getCampo('data_entrega')) },
-        { label: 'Condição do prazo', value: normalizeField(getCampo('condicao_prazo')) },
-        { label: 'Condição da quantidade', value: normalizeField(getCampo('condicao_quantidade')) },
+        { label: 'Condição do prazo', value: formatCondicaoPrazo(getCampo('condicao_prazo')) },
+        { label: 'Condição da quantidade', value: formatCondicaoQuantidade(getCampo('condicao_quantidade')) },
       ],
     },
     {
