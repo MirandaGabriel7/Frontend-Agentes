@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -13,17 +13,19 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { isUuid } from '../utils/uuid';
 
 export const LoginPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, session, loading: authLoading } = useAuth();
+  const { signIn, session, orgIdAtiva, authLoading, orgLoading, refreshOrg } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const didRedirect = useRef(false);
 
   // Verificar mensagem do state (vindo de ProtectedRoute)
   useEffect(() => {
@@ -33,20 +35,24 @@ export const LoginPage: React.FC = () => {
     }
   }, [location]);
 
-  // Se já estiver logado, redirecionar
+  // Redirecionar apenas quando session E orgId existirem (com guard para evitar loop)
   useEffect(() => {
-    if (!authLoading && session) {
+    if (didRedirect.current) return;
+    
+    if (!authLoading && !orgLoading && session && orgIdAtiva && isUuid(orgIdAtiva)) {
+      didRedirect.current = true;
       navigate('/agents', { replace: true });
     }
-  }, [session, authLoading, navigate]);
+  }, [session, orgIdAtiva, authLoading, orgLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    didRedirect.current = false; // Reset guard ao tentar novo login
 
     try {
-      const { error: signInError, hasOrg } = await signIn(email, password);
+      const { error: signInError } = await signIn(email, password);
 
       if (signInError) {
         setError(signInError.message || 'Erro ao fazer login. Verifique suas credenciais.');
@@ -54,23 +60,33 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      // Verificar se o usuário tem org vinculada
-      if (hasOrg === false) {
-        setError('Usuário não vinculado a nenhuma organização. Entre em contato com o administrador.');
-        setLoading(false);
-        return;
-      }
-
-      // Login bem-sucedido e tem org, redirecionar
-      navigate('/agents', { replace: true });
+      // O useEffect vai verificar session + orgId e redirecionar se ambos existirem
+      // Não redirecionar aqui para evitar loop
+      setLoading(false);
     } catch (err) {
       setError('Erro inesperado ao fazer login. Tente novamente.');
       setLoading(false);
     }
   };
 
-  // Mostrar loading enquanto verifica sessão
-  if (authLoading) {
+  const handleRefreshOrg = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const hasOrg = await refreshOrg();
+      if (!hasOrg) {
+        setError('Organização não encontrada. Entre em contato com o administrador.');
+      }
+      // Se encontrou, o useEffect vai redirecionar
+    } catch (err) {
+      setError('Erro ao atualizar organização. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mostrar loading enquanto verifica sessão ou org
+  if (authLoading || orgLoading) {
     return (
       <Box
         sx={{
@@ -84,6 +100,9 @@ export const LoginPage: React.FC = () => {
       </Box>
     );
   }
+
+  // Se tem session mas não tem orgId válido, mostrar mensagem e botão para atualizar
+  const hasSessionButNoOrg = session && (!orgIdAtiva || !isUuid(orgIdAtiva));
 
   return (
     <Container maxWidth="sm">
@@ -131,6 +150,20 @@ export const LoginPage: React.FC = () => {
           {error && (
             <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
               {error}
+            </Alert>
+          )}
+
+          {hasSessionButNoOrg && !error && (
+            <Alert 
+              severity="warning" 
+              sx={{ mb: 3 }}
+              action={
+                <Button color="inherit" size="small" onClick={handleRefreshOrg} disabled={loading}>
+                  Atualizar organização
+                </Button>
+              }
+            >
+              Usuário não vinculado a nenhuma organização. Clique em "Atualizar organização" para tentar novamente.
             </Alert>
           )}
 

@@ -7,23 +7,26 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+const LoadingScreen: React.FC = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+    }}
+  >
+    <CircularProgress />
+  </Box>
+);
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { session, orgIdAtiva, loading } = useAuth();
+  const { session, orgIdAtiva, authLoading, orgLoading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
+  // Enquanto está carregando auth ou org, mostrar loading (não navegar)
+  if (authLoading || orgLoading) {
+    return <LoadingScreen />;
   }
 
   // Verificar sessão
@@ -31,9 +34,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Verificar orgId válido (no estado OU localStorage)
-  const orgIdFromStorage = localStorage.getItem('planco_active_org_id');
-  const hasValidOrgId = (orgIdAtiva && isUuid(orgIdAtiva)) || (orgIdFromStorage && isUuid(orgIdFromStorage));
+  // Verificar orgId válido
+  const hasValidOrgId = orgIdAtiva && isUuid(orgIdAtiva);
 
   if (!hasValidOrgId) {
     // Usuário logado mas sem org válida

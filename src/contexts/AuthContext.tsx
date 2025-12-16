@@ -5,8 +5,10 @@ import { supabase, isSupabaseConfigured } from '../infra/supabaseClient';
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  userId: string | null;
   orgIdAtiva: string | null;
-  loading: boolean;
+  authLoading: boolean;
+  orgLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; hasOrg?: boolean }>;
   signOut: () => Promise<void>;
   refreshOrg: () => Promise<boolean>;
@@ -19,8 +21,10 @@ const STORAGE_KEY_ORG_ID = 'planco_active_org_id';
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [orgIdAtiva, setOrgIdAtiva] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [orgLoading, setOrgLoading] = useState(false);
 
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
 
@@ -66,41 +70,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Carregar org_id do localStorage primeiro (bootstrap rápido)
-  // Depois validar/atualizar do backend via refreshOrg
-  const loadOrgId = async (userId: string) => {
-    // Bootstrap: carregar do localStorage imediatamente
-    const cachedOrgId = localStorage.getItem(STORAGE_KEY_ORG_ID);
-    if (cachedOrgId) {
-      if (isDev) {
-        console.debug('[AuthContext] Bootstrap: org carregada do cache:', cachedOrgId);
-      }
-      setOrgIdAtiva(cachedOrgId);
-    }
-
-    // Validar/atualizar do backend via refreshOrg
-    const hasOrg = await refreshOrg();
-    if (!hasOrg && cachedOrgId) {
-      // Se refreshOrg retornou false mas tinha cache, limpar
-      if (isDev) {
-        console.warn('[AuthContext] Org não encontrada no backend, limpando cache');
-      }
-      setOrgIdAtiva(null);
-      localStorage.removeItem(STORAGE_KEY_ORG_ID);
-    }
-  };
-
   // Refresh org (útil quando o usuário trocar de org no futuro)
   // Retorna true se encontrou org, false se não encontrou
+  // IMPORTANTE: nunca roda sem userId
   const refreshOrg = async (): Promise<boolean> => {
-    if (!user?.id) {
-      if (isDev) {
-        console.warn('[AuthContext] refreshOrg chamado sem user.id');
-      }
+    if (!userId) {
+      // Não logar erro - isso é esperado quando não há userId
       return false;
     }
     
-    const orgId = await fetchUserOrg(user.id);
+    const orgId = await fetchUserOrg(userId);
     if (orgId) {
       setOrgIdAtiva(orgId);
       localStorage.setItem(STORAGE_KEY_ORG_ID, orgId);
@@ -112,7 +91,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setOrgIdAtiva(null);
       localStorage.removeItem(STORAGE_KEY_ORG_ID);
       if (isDev) {
-        console.warn('[AuthContext] Org não encontrada no refresh');
+        console.debug('[AuthContext] Org não encontrada no refresh');
       }
       return false;
     }
@@ -146,11 +125,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.session && data.user) {
         setSession(data.session);
         setUser(data.user);
+        setUserId(data.user.id);
         
-        // Carregar org (com bootstrap do cache + validação do backend)
-        await loadOrgId(data.user.id, false);
+        // O useEffect [userId] vai carregar a org automaticamente
         
-        // Verificar se tem org após carregar
+        // Verificar se tem org após carregar (aguardar um pouco para o useEffect rodar)
+        // Na prática, o usuário vai ver o estado de loading enquanto carrega
         const hasOrg = !!localStorage.getItem(STORAGE_KEY_ORG_ID);
         
         if (isDev) {
@@ -181,6 +161,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       setSession(null);
       setUser(null);
+      setUserId(null);
       setOrgIdAtiva(null);
       // Limpar orgId do localStorage
       localStorage.removeItem(STORAGE_KEY_ORG_ID);
@@ -199,34 +180,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     if (!supabase) {
       // Se Supabase não está configurado, apenas finalizar loading
-      setLoading(false);
+      setAuthLoading(false);
       return;
     }
 
-    // Bootstrap: carregar orgId do localStorage imediatamente se existir
-    const cachedOrgId = localStorage.getItem(STORAGE_KEY_ORG_ID);
-    if (cachedOrgId) {
-      if (isDev) {
-        console.debug('[AuthContext] Bootstrap: orgId carregada do localStorage:', cachedOrgId);
-      }
-      setOrgIdAtiva(cachedOrgId);
-    }
+    setAuthLoading(true);
 
-    // Verificar sessão atual (supabase já validado no início do useEffect)
-    supabase!.auth.getSession().then(({ data: { session } }) => {
+    // Verificar sessão atual
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSession(session);
         setUser(session.user);
-        // Carregar org (bootstrap do cache + validação via refreshOrg)
-        loadOrgId(session.user.id);
+        setUserId(session.user.id);
+      } else {
+        setSession(null);
+        setUser(null);
+        setUserId(null);
       }
-      setLoading(false);
+      setAuthLoading(false);
     });
 
-    // Escutar mudanças de auth (supabase já validado no início do useEffect)
+    // Escutar mudanças de auth
     const {
       data: { subscription },
-    } = supabase!.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (isDev) {
         console.debug('[AuthContext] Auth state changed:', event);
       }
@@ -234,15 +211,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (session) {
         setSession(session);
         setUser(session.user);
-        // Carregar org (bootstrap do cache + validação via refreshOrg)
-        await loadOrgId(session.user.id);
+        setUserId(session.user.id);
       } else {
         setSession(null);
         setUser(null);
+        setUserId(null);
         setOrgIdAtiva(null);
         localStorage.removeItem(STORAGE_KEY_ORG_ID);
       }
-      setLoading(false);
+      setAuthLoading(false);
     });
 
     return () => {
@@ -250,11 +227,61 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
+  // Carregar org quando userId mudar
+  useEffect(() => {
+    if (!userId) {
+      setOrgIdAtiva(null);
+      setOrgLoading(false);
+      return;
+    }
+
+    setOrgLoading(true);
+
+    // Bootstrap: carregar do localStorage imediatamente (rápido)
+    const cachedOrgId = localStorage.getItem(STORAGE_KEY_ORG_ID);
+    if (cachedOrgId) {
+      if (isDev) {
+        console.debug('[AuthContext] Bootstrap: org carregada do cache:', cachedOrgId);
+      }
+      setOrgIdAtiva(cachedOrgId);
+    }
+
+    // Validar/atualizar do backend
+    fetchUserOrg(userId)
+      .then((orgId) => {
+        if (orgId) {
+          setOrgIdAtiva(orgId);
+          localStorage.setItem(STORAGE_KEY_ORG_ID, orgId);
+          if (isDev) {
+            console.debug('[AuthContext] Org validada do backend:', orgId);
+          }
+        } else {
+          // Se não encontrou no backend, limpar cache se existir
+          if (cachedOrgId) {
+            if (isDev) {
+              console.warn('[AuthContext] Org não encontrada no backend, limpando cache');
+            }
+            setOrgIdAtiva(null);
+            localStorage.removeItem(STORAGE_KEY_ORG_ID);
+          }
+        }
+        setOrgLoading(false);
+      })
+      .catch((err) => {
+        if (isDev) {
+          console.error('[AuthContext] Erro ao buscar org:', err);
+        }
+        setOrgLoading(false);
+      });
+  }, [userId]);
+
   const value: AuthContextType = {
     session,
     user,
+    userId,
     orgIdAtiva,
-    loading,
+    authLoading,
+    orgLoading,
     signIn,
     signOut,
     refreshOrg,
