@@ -116,6 +116,20 @@ export interface TrpRunListItem {
 export interface TrpListRunsApiResponse {
   success: boolean;
   data?: TrpRunListItem[];
+  nextCursor?: string;
+  message?: string;
+}
+
+export interface TrpRunsSummary {
+  total: number;
+  completed: number;
+  failed: number;
+  lastExecution?: string;
+}
+
+export interface TrpRunsSummaryApiResponse {
+  success: boolean;
+  data?: TrpRunsSummary;
   message?: string;
 }
 
@@ -298,6 +312,78 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
   }
 
   return wrapper.data || [];
+}
+
+/**
+ * Busca TRPs com filtros e paginação
+ */
+export interface FetchTrpRunsParams {
+  limit?: number;
+  cursor?: string;
+  status?: 'ALL' | 'COMPLETED' | 'FAILED' | 'PENDING' | 'RUNNING';
+  q?: string; // Busca por número de contrato ou NF
+}
+
+export interface FetchTrpRunsResult {
+  items: TrpRunListItem[];
+  nextCursor?: string;
+}
+
+export async function fetchTrpRuns(params: FetchTrpRunsParams = {}): Promise<FetchTrpRunsResult> {
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+  const { limit = 20, cursor, status, q } = params;
+
+  const queryParams = new URLSearchParams();
+  queryParams.set('limit', limit.toString());
+  if (cursor) queryParams.set('cursor', cursor);
+  if (status && status !== 'ALL') queryParams.set('status', status);
+  if (q) queryParams.set('q', q);
+
+  if (isDev) {
+    console.debug('[TRP API] Fetching runs with params:', { limit, cursor, status, q });
+  }
+
+  const response = await api.get<TrpListRunsApiResponse>(`/trp/runs?${queryParams.toString()}`);
+
+  const wrapper = response.data;
+
+  if (wrapper.success !== true) {
+    const errorMessage = wrapper.message || 'Falha ao buscar TRPs';
+    if (isDev) {
+      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+    }
+    throw new Error(errorMessage);
+  }
+
+  return {
+    items: wrapper.data || [],
+    nextCursor: wrapper.nextCursor,
+  };
+}
+
+/**
+ * Busca resumo de TRPs
+ */
+export async function fetchTrpRunsSummary(): Promise<TrpRunsSummary> {
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+
+  if (isDev) {
+    console.debug('[TRP API] Fetching runs summary');
+  }
+
+  const response = await api.get<TrpRunsSummaryApiResponse>('/trp/runs/summary');
+
+  const wrapper = response.data;
+
+  if (wrapper.success !== true) {
+    const errorMessage = wrapper.message || 'Falha ao buscar resumo de TRPs';
+    if (isDev) {
+      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+    }
+    throw new Error(errorMessage);
+  }
+
+  return wrapper.data || { total: 0, completed: 0, failed: 0 };
 }
 
 // Funções antigas (mantidas para compatibilidade, mas não usadas no novo fluxo)

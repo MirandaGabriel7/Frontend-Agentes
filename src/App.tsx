@@ -15,6 +15,7 @@ import { TrpNewPage } from './modules/trp/pages/TrpNewPage';
 import { TrpDetailPage } from './modules/trp/pages/TrpDetailPage';
 import { TrpPage } from './modules/trp/pages/TrpPage';
 import { TrpResultPage } from './modules/trp/pages/TrpResultPage';
+import { TrpHistoryPage } from './modules/trp/pages/TrpHistoryPage';
 import AgenteDfdResultado from './pages/AgenteDfdResultado';
 
 function App() {
@@ -95,6 +96,16 @@ function App() {
                   <ProtectedRoute>
                     <MainLayout>
                       <TrpResultPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp/historico"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpHistoryPage />
                     </MainLayout>
                   </ProtectedRoute>
                 }
