@@ -282,11 +282,16 @@ export const TrpPage: React.FC = () => {
   // Estado para histórico
   const [historyItems, setHistoryItems] = useState<TrpHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const didFetchHistory = React.useRef(false);
 
   /**
    * Carrega histórico do backend
    */
   React.useEffect(() => {
+    // Evitar double-fetch em React StrictMode
+    if (didFetchHistory.current) return;
+    didFetchHistory.current = true;
+
     const loadHistory = async () => {
       try {
         setHistoryLoading(true);

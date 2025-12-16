@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TrpRun, TrpInputForm } from '../../../lib/types/trp';
 import { listTrpRuns, getTrpRun, createTrpRun, simulateTrpAgent } from '../../../lib/services/trpService';
 
@@ -33,12 +33,16 @@ export function useTrpAgent(): UseTrpAgentResult {
   const [isLoadingRuns, setIsLoadingRuns] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const didFetchRuns = useRef(false);
+  const lastFetchAt = useRef<number | null>(null);
 
+  // reloadRuns ignora o cache (força fetch sempre)
   const reloadRuns = useCallback(async () => {
     setIsLoadingRuns(true);
     try {
       const loadedRuns = await listTrpRuns();
       setRuns(loadedRuns);
+      lastFetchAt.current = Date.now(); // Atualizar timestamp após fetch bem-sucedido
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar TRPs');
     } finally {
@@ -47,8 +51,32 @@ export function useTrpAgent(): UseTrpAgentResult {
   }, []);
 
   useEffect(() => {
-    reloadRuns();
-  }, [reloadRuns]);
+    // Evitar double-fetch em React StrictMode
+    if (didFetchRuns.current) return;
+    didFetchRuns.current = true;
+
+    // Verificar cache temporal (10 segundos)
+    const now = Date.now();
+    if (lastFetchAt.current !== null && now - lastFetchAt.current < 10000) {
+      // Cache válido, não buscar novamente
+      setIsLoadingRuns(false);
+      return;
+    }
+
+    // Cache expirado ou não existe, buscar normalmente
+    setIsLoadingRuns(true);
+    listTrpRuns()
+      .then((loadedRuns) => {
+        setRuns(loadedRuns);
+        lastFetchAt.current = Date.now(); // Atualizar timestamp após fetch bem-sucedido
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar TRPs');
+      })
+      .finally(() => {
+        setIsLoadingRuns(false);
+      });
+  }, []); // Dependências vazias - só roda uma vez ao montar
 
   const executeAgent = useCallback(async () => {
     setIsExecuting(true);
