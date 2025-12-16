@@ -14,7 +14,7 @@ import { TrpFormCard } from '../components/TrpFormCard';
 import { TrpActionsBar } from '../components/TrpActionsBar';
 import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
-import { TrpInputForm } from '../../../lib/types/trp';
+import { TrpInputForm, TrpAgentOutput, TrpCamposNormalizados } from '../../../lib/types/trp';
 import { generateTrp } from '../../../services/api';
 import type { DadosRecebimentoPayload } from '../../../types/trp';
 import { createTrpRun } from '../../../lib/services/trpService';
@@ -222,6 +222,27 @@ export const TrpPage: React.FC = () => {
       });
 
       // ✅ generateTrp já retorna apenas o data (sem wrapper)
+      // generateTrp já mapeou documento_markdown_final -> documento_markdown
+      // e campos_trp_normalizados -> campos
+      
+      // Debug detalhado (apenas em dev)
+      const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+      if (isDev) {
+        console.debug('[TrpPage] Resultado do generateTrp:', {
+          documentoMarkdownLength: result.documento_markdown?.length,
+          documentoMarkdownPreview: result.documento_markdown?.substring(0, 200),
+          camposKeys: Object.keys(result.campos),
+          camposCriticos: {
+            vencimento_nf: result.campos?.vencimento_nf,
+            data_entrega: result.campos?.data_entrega,
+            condicao_prazo: result.campos?.condicao_prazo,
+            condicao_quantidade: result.campos?.condicao_quantidade,
+            observacoes: result.campos?.observacoes,
+          },
+          todosOsCampos: result.campos,
+        });
+      }
+      
       // Salvar resultado e navegar para página de resultado
       const fileName = fichaContratualizacaoFile?.name || 
                       notaFiscalFile?.name || 
@@ -232,25 +253,62 @@ export const TrpPage: React.FC = () => {
       const run = await createTrpRun(form);
       
       // Preparar o output com os dados reais do backend
-      const trpOutput = {
-        documento_markdown: result.documento_markdown,
-        campos: result.campos,
+      // result.documento_markdown já contém documento_markdown_final (mapeado em generateTrp)
+      // result.campos já contém campos_trp_normalizados (mapeado em generateTrp)
+      const trpOutput: TrpAgentOutput = {
+        documento_markdown: result.documento_markdown || '',
+        campos: (result.campos || {}) as TrpCamposNormalizados,
         meta: {
           fileName: fileName,
           hash_tdr: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         },
       };
       
-      // Salvar o output diretamente no localStorage
-      const stored = localStorage.getItem('trp_runs');
-      if (stored) {
-        const runs = JSON.parse(stored);
+      // Salvar o output diretamente no localStorage de forma robusta
+      try {
+        const stored = localStorage.getItem('trp_runs');
+        let runs: any[] = [];
+        
+        if (stored) {
+          try {
+            runs = JSON.parse(stored);
+          } catch (parseError) {
+            console.warn('[TrpPage] Erro ao fazer parse do localStorage, criando novo array:', parseError);
+            runs = [];
+          }
+        }
+        
+        // Buscar o run no array
         const runIndex = runs.findIndex((r: any) => r.id === run.id);
+        
         if (runIndex !== -1) {
+          // Atualizar run existente
           runs[runIndex].output = trpOutput;
           runs[runIndex].status = 'COMPLETED';
-          localStorage.setItem('trp_runs', JSON.stringify(runs));
+        } else {
+          // Se não encontrou, adicionar o output ao run e adicionar ao array
+          run.output = trpOutput;
+          run.status = 'COMPLETED';
+          runs.push(run);
         }
+        
+        // Salvar no localStorage
+        localStorage.setItem('trp_runs', JSON.stringify(runs));
+        
+        // Debug: verificar o que foi salvo
+        if (isDev) {
+          console.debug('[TrpPage] Dados salvos no localStorage:', {
+            runId: run.id,
+            runIndex: runIndex !== -1 ? runIndex : 'novo',
+            output: trpOutput,
+            camposSalvos: trpOutput.campos,
+            documentoMarkdownLength: trpOutput.documento_markdown?.length,
+            totalRuns: runs.length,
+          });
+        }
+      } catch (storageError) {
+        console.error('[TrpPage] Erro ao salvar no localStorage:', storageError);
+        // Continuar mesmo com erro, pois o run já foi criado
       }
       
       // Navegar para a página de resultado

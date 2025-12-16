@@ -73,6 +73,24 @@ export const TrpResultPage: React.FC = () => {
           result = await fetchTrpResultMock();
         }
         
+        // Debug: verificar o que foi carregado
+        const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+        if (isDev) {
+          console.debug('[TrpResultPage] Dados carregados:', {
+            hasDocumentoMarkdown: !!result.documento_markdown,
+            documentoMarkdownLength: result.documento_markdown?.length,
+            hasCampos: !!result.campos,
+            camposKeys: result.campos ? Object.keys(result.campos) : [],
+            camposCriticos: {
+              vencimento_nf: result.campos?.vencimento_nf,
+              data_entrega: result.campos?.data_entrega,
+              condicao_prazo: result.campos?.condicao_prazo,
+              condicao_quantidade: result.campos?.condicao_quantidade,
+              observacoes: result.campos?.observacoes,
+            },
+          });
+        }
+        
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro desconhecido ao carregar TRP');
@@ -343,6 +361,7 @@ export const TrpResultPage: React.FC = () => {
             }}
           >
             {/* Markdown Viewer - Left (2/3) */}
+            {/* data.documento_markdown já contém documento_markdown_final (mapeado em generateTrp) */}
             <Box sx={{ flex: { xs: 1, lg: 2 }, minWidth: 0 }}>
               <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
             </Box>
@@ -416,6 +435,7 @@ export const TrpResultPage: React.FC = () => {
         </TabPanel>
 
         {/* Tab 2: Dados Estruturados */}
+        {/* data.campos já contém campos_trp_normalizados (mapeado em generateTrp) */}
         <TabPanel value={activeTab} index={1}>
           <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
             <TrpStructuredDataPanel campos={data.campos} />

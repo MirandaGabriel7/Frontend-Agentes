@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 interface TrpMarkdownViewProps {
   content: string;
@@ -180,7 +181,10 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
             },
           }}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+          >
             {content}
           </ReactMarkdown>
         </Box>

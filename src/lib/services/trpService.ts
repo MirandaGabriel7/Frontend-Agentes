@@ -168,6 +168,29 @@ export async function listTrpRuns(): Promise<TrpRun[]> {
 }
 
 export async function getTrpRun(id: string): Promise<TrpRun | undefined> {
+  // Recarregar do localStorage para garantir que temos os dados mais recentes
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const runs = JSON.parse(stored);
+        const run = runs.find((r: TrpRun) => r.id === id);
+        if (run) {
+          // Atualizar o runsStore também
+          const storeIndex = runsStore.findIndex(r => r.id === id);
+          if (storeIndex !== -1) {
+            runsStore[storeIndex] = run;
+          } else {
+            runsStore.push(run);
+          }
+          return run;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load TRP run from localStorage', e);
+    }
+  }
+  // Fallback para o runsStore
   return runsStore.find(run => run.id === id);
 }
 
@@ -228,13 +251,66 @@ export async function simulateTrpAgent(runId: string): Promise<TrpRun> {
  * Later, this will call a real API endpoint.
  */
 export async function fetchTrpResult(runId: string): Promise<TrpAgentOutput> {
+  const isDev = typeof window !== 'undefined' && (
+    (import.meta.env?.MODE === 'development') || 
+    (import.meta.env?.DEV === true)
+  );
+  
+  if (isDev) {
+    console.debug('[fetchTrpResult] Buscando run:', runId);
+  }
+  
   const run = await getTrpRun(runId);
+  
+  if (isDev) {
+    console.debug('[fetchTrpResult] Run encontrado:', {
+      found: !!run,
+      status: run?.status,
+      hasOutput: !!run?.output,
+      runId: run?.id,
+    });
+  }
+  
   if (!run) {
+    // Debug: listar todos os runs disponíveis
+    if (isDev && typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const runs = JSON.parse(stored);
+          console.debug('[fetchTrpResult] Runs disponíveis no localStorage:', {
+            total: runs.length,
+            ids: runs.map((r: any) => r.id),
+            statuses: runs.map((r: any) => ({ id: r.id, status: r.status, hasOutput: !!r.output })),
+          });
+        }
+      } catch (e) {
+        console.warn('[fetchTrpResult] Erro ao listar runs:', e);
+      }
+    }
     throw new Error(`TRP run with id ${runId} not found`);
   }
+  
   if (run.status !== 'COMPLETED' || !run.output) {
+    if (isDev) {
+      console.debug('[fetchTrpResult] Run não está completo:', {
+        status: run.status,
+        hasOutput: !!run.output,
+        outputKeys: run.output ? Object.keys(run.output) : [],
+      });
+    }
     throw new Error(`TRP run ${runId} is not completed or has no output`);
   }
+  
+  if (isDev) {
+    console.debug('[fetchTrpResult] Retornando output:', {
+      hasDocumentoMarkdown: !!run.output.documento_markdown,
+      documentoMarkdownLength: run.output.documento_markdown?.length,
+      hasCampos: !!run.output.campos,
+      camposKeys: run.output.campos ? Object.keys(run.output.campos) : [],
+    });
+  }
+  
   return run.output;
 }
 

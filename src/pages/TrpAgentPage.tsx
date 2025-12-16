@@ -14,6 +14,7 @@ import {
 import { UploadFile } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { generateTrp, TrpRunResult } from '../services/api';
 
 type CondicaoPrazoUI = 'NO_PRAZO' | 'ATRASADO';
@@ -101,7 +102,16 @@ export const TrpAgentPage = () => {
         },
       });
 
-      console.log('TRP_RESULT (INNER DATA):', trp);
+      // Debug temporário
+      console.debug('TRP_RESULT (INNER DATA):', trp);
+      console.debug('TRP documento_markdown length:', trp.documento_markdown?.length);
+      console.debug('TRP campos keys:', Object.keys(trp.campos));
+      console.debug('TRP vencimento_nf:', trp.campos.vencimento_nf);
+      console.debug('TRP data_entrega:', trp.campos.data_entrega);
+      console.debug('TRP condicao_prazo:', trp.campos.condicao_prazo);
+      console.debug('TRP condicao_quantidade:', trp.campos.condicao_quantidade);
+      console.debug('TRP observacoes:', trp.campos.observacoes);
+      
       setResult(trp);
 
       // scroll pro resultado
@@ -332,7 +342,10 @@ export const TrpAgentPage = () => {
                     }}
                   >
                     {result!.documento_markdown && result!.documento_markdown.trim() ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw]}
+                      >
                         {result!.documento_markdown}
                       </ReactMarkdown>
                     ) : (

@@ -14,7 +14,10 @@ interface TrpStructuredDataPanelProps {
 }
 
 const normalizeField = (value: string | null | undefined): string => {
-  if (!value || value === 'NAO_DECLARADO') return 'Não informado';
+  // Só exibir "Não informado" se o valor for null/undefined/"" ou "NAO_DECLARADO"
+  if (value === null || value === undefined || value === '' || value === 'NAO_DECLARADO') {
+    return 'Não informado';
+  }
   return value;
 };
 
@@ -60,44 +63,68 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
 }) => {
   const theme = useTheme();
 
+  // Debug temporário
+  console.debug('TrpStructuredDataPanel - campos recebido:', campos);
+  console.debug('TrpStructuredDataPanel - campos keys:', Object.keys(campos));
+  console.debug('TrpStructuredDataPanel - vencimento_nf:', (campos as any).vencimento_nf);
+  console.debug('TrpStructuredDataPanel - data_entrega:', (campos as any).data_entrega);
+  console.debug('TrpStructuredDataPanel - condicao_prazo:', (campos as any).condicao_prazo);
+  console.debug('TrpStructuredDataPanel - condicao_quantidade:', (campos as any).condicao_quantidade);
+  console.debug('TrpStructuredDataPanel - observacoes:', (campos as any).observacoes);
+
+  // Helper para obter campo do objeto snake_case com fallbacks
+  const getCampo = (key: string): string | null | undefined => {
+    // Acessar diretamente o objeto, sem depender do tipo
+    const value = (campos as any)[key];
+    // Se for number, converter para string
+    if (typeof value === 'number') {
+      return value.toString();
+    }
+    // Se for string, retornar
+    if (typeof value === 'string') {
+      return value;
+    }
+    // Se for null ou undefined, retornar null
+    return value ?? null;
+  };
+
   const sections = [
     {
       title: 'Contrato',
       fields: [
-        { label: 'Número do contrato', value: normalizeField(campos.numero_contrato) },
-        { label: 'Processo licitatório', value: normalizeField(campos.processo_licitatorio) },
-        { label: 'Vigência', value: normalizeField(campos.vigencia) },
-        { label: 'Tipo de contrato', value: normalizeField(campos.tipo_contrato) },
-        { label: 'Objeto do contrato', value: normalizeField(campos.objeto_contrato) },
+        { label: 'Número do contrato', value: normalizeField(getCampo('numero_contrato')) },
+        { label: 'Processo licitatório', value: normalizeField(getCampo('processo_licitatorio')) },
+        { label: 'Vigência', value: normalizeField(getCampo('vigencia')) },
+        { label: 'Tipo de contrato', value: normalizeField(getCampo('tipo_contrato')) },
+        { label: 'Objeto do contrato', value: normalizeField(getCampo('objeto_contrato')) },
       ],
     },
     {
       title: 'Fornecedor',
       fields: [
-        { label: 'Contratada', value: normalizeField(campos.contratada) },
-        { label: 'CNPJ', value: normalizeField(campos.cnpj) },
+        { label: 'Contratada', value: normalizeField(getCampo('contratada')) },
+        { label: 'CNPJ', value: normalizeField(getCampo('cnpj')) },
       ],
     },
     {
       title: 'Documento Fiscal',
       fields: [
-        { label: 'Número da NF', value: normalizeField(campos.numero_nf) },
-        { label: 'Vencimento da NF', value: normalizeField(campos.vencimento_nf) },
-        { label: 'Número do Empenho', value: normalizeField(campos.numero_empenho) },
+        { label: 'Número da NF', value: normalizeField(getCampo('numero_nf')) },
+        { label: 'Vencimento da NF', value: normalizeField(getCampo('vencimento_nf')) },
+        { label: 'Número do Empenho', value: normalizeField(getCampo('numero_empenho')) },
         {
           label: 'Valor efetivo',
-          value: campos.valor_efetivo_formatado || normalizeField(campos.valor_efetivo_numero?.toString()),
+          value: getCampo('valor_efetivo_formatado') as string || normalizeField(getCampo('valor_efetivo_numero')?.toString()),
         },
-        { label: 'Competência (Mês/Ano)', value: normalizeField(campos.competencia_mes_ano) },
+        { label: 'Competência (Mês/Ano)', value: normalizeField(getCampo('competencia_mes_ano')) },
       ],
     },
     {
       title: 'Recebimento',
       fields: [
-        { label: 'Regime de fornecimento', value: normalizeField(campos.regime_fornecimento) },
-        { label: 'Data da entrega', value: normalizeField(campos.data_entrega) },
-        { label: 'Condição do prazo', value: normalizeField(campos.condicao_prazo) },
-        { label: 'Condição da quantidade', value: normalizeField(campos.condicao_quantidade) },
+        { label: 'Data da entrega', value: normalizeField(getCampo('data_entrega')) },
+        { label: 'Condição do prazo', value: normalizeField(getCampo('condicao_prazo')) },
+        { label: 'Condição da quantidade', value: normalizeField(getCampo('condicao_quantidade')) },
       ],
     },
     {
@@ -105,7 +132,14 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
       fields: [
         {
           label: 'Observações',
-          value: normalizeField(campos.observacoes) || 'Nenhuma observação registrada.',
+          value: (() => {
+            const obs = getCampo('observacoes');
+            // Só exibir "Não há observações adicionais" se o valor for null/undefined/"" ou "NAO_DECLARADO"
+            if (obs === null || obs === undefined || obs === '' || obs === 'NAO_DECLARADO') {
+              return 'Não há observações adicionais';
+            }
+            return obs;
+          })(),
         },
       ],
     },

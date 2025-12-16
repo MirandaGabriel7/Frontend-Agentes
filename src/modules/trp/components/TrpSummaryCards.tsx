@@ -13,8 +13,27 @@ interface TrpSummaryCardsProps {
 }
 
 const normalizeField = (value: string | null | undefined): string => {
-  if (!value || value === 'NAO_DECLARADO') return 'Não informado';
+  // Só exibir "Não informado" se o valor for null/undefined/"" ou "NAO_DECLARADO"
+  if (value === null || value === undefined || value === '' || value === 'NAO_DECLARADO') {
+    return 'Não informado';
+  }
   return value;
+};
+
+// Helper para obter campo do objeto snake_case
+const getCampo = (campos: TrpCamposNormalizados, key: string): string | null | undefined => {
+  // Acessar diretamente o objeto, sem depender do tipo
+  const value = (campos as any)[key];
+  // Se for number, converter para string
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  // Se for string, retornar
+  if (typeof value === 'string') {
+    return value;
+  }
+  // Se for null ou undefined, retornar null
+  return value ?? null;
 };
 
 export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
@@ -23,25 +42,25 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
   const cards = [
     {
       label: 'CONTRATO',
-      primary: normalizeField(campos.numero_contrato),
+      primary: normalizeField(getCampo(campos, 'numero_contrato')),
       icon: <ContractIcon />,
       color: theme.palette.primary.main,
     },
     {
       label: 'FORNECEDOR',
-      primary: normalizeField(campos.contratada),
+      primary: normalizeField(getCampo(campos, 'contratada')),
       icon: <SupplierIcon />,
       color: theme.palette.info.main,
     },
     {
       label: 'DOCUMENTO FISCAL',
-      primary: `NF: ${normalizeField(campos.numero_nf)}`,
+      primary: `NF: ${normalizeField(getCampo(campos, 'numero_nf'))}`,
       icon: <InvoiceIcon />,
       color: theme.palette.success.main,
     },
     {
       label: 'VALOR',
-      primary: campos.valor_efetivo_formatado || 'Não informado',
+      primary: (getCampo(campos, 'valor_efetivo_formatado') as string) || 'Não informado',
       icon: <ValueIcon />,
       color: theme.palette.warning.main,
     },
