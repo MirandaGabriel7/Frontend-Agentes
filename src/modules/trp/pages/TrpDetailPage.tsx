@@ -6,12 +6,12 @@ import {
   Button,
   Container,
   CircularProgress,
-  Grid,
   Chip,
   alpha,
   useTheme,
   Alert,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import DownloadIcon from '@mui/icons-material/Download';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -207,10 +207,10 @@ export const TrpDetailPage: React.FC = () => {
       </Box>
 
       <Grid container spacing={4}>
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <TrpMarkdownView content={trp.documento_markdown || ''} />
         </Grid>
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <TrpInfoSidebar data={trp} />
         </Grid>
       </Grid>

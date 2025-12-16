@@ -21,8 +21,8 @@ import {
   KeyboardArrowUp as ArrowUpIcon,
   Description as WordIcon,
 } from '@mui/icons-material';
-import { TrpAgentOutput } from '../../../lib/types/trp';
-import { fetchTrpResult, fetchTrpResultMock } from '../../../lib/services/trpService';
+import { TrpAgentOutput, TrpCamposNormalizados } from '../../../lib/types/trp';
+import { fetchTrpRun } from '../../../services/api';
 import { TrpSummaryCards } from '../components/TrpSummaryCards';
 import { TrpMarkdownView } from '../components/TrpMarkdownView';
 import { TrpStructuredDataPanel } from '../components/TrpStructuredDataPanel';
@@ -42,65 +42,86 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 };
 
 export const TrpResultPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runData, setRunData] = useState<any>(null);
   const [data, setData] = useState<TrpAgentOutput | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Se temos um ID, tenta buscar do serviço real, senão usa mock
-        let result: TrpAgentOutput;
-        if (id) {
-          try {
-            result = await fetchTrpResult(id);
-          } catch (err) {
-            // Se não encontrar no serviço real, usa mock para demonstração
-            console.warn('TRP não encontrado no serviço, usando mock:', err);
-            result = await fetchTrpResultMock();
-          }
-        } else {
-          // Sem ID, usa mock
-          result = await fetchTrpResultMock();
-        }
-        
-        // Debug: verificar o que foi carregado
-        const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
-        if (isDev) {
-          console.debug('[TrpResultPage] Dados carregados:', {
-            hasDocumentoMarkdown: !!result.documento_markdown,
-            documentoMarkdownLength: result.documento_markdown?.length,
-            hasCampos: !!result.campos,
-            camposKeys: result.campos ? Object.keys(result.campos) : [],
-            camposCriticos: {
-              vencimento_nf: result.campos?.vencimento_nf,
-              data_entrega: result.campos?.data_entrega,
-              condicao_prazo: result.campos?.condicao_prazo,
-              condicao_quantidade: result.campos?.condicao_quantidade,
-              observacoes: result.campos?.observacoes,
-            },
-          });
-        }
-        
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro desconhecido ao carregar TRP');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadData = async () => {
+    if (!runId) {
+      setError('ID do TRP não fornecido');
+      setLoading(false);
+      return;
+    }
 
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // ✅ SEMPRE buscar do backend (fonte da verdade)
+      const run = await fetchTrpRun(runId);
+      
+      const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+      if (isDev) {
+        console.debug('[TrpResultPage] Run carregado:', {
+          runId: run.runId,
+          status: run.status,
+          hasDocumentoMarkdownFinal: !!run.documento_markdown_final,
+          documentoMarkdownFinalLength: run.documento_markdown_final?.length,
+          hasCamposTrpNormalizados: !!run.campos_trp_normalizados,
+          camposKeys: run.campos_trp_normalizados ? Object.keys(run.campos_trp_normalizados) : [],
+          camposCriticos: {
+            vencimento_nf: run.campos_trp_normalizados?.vencimento_nf,
+            data_entrega: run.campos_trp_normalizados?.data_entrega,
+            condicao_prazo: run.campos_trp_normalizados?.condicao_prazo,
+            condicao_quantidade: run.campos_trp_normalizados?.condicao_quantidade,
+            observacoes: run.campos_trp_normalizados?.observacoes,
+          },
+        });
+      }
+      
+      setRunData(run);
+      
+      // Mapear para o formato esperado pelos componentes
+      // Prioridade: documento_markdown_final > documento_markdown > ''
+      const documento_markdown = run.documento_markdown_final 
+        ?? run.documento_markdown 
+        ?? '';
+      
+      // Prioridade: campos_trp_normalizados > campos_trp > campos > {}
+      const campos = (run.campos_trp_normalizados 
+        ?? run.campos_trp 
+        ?? run.campos 
+        ?? {}) as TrpCamposNormalizados;
+      
+      const trpOutput: TrpAgentOutput = {
+        documento_markdown,
+        campos,
+        meta: {
+          fileName: run.runId || 'TRP_Gerado.pdf',
+          hash_tdr: run.runId || '',
+        },
+      };
+      
+      setData(trpOutput);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao carregar TRP';
+      console.error('[TrpResultPage] Erro ao carregar TRP:', err);
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
-  }, [id]);
+  }, [runId]);
 
   // Scroll to top button visibility
   useEffect(() => {
@@ -142,7 +163,7 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
         <Alert
@@ -153,7 +174,49 @@ export const TrpResultPage: React.FC = () => {
             </Button>
           }
         >
-          {error || 'Não foi possível carregar o TRP. Tente novamente.'}
+          {error}
+        </Alert>
+      </Box>
+    );
+  }
+
+  // Se o run existe mas não está completo, mostrar status
+  if (runData && runData.status !== 'COMPLETED') {
+    const statusLabels: Record<string, string> = {
+      PENDING: 'Pendente',
+      RUNNING: 'Em processamento',
+      FAILED: 'Falhou',
+    };
+    
+    return (
+      <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
+        <Alert severity={runData.status === 'FAILED' ? 'error' : 'info'}>
+          <Typography variant="h6" gutterBottom>
+            Status: {statusLabels[runData.status] || runData.status}
+          </Typography>
+          <Typography variant="body2">
+            {runData.status === 'PENDING' && 'O TRP está aguardando processamento.'}
+            {runData.status === 'RUNNING' && 'O TRP está sendo processado. Aguarde alguns instantes e recarregue a página.'}
+            {runData.status === 'FAILED' && 'O processamento do TRP falhou. Tente gerar novamente.'}
+          </Typography>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={() => runId && window.location.reload()}
+            sx={{ mt: 2 }}
+          >
+            Recarregar
+          </Button>
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!data || !runData) {
+    return (
+      <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
+        <Alert severity="warning">
+          Não foi possível carregar os dados do TRP.
         </Alert>
       </Box>
     );

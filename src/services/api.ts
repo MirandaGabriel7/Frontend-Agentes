@@ -4,14 +4,25 @@ export const api = axios.create({
   baseURL: '/api',
 });
 
-// Tipos para a nova API de geração de TRP
-export interface TrpRunResult {
-  documento_markdown: string;
-  campos: Record<string, any>; // Usar any para permitir acesso direto aos campos
+// Tipos para a nova API de geração de TRP (Supabase-first)
+
+// Resposta do POST /trp/generate
+export interface TrpGenerateResponse {
+  runId: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  createdAt: string;
 }
 
-// Estrutura real retornada pelo backend
-export interface TrpBackendResponse {
+export interface TrpGenerateApiResponse {
+  success: boolean;
+  data?: TrpGenerateResponse;
+  message?: string;
+}
+
+// Resposta do GET /trp/runs/:runId
+export interface TrpRunData {
+  runId: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
   documento_markdown_final?: string;
   documento_markdown_prime?: string;
   documento_markdown?: string; // fallback
@@ -19,11 +30,32 @@ export interface TrpBackendResponse {
   campos_trp?: Record<string, unknown>; // fallback
   campos?: Record<string, unknown>; // fallback
   camposTrpNormalizados?: Record<string, unknown>; // fallback camelCase
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface TrpGenerateApiResponse {
+export interface TrpRunApiResponse {
   success: boolean;
-  data?: TrpBackendResponse;
+  data?: TrpRunData;
+  message?: string;
+}
+
+// Resposta do GET /trp/runs?limit=20
+export interface TrpRunListItem {
+  runId: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  createdAt: string;
+  updatedAt?: string;
+  // Campos opcionais para exibição no histórico
+  numero_contrato?: string;
+  numero_nf?: string;
+  valor_efetivo_numero?: number;
+  valor_efetivo_formatado?: string;
+}
+
+export interface TrpListRunsApiResponse {
+  success: boolean;
+  data?: TrpRunListItem[];
   message?: string;
 }
 
@@ -53,7 +85,11 @@ export interface GenerateTrpParams {
   };
 }
 
-export async function generateTrp(params: GenerateTrpParams): Promise<TrpRunResult> {
+/**
+ * Gera um novo TRP e retorna apenas runId, status e createdAt
+ * O resultado completo deve ser buscado via fetchTrpRun(runId)
+ */
+export async function generateTrp(params: GenerateTrpParams): Promise<TrpGenerateResponse> {
   const formData = new FormData();
   formData.append('dadosRecebimento', JSON.stringify(params.dadosRecebimento));
 
@@ -73,22 +109,18 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpRunResu
     { headers: { 'Content-Type': 'multipart/form-data' } }
   );
 
-  // IMPORTANTÍSSIMO: O backend SEMPRE retorna com wrapper { success, data }
-  // axios já extrai response.data automaticamente, então response.data já é o objeto completo
-  const isDev = import.meta.env.MODE === 'development' || import.meta.env.DEV;
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
   
   if (isDev) {
-    console.debug('[TRP API] Response data shape:', {
+    console.debug('[TRP API] Generate response:', {
       keys: Object.keys(response.data),
       hasSuccess: 'success' in response.data,
       hasData: 'data' in response.data,
     });
   }
 
-  // Extrair o wrapper { success, data }
   const wrapper = response.data;
   
-  // Validar success
   if (wrapper.success !== true) {
     const errorMessage = wrapper.message || 'Falha ao gerar TRP no servidor.';
     if (isDev) {
@@ -97,7 +129,6 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpRunResu
     throw new Error(errorMessage);
   }
 
-  // Extrair data do wrapper
   if (!wrapper.data) {
     const errorMessage = 'Resposta do servidor não contém data.';
     if (isDev) {
@@ -106,58 +137,107 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpRunResu
     throw new Error(errorMessage);
   }
 
-  const result: TrpBackendResponse = wrapper.data;
+  const result = wrapper.data;
 
   if (isDev) {
-    console.debug('[TRP API] Data keys:', Object.keys(result));
-    console.debug('[TRP API] Has documento_markdown_final:', !!result.documento_markdown_final);
-    console.debug('[TRP API] Has documento_markdown_prime:', !!result.documento_markdown_prime);
-    console.debug('[TRP API] Has campos_trp_normalizados:', !!result.campos_trp_normalizados);
-    if (result.documento_markdown_final) {
-      console.debug('[TRP API] documento_markdown_final length:', result.documento_markdown_final.length);
-      console.debug('[TRP API] documento_markdown_final preview:', result.documento_markdown_final.substring(0, 100) + '...');
-    }
-    if (result.campos_trp_normalizados) {
-      console.debug('[TRP API] campos_trp_normalizados keys:', Object.keys(result.campos_trp_normalizados));
-    }
+    console.debug('[TRP API] Generate result:', {
+      runId: result.runId,
+      status: result.status,
+      createdAt: result.createdAt,
+    });
   }
 
-  // Mapear campos do backend para o formato esperado pelo frontend
-  // Prioridade: documento_markdown_final > documento_markdown > ''
-  const documento_markdown = result.documento_markdown_final 
-    ?? result.documento_markdown 
-    ?? '';
+  return result;
+}
+
+/**
+ * Busca um TRP completo pelo runId
+ * Fonte da verdade: backend (Supabase)
+ */
+export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
   
-  // Prioridade: campos_trp_normalizados > campos_trp > campos > camposTrpNormalizados > {}
-  const camposRaw = result.campos_trp_normalizados 
-    ?? result.campos_trp 
-    ?? result.campos 
-    ?? result.camposTrpNormalizados 
-    ?? {};
-
-  // Garantir que campos seja um objeto acessível (nunca undefined/null)
-  const campos: Record<string, any> = (typeof camposRaw === 'object' && camposRaw !== null) 
-    ? camposRaw as Record<string, any>
-    : {};
-
-  // Debug dos campos críticos (apenas em dev)
   if (isDev) {
-    console.debug('[TRP API] Mapeamento final:');
-    console.debug('  - documento_markdown length:', documento_markdown.length);
-    console.debug('  - campos keys:', Object.keys(campos));
-    console.debug('  - Campos críticos:');
-    console.debug('    * vencimento_nf:', campos.vencimento_nf);
-    console.debug('    * data_entrega:', campos.data_entrega);
-    console.debug('    * condicao_prazo:', campos.condicao_prazo);
-    console.debug('    * condicao_quantidade:', campos.condicao_quantidade);
-    console.debug('    * observacoes:', campos.observacoes);
+    console.debug('[TRP API] Fetching run:', runId);
   }
 
-  // Garantir retorno consistente (nunca undefined)
-  return {
-    documento_markdown: documento_markdown || '',
-    campos: campos || {},
-  };
+  const response = await api.get<TrpRunApiResponse>(`/trp/runs/${runId}`);
+
+  if (isDev) {
+    console.debug('[TRP API] Fetch response:', {
+      keys: Object.keys(response.data),
+      hasSuccess: 'success' in response.data,
+      hasData: 'data' in response.data,
+    });
+  }
+
+  const wrapper = response.data;
+  
+  if (wrapper.success !== true) {
+    const errorMessage = wrapper.message || `Falha ao buscar TRP ${runId}`;
+    if (isDev) {
+      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+    }
+    throw new Error(errorMessage);
+  }
+
+  if (!wrapper.data) {
+    const errorMessage = `TRP ${runId} não encontrado`;
+    if (isDev) {
+      console.error('[TRP API]', errorMessage);
+    }
+    throw new Error(errorMessage);
+  }
+
+  const result = wrapper.data;
+
+  if (isDev) {
+    console.debug('[TRP API] Run data:', {
+      runId: result.runId,
+      status: result.status,
+      hasDocumentoMarkdownFinal: !!result.documento_markdown_final,
+      hasCamposTrpNormalizados: !!result.campos_trp_normalizados,
+      documentoMarkdownFinalLength: result.documento_markdown_final?.length,
+      camposKeys: result.campos_trp_normalizados ? Object.keys(result.campos_trp_normalizados) : [],
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Lista os últimos TRPs gerados
+ * Fonte da verdade: backend (Supabase)
+ */
+export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]> {
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+  
+  if (isDev) {
+    console.debug('[TRP API] Listing runs with limit:', limit);
+  }
+
+  const response = await api.get<TrpListRunsApiResponse>(`/trp/runs?limit=${limit}`);
+
+  if (isDev) {
+    console.debug('[TRP API] List response:', {
+      keys: Object.keys(response.data),
+      hasSuccess: 'success' in response.data,
+      hasData: 'data' in response.data,
+      dataLength: response.data?.data?.length,
+    });
+  }
+
+  const wrapper = response.data;
+  
+  if (wrapper.success !== true) {
+    const errorMessage = wrapper.message || 'Falha ao listar TRPs';
+    if (isDev) {
+      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+    }
+    throw new Error(errorMessage);
+  }
+
+  return wrapper.data || [];
 }
 
 // Funções antigas (mantidas para compatibilidade, mas não usadas no novo fluxo)

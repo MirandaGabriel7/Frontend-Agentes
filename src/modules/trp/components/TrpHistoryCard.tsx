@@ -253,10 +253,12 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                       />
                     </Box>
                   }
+                  secondaryTypographyProps={{ component: 'div' }}
                   secondary={
                     <Box>
                       <Typography
                         variant="body2"
+                        component="div"
                         sx={{
                           color: theme.palette.text.secondary,
                           mb: 1,
@@ -291,6 +293,7 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                         <Typography
                           variant="caption"
+                          component="div"
                           sx={{
                             color: theme.palette.text.secondary,
                             fontSize: '0.75rem',

@@ -14,10 +14,9 @@ import { TrpFormCard } from '../components/TrpFormCard';
 import { TrpActionsBar } from '../components/TrpActionsBar';
 import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
-import { TrpInputForm, TrpAgentOutput, TrpCamposNormalizados } from '../../../lib/types/trp';
-import { generateTrp } from '../../../services/api';
+import { TrpInputForm } from '../../../lib/types/trp';
+import { generateTrp, listTrpRuns } from '../../../services/api';
 import type { DadosRecebimentoPayload } from '../../../types/trp';
-import { createTrpRun } from '../../../lib/services/trpService';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
@@ -194,8 +193,7 @@ export const TrpPage: React.FC = () => {
       // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
       // serão preenchidas automaticamente pelo sistema a partir dos documentos
 
-      // ✅ Usa generateTrp do services/api.ts (usa api instance com proxy)
-      // Nota: Assinaturas serão preenchidas automaticamente pelo sistema
+      // ✅ Gerar TRP - retorna apenas runId, status e createdAt
       const result = await generateTrp({
         dadosRecebimento: {
           tipoContratacao: payload.tipoContratacao,
@@ -221,98 +219,34 @@ export const TrpPage: React.FC = () => {
         },
       });
 
-      // ✅ generateTrp já retorna apenas o data (sem wrapper)
-      // generateTrp já mapeou documento_markdown_final -> documento_markdown
-      // e campos_trp_normalizados -> campos
-      
-      // Debug detalhado (apenas em dev)
+      // Debug (apenas em dev)
       const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
       if (isDev) {
-        console.debug('[TrpPage] Resultado do generateTrp:', {
-          documentoMarkdownLength: result.documento_markdown?.length,
-          documentoMarkdownPreview: result.documento_markdown?.substring(0, 200),
-          camposKeys: Object.keys(result.campos),
-          camposCriticos: {
-            vencimento_nf: result.campos?.vencimento_nf,
-            data_entrega: result.campos?.data_entrega,
-            condicao_prazo: result.campos?.condicao_prazo,
-            condicao_quantidade: result.campos?.condicao_quantidade,
-            observacoes: result.campos?.observacoes,
-          },
-          todosOsCampos: result.campos,
+        console.debug('[TrpPage] TRP gerado:', {
+          runId: result.runId,
+          status: result.status,
+          createdAt: result.createdAt,
         });
       }
       
-      // Salvar resultado e navegar para página de resultado
-      const fileName = fichaContratualizacaoFile?.name || 
-                      notaFiscalFile?.name || 
-                      ordemFornecimentoFile?.name || 
-                      'TRP_Gerado.pdf';
-      
-      // Criar um run para salvar o resultado
-      const run = await createTrpRun(form);
-      
-      // Preparar o output com os dados reais do backend
-      // result.documento_markdown já contém documento_markdown_final (mapeado em generateTrp)
-      // result.campos já contém campos_trp_normalizados (mapeado em generateTrp)
-      const trpOutput: TrpAgentOutput = {
-        documento_markdown: result.documento_markdown || '',
-        campos: (result.campos || {}) as TrpCamposNormalizados,
-        meta: {
-          fileName: fileName,
-          hash_tdr: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        },
-      };
-      
-      // Salvar o output diretamente no localStorage de forma robusta
+      // Salvar runId no histórico (opcional, apenas para cache)
       try {
-        const stored = localStorage.getItem('trp_runs');
-        let runs: any[] = [];
-        
-        if (stored) {
-          try {
-            runs = JSON.parse(stored);
-          } catch (parseError) {
-            console.warn('[TrpPage] Erro ao fazer parse do localStorage, criando novo array:', parseError);
-            runs = [];
-          }
+        const historyKey = 'trp_run_history';
+        const stored = localStorage.getItem(historyKey);
+        const history: string[] = stored ? JSON.parse(stored) : [];
+        if (!history.includes(result.runId)) {
+          history.unshift(result.runId);
+          // Manter apenas os últimos 50
+          const limitedHistory = history.slice(0, 50);
+          localStorage.setItem(historyKey, JSON.stringify(limitedHistory));
         }
-        
-        // Buscar o run no array
-        const runIndex = runs.findIndex((r: any) => r.id === run.id);
-        
-        if (runIndex !== -1) {
-          // Atualizar run existente
-          runs[runIndex].output = trpOutput;
-          runs[runIndex].status = 'COMPLETED';
-        } else {
-          // Se não encontrou, adicionar o output ao run e adicionar ao array
-          run.output = trpOutput;
-          run.status = 'COMPLETED';
-          runs.push(run);
-        }
-        
-        // Salvar no localStorage
-        localStorage.setItem('trp_runs', JSON.stringify(runs));
-        
-        // Debug: verificar o que foi salvo
-        if (isDev) {
-          console.debug('[TrpPage] Dados salvos no localStorage:', {
-            runId: run.id,
-            runIndex: runIndex !== -1 ? runIndex : 'novo',
-            output: trpOutput,
-            camposSalvos: trpOutput.campos,
-            documentoMarkdownLength: trpOutput.documento_markdown?.length,
-            totalRuns: runs.length,
-          });
-        }
-      } catch (storageError) {
-        console.error('[TrpPage] Erro ao salvar no localStorage:', storageError);
-        // Continuar mesmo com erro, pois o run já foi criado
+      } catch (e) {
+        // Ignorar erros de localStorage
+        console.warn('[TrpPage] Erro ao salvar histórico:', e);
       }
       
-      // Navegar para a página de resultado
-      navigate(`/agents/trp/resultado/${run.id}`);
+      // Navegar para a página de resultado usando runId
+      navigate(`/agents/trp/resultado/${result.runId}`);
     } catch (err: any) {
       console.error('Erro ao gerar TRP:', err);
       setErrorMessage(err?.message || 'Erro inesperado ao gerar o Termo de Recebimento Provisório.');
@@ -345,67 +279,43 @@ export const TrpPage: React.FC = () => {
     setErrorMessage(null);
   };
 
+  // Estado para histórico
+  const [historyItems, setHistoryItems] = useState<TrpHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   /**
-   * Retorna os itens do histórico
-   * Busca do serviço de TRPs salvos
+   * Carrega histórico do backend
    */
-  const getHistoryItems = (): TrpHistoryItem[] => {
-    const items: TrpHistoryItem[] = [];
-
-    // Buscar TRPs salvos do localStorage
-    try {
-      const stored = localStorage.getItem('trp_runs');
-      if (stored) {
-        const runs = JSON.parse(stored);
-        const completedRuns = runs
-          .filter((run: any) => run.status === 'COMPLETED' && run.output)
-          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 5); // Limitar a 5 itens mais recentes
+  React.useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        setHistoryLoading(true);
+        const runs = await listTrpRuns(20);
         
-        completedRuns.forEach((run: any) => {
-          if (run.output) {
-            items.push({
-              id: run.id,
-              fileName: run.output.meta?.fileName || 'TRP_Gerado.pdf',
-              contractNumber: run.output.campos?.numero_contrato || undefined,
-              invoiceNumber: run.output.campos?.numero_nf || undefined,
-              status: 'completed',
-              createdAt: run.createdAt,
-              totalValue: run.output.campos?.valor_efetivo_numero || undefined,
-            });
-          }
-        });
+        const items: TrpHistoryItem[] = runs
+          .filter(run => run.status === 'COMPLETED')
+          .map(run => ({
+            id: run.runId,
+            fileName: `TRP_${run.runId.substring(0, 8)}.pdf`,
+            contractNumber: run.numero_contrato || undefined,
+            invoiceNumber: run.numero_nf || undefined,
+            status: 'completed' as const,
+            createdAt: run.createdAt,
+            totalValue: run.valor_efetivo_numero || undefined,
+          }));
+        
+        setHistoryItems(items);
+      } catch (err) {
+        console.warn('[TrpPage] Erro ao carregar histórico do backend:', err);
+        // Em caso de erro, não exibir histórico (não usar mocks)
+        setHistoryItems([]);
+      } finally {
+        setHistoryLoading(false);
       }
-    } catch (err) {
-      console.warn('Erro ao carregar histórico de TRPs:', err);
-    }
+    };
 
-    // Se não houver itens, adiciona itens mockados para demonstração
-    if (items.length === 0) {
-      items.push(
-        {
-          id: 'mock-1',
-          fileName: 'TRP_Contrato_12345.pdf',
-          contractNumber: '12345/2024',
-          invoiceNumber: 'NF-001234',
-          status: 'completed',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 horas atrás
-          totalValue: 125000.50,
-        },
-        {
-          id: 'mock-2',
-          fileName: 'TRP_Obra_11B.pdf',
-          contractNumber: '11B/2024',
-          invoiceNumber: 'NF-005678',
-          status: 'completed',
-          createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 horas atrás
-          totalValue: 85000.00,
-        }
-      );
-    }
-
-    return items;
-  };
+    loadHistory();
+  }, []);
 
   return (
     <Box
@@ -475,10 +385,10 @@ export const TrpPage: React.FC = () => {
       />
 
       {/* Histórico de TRPs */}
-      {!isLoading && (
+      {!isLoading && !historyLoading && historyItems.length > 0 && (
         <Box sx={{ mt: 6 }}>
           <TrpHistoryCard
-            items={getHistoryItems()}
+            items={historyItems}
             onView={(id) => {
               navigate(`/agents/trp/resultado/${id}`);
             }}

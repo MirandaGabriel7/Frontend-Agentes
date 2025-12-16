@@ -7,8 +7,8 @@ import {
   Alert,
   alpha,
   useTheme,
-  Grid,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -277,7 +277,7 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
       </Box>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           {renderFileUpload(
             'ficha',
             'Ficha de Contratualização',
@@ -287,7 +287,7 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
             errors.ficha
           )}
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           {renderFileUpload(
             'notaFiscal',
             'Nota Fiscal',
@@ -297,7 +297,7 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
             errors.notaFiscal
           )}
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           {renderFileUpload(
             'ordemFornecimento',
             'Ordem de Fornecimento',
