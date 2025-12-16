@@ -264,7 +264,7 @@ export const TrpResultPage: React.FC = () => {
       </Box>
 
       {/* Summary Cards */}
-      <TrpSummaryCards campos={data.campos_trp_normalizados} />
+      <TrpSummaryCards campos={data.campos} />
 
       {/* Main Content Card with Tabs */}
       <Paper
@@ -344,7 +344,7 @@ export const TrpResultPage: React.FC = () => {
           >
             {/* Markdown Viewer - Left (2/3) */}
             <Box sx={{ flex: { xs: 1, lg: 2 }, minWidth: 0 }}>
-              <TrpMarkdownView content={data.documento_markdown_final} showTitle={false} />
+              <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
             </Box>
 
             {/* Actions Card - Right (1/3) */}
@@ -418,7 +418,7 @@ export const TrpResultPage: React.FC = () => {
         {/* Tab 2: Dados Estruturados */}
         <TabPanel value={activeTab} index={1}>
           <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
-            <TrpStructuredDataPanel campos={data.campos_trp_normalizados} />
+            <TrpStructuredDataPanel campos={data.campos} />
           </Box>
         </TabPanel>
 

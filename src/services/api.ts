@@ -6,9 +6,8 @@ export const api = axios.create({
 
 // Tipos para a nova API de geração de TRP
 export interface TrpRunResult {
-  documento_markdown_final: string;
-  documento_markdown_prime: string;
-  campos_trp_normalizados: Record<string, unknown>;
+  documento_markdown: string;
+  campos: Record<string, unknown>;
 }
 
 export interface TrpGenerateApiResponse {
@@ -92,8 +91,8 @@ export interface TrpRunRequest {
 
 export interface TrpRunResponse {
   runId: string;
-  documento_markdown_final: string;
-  campos_trp_normalizados: Record<string, any>;
+  documento_markdown: string;
+  campos: Record<string, any>;
   meta: Record<string, any>;
 }
 

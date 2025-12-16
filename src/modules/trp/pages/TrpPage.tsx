@@ -233,9 +233,8 @@ export const TrpPage: React.FC = () => {
       
       // Preparar o output com os dados reais do backend
       const trpOutput = {
-        documento_markdown_final: result.documento_markdown_final,
-        documento_markdown_prime: result.documento_markdown_prime || result.documento_markdown_final,
-        campos_trp_normalizados: result.campos_trp_normalizados as any,
+        documento_markdown: result.documento_markdown,
+        campos: result.campos,
         meta: {
           fileName: fileName,
           hash_tdr: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -310,11 +309,11 @@ export const TrpPage: React.FC = () => {
             items.push({
               id: run.id,
               fileName: run.output.meta?.fileName || 'TRP_Gerado.pdf',
-              contractNumber: run.output.campos_trp_normalizados?.numero_contrato || undefined,
-              invoiceNumber: run.output.campos_trp_normalizados?.numero_nf || undefined,
+              contractNumber: run.output.campos?.numero_contrato || undefined,
+              invoiceNumber: run.output.campos?.numero_nf || undefined,
               status: 'completed',
               createdAt: run.createdAt,
-              totalValue: run.output.campos_trp_normalizados?.valor_efetivo_numero || undefined,
+              totalValue: run.output.campos?.valor_efetivo_numero || undefined,
             });
           }
         });

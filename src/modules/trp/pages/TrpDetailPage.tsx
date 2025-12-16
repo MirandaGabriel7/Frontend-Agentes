@@ -76,7 +76,7 @@ export const TrpDetailPage: React.FC = () => {
 
   const handleCopyMarkdown = () => {
     if (trp) {
-      navigator.clipboard.writeText(trp.documento_markdown_final);
+      navigator.clipboard.writeText(trp.documento_markdown || '');
       alert('Markdown copiado para a área de transferência!');
     }
   };
@@ -130,7 +130,7 @@ export const TrpDetailPage: React.FC = () => {
   }
 
   const statusColors = getStatusColor(trp.status, theme);
-  const campos = trp.campos_trp_normalizados;
+  const campos = trp.campos;
 
   return (
     <Container
@@ -208,7 +208,7 @@ export const TrpDetailPage: React.FC = () => {
 
       <Grid container spacing={4}>
         <Grid item xs={12} md={7}>
-          <TrpMarkdownView content={trp.documento_markdown_final} />
+          <TrpMarkdownView content={trp.documento_markdown || ''} />
         </Grid>
         <Grid item xs={12} md={5}>
           <TrpInfoSidebar data={trp} />

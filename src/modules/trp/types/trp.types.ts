@@ -16,8 +16,8 @@ export interface TrpRunRequest {
 
 export interface TrpRunResponse {
   id: string;
-  documento_markdown_final: string;
-  campos_trp_normalizados: {
+  documento_markdown: string;
+  campos: {
     numero_contrato: string;
     numero_nf?: string;
     processo_licitatorio: string;

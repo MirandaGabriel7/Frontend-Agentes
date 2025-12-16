@@ -86,9 +86,12 @@ export const TrpAgentPage = () => {
       // ✅ chama direto o endpoint novo
       const trp = await generateTrp({
         dadosRecebimento: {
+          tipoContratacao: 'BENS', // Valor padrão, deve ser preenchido pelo formulário em produção
+          tipoBasePrazo: 'DATA_RECEBIMENTO',
           dataRecebimento: formData.dataRecebimento,
           condicaoPrazo: mapped.condicaoPrazo,
-          condicaoQuantidade: mapped.condicaoQuantidade,
+          condicaoQuantidadeOrdem: mapped.condicaoQuantidade,
+          condicaoQuantidadeNF: mapped.condicaoQuantidade,
           observacoesRecebimento: formData.observacoes || null,
         },
         files: {
@@ -117,7 +120,7 @@ export const TrpAgentPage = () => {
     }
   };
 
-  const hasResult = !!result?.documento_markdown_final?.trim();
+  const hasResult = !!result?.documento_markdown?.trim();
 
   return (
     <Box sx={{ width: '100%', mx: 'auto', py: { xs: 2, sm: 3, md: 4 } }}>
@@ -318,19 +321,25 @@ export const TrpAgentPage = () => {
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Documento Markdown Final
+                    Visualização do Documento
                   </Typography>
                   <Paper
                     sx={{
                       p: 2,
-                      maxHeight: '400px',
+                      maxHeight: '600px',
                       overflow: 'auto',
                       bgcolor: 'background.default',
                     }}
                   >
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {result!.documento_markdown_final}
-                    </ReactMarkdown>
+                    {result!.documento_markdown && result!.documento_markdown.trim() ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {result!.documento_markdown}
+                      </ReactMarkdown>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                        Documento não disponível
+                      </Typography>
+                    )}
                   </Paper>
                 </Grid>
 
@@ -347,7 +356,7 @@ export const TrpAgentPage = () => {
                     }}
                   >
                     <pre style={{ margin: 0, fontSize: '0.875rem' }}>
-                      {JSON.stringify(result!.campos_trp_normalizados, null, 2)}
+                      {JSON.stringify(result!.campos, null, 2)}
                     </pre>
                   </Paper>
                 </Grid>

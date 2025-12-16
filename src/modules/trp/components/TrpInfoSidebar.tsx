@@ -16,7 +16,7 @@ interface TrpInfoSidebarProps {
 
 export const TrpInfoSidebar: React.FC<TrpInfoSidebarProps> = ({ data }) => {
   const theme = useTheme();
-  const campos = data.campos_trp_normalizados;
+  const campos = data.campos;
 
   const InfoRow = ({ label, value }: { label: string; value: string }) => (
     <Box sx={{ mb: 3 }}>

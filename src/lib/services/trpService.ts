@@ -201,9 +201,8 @@ export async function simulateTrpAgent(runId: string): Promise<TrpRun> {
     const markdown = generateMarkdown(campos);
 
     const output: TrpAgentOutput = {
-      documento_markdown_final: markdown,
-      documento_markdown_prime: markdown, // For now, same as final
-      campos_trp_normalizados: campos,
+      documento_markdown: markdown,
+      campos: campos,
       meta: {
         fileName: run.input.arquivoTdrNome || '__TDR_sem_nome.pdf',
         hash_tdr: '919771717',
@@ -247,7 +246,7 @@ export async function fetchTrpResultMock(): Promise<TrpAgentOutput> {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   return {
-    documento_markdown_final: `## TERMO DE RECEBIMENTO PROVISÓRIO
+    documento_markdown: `## TERMO DE RECEBIMENTO PROVISÓRIO
 
 ### 1. Identificação do Contrato
 | Campo | Informação |
@@ -289,39 +288,7 @@ Atesto o recebimento provisório do objeto, conforme condições estabelecidas e
 **Fiscal do Contrato:** _____________________  
 
 **Data:** ____/____/________`,
-    documento_markdown_prime: `## TERMO DE RECEBIMENTO PROVISÓRIO (PRIME)
-
-### 1. Identificação do Contrato
-| Campo | Informação |
-|-------|------------|
-| Número do contrato | 058/2025 |
-| Processo licitatório | 003/2025 |
-| Objeto | Contratação da empresa BLACK HAWK COMÉRCIO DE BOTAS ESPECIAIS LTDA para eventual e futura aquisição de EPIs e uniformes personalizados para o Serviço de Atendimento Móvel de Urgência (SAMU 192) e a sede administrativa do CIAS. |
-| Contratada | BLACK HAWK COMÉRCIO DE BOTAS ESPECIAIS LTDA |
-| CNPJ | 53.637.835/0001-13 |
-| Vigência | 20/08/2025 até 20/08/2026 |
-| Mês/Ano de competência | NAO_DECLARADO |
-| Nota Fiscal | 000179 |
-| Vencimento da NF | NAO_DECLARADO |
-| Empenho | 058/2025 |
-| Valor efetivo | 44080 |
-
-### 2. Regime e Execução
-| Item | Informação |
-|------|------------|
-| Regime de fornecimento/serviço | NAO_DECLARADO |
-| Tipo de contrato | BENS |
-| Data da entrega | NAO_DECLARADO |
-
-### 3. Condições de Recebimento
-| Item | Informação |
-|------|------------|
-| Condição quanto ao prazo | NAO_DECLARADO |
-| Condição quanto à quantidade | NAO_DECLARADO |
-
-### 4. Observações
-Não há observações adicionais.`,
-    campos_trp_normalizados: {
+    campos: {
       numero_contrato: '058/2025',
       processo_licitatorio: '003/2025',
       objeto_contrato: 'Contratação da empresa BLACK HAWK COMÉRCIO DE BOTAS ESPECIAIS LTDA para eventual e futura aquisição de EPIs e uniformes personalizados para o Serviço de Atendimento Móvel de Urgência (SAMU 192) e a sede administrativa do CIAS.',

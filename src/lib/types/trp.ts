@@ -82,9 +82,8 @@ export interface TrpMeta {
 }
 
 export interface TrpAgentOutput {
-  documento_markdown_final: string;
-  documento_markdown_prime?: string; // Versão original do PRIME (para debug)
-  campos_trp_normalizados: TrpCamposNormalizados;
+  documento_markdown: string;
+  campos: TrpCamposNormalizados;
   meta: TrpMeta;
 }
 

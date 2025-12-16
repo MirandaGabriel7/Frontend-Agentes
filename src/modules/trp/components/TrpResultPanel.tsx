@@ -50,8 +50,8 @@ export const TrpResultPanel: React.FC<TrpResultPanelProps> = ({ run }) => {
   const [tabValue, setTabValue] = useState(0);
 
   const handleCopyMarkdown = () => {
-    if (run.output?.documento_markdown_final) {
-      navigator.clipboard.writeText(run.output.documento_markdown_final);
+    if (run.output?.documento_markdown) {
+      navigator.clipboard.writeText(run.output.documento_markdown);
       alert('Markdown copiado para a área de transferência!');
     }
   };
@@ -75,7 +75,7 @@ export const TrpResultPanel: React.FC<TrpResultPanelProps> = ({ run }) => {
     );
   }
 
-  const campos = run.output.campos_trp_normalizados;
+  const campos = run.output.campos;
 
   return (
     <Paper
@@ -119,7 +119,7 @@ export const TrpResultPanel: React.FC<TrpResultPanelProps> = ({ run }) => {
               Copiar Markdown
             </Button>
           </Box>
-          <TrpMarkdownView content={run.output.documento_markdown_final} showTitle={false} />
+          <TrpMarkdownView content={run.output.documento_markdown} showTitle={false} />
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>

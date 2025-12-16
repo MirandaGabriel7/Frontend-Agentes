@@ -46,9 +46,8 @@ export interface DadosRecebimentoPayload {
 }
 
 export interface TrpApiResponse {
-  documento_markdown_final: string;
-  documento_markdown_prime: string;
-  campos_trp_normalizados: {
+  documento_markdown: string;
+  campos: {
     numero_contrato: string | null;
     processo_licitatorio: string | null;
     objeto_contrato: string | null;

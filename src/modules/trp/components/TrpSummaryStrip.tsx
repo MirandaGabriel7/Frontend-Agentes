@@ -53,7 +53,7 @@ const getStatusColor = (status: string, theme: any) => {
 
 export const TrpSummaryStrip: React.FC<TrpSummaryStripProps> = ({ run }) => {
   const theme = useTheme();
-  const campos = run.output?.campos_trp_normalizados;
+  const campos = run.output?.campos;
   const statusColors = getStatusColor(run.status, theme);
 
   if (!campos) return null;
