@@ -4,7 +4,10 @@ import { CssBaseline } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { theme } from './theme';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './layout/MainLayout';
+import { LoginPage } from './pages/LoginPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { DfdAgentPage } from './pages/DfdAgentPage';
 import { TrpListPage } from './modules/trp/pages/TrpListPage';
@@ -19,21 +22,106 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <BrowserRouter>
-          <MainLayout>
+        <AuthProvider>
+          <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Navigate to="/agents" replace />} />
-              <Route path="/agents" element={<AgentsPage />} />
-              <Route path="/agents/trp" element={<TrpPage />} />
-              <Route path="/agents/trp/lista" element={<TrpListPage />} />
-              <Route path="/agents/trp/novo" element={<TrpNewPage />} />
-              <Route path="/agents/trp/:id" element={<TrpDetailPage />} />
-              <Route path="/agents/trp/resultado/:id" element={<TrpResultPage />} />
-              <Route path="/agents/dfd" element={<DfdAgentPage />} />
-              <Route path="/agents/dfd/resultado/:id" element={<AgenteDfdResultado />} />
+              {/* Rota pública de login */}
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Rotas protegidas */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <Navigate to="/agents" replace />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <AgentsPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp/lista"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpListPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp/novo"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpNewPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp/:id"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpDetailPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/trp/resultado/:id"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpResultPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/dfd"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <DfdAgentPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/agents/dfd/resultado/:id"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <AgenteDfdResultado />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
-          </MainLayout>
-        </BrowserRouter>
+          </BrowserRouter>
+        </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>
   );

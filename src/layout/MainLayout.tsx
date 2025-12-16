@@ -1,5 +1,6 @@
 import { useState, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Box,
   Drawer,
@@ -71,6 +72,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { signOut, user } = useAuth();
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -78,6 +80,16 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    handleMenuClose();
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   const handleDrawerToggle = () => {
@@ -440,7 +452,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                       fontWeight: 600,
                     }}
                   >
-                    GM
+                    {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </Avatar>
                 </Box>
               </Box>
@@ -491,7 +503,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </MenuItem>
                 <Divider sx={{ my: 0.5 }} />
                 <MenuItem
-                  onClick={handleMenuClose}
+                  onClick={handleLogout}
                   sx={{
                     color: 'error.main',
                     '&:hover': {

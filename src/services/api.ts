@@ -1,8 +1,82 @@
-import axios from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { supabase } from '../infra/supabaseClient';
+import { isUuid } from '../utils/uuid';
 
-export const api = axios.create({
+export const api: AxiosInstance = axios.create({
   baseURL: '/api',
 });
+
+// Interceptor para injetar headers de autenticação
+// IMPORTANTE: Não depende de hooks/context, usa supabase diretamente
+api.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+    let hasAuthorization = false;
+    let hasOrgId = false;
+
+    try {
+      // Verificar se supabase está disponível
+      if (!supabase) {
+        if (isDev) {
+          console.debug('[API Interceptor] Supabase não configurado, sem headers de auth');
+        }
+        return config;
+      }
+
+      // Obter sessão diretamente do Supabase (não depende de React state)
+      // Supabase pode ser null em dev se envs não estiverem configuradas
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        if (isDev) {
+          console.warn('[API Interceptor] Erro ao buscar sessão:', error);
+        }
+        // Continuar sem headers se houver erro
+        return config;
+      }
+
+      const session = data?.session;
+
+      if (session?.access_token) {
+        // Enviar JWT do Supabase no header Authorization
+        config.headers['Authorization'] = `Bearer ${session.access_token}`;
+        hasAuthorization = true;
+
+        // Buscar org_id do localStorage e validar se é UUID
+        const orgId = localStorage.getItem('planco_active_org_id');
+        if (orgId && isUuid(orgId)) {
+          config.headers['x-org-id'] = orgId;
+          hasOrgId = true;
+        } else if (orgId && isDev) {
+          // Log apenas em dev se orgId não for UUID válido
+          console.warn('[API Interceptor] orgId no localStorage não é UUID válido:', orgId);
+        }
+      }
+      // Se não houver sessão, não setar headers (requisições públicas podem continuar)
+    } catch (error) {
+      // Em caso de erro inesperado, continuar sem headers
+      // Não quebrar requisições por causa de erro de auth
+      if (isDev) {
+        console.warn('[API Interceptor] Erro inesperado ao injetar headers:', error);
+      }
+    } finally {
+      // Logs apenas em dev
+      if (isDev) {
+        console.debug('[API Interceptor]', {
+          url: config.url,
+          method: config.method,
+          Authorization: hasAuthorization,
+          'x-org-id': hasOrgId,
+        });
+      }
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Tipos para a nova API de geração de TRP (Supabase-first)
 
