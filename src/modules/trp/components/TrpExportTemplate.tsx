@@ -23,11 +23,17 @@ export const TrpExportTemplate: React.FC<TrpExportTemplateProps> = ({ viewModel 
   // ✅ Organizar campos dinamicamente por seções
   const sectionsWithFields = organizeFieldsBySections(campos as Record<string, unknown>);
   // Helper para normalizar campos vazios
-  const normalizeField = (value: any): string => {
+  // ✅ GARANTIA: Sempre normaliza valores técnicos antes de exibir
+  const normalizeField = (value: any, fieldName?: string): string => {
     if (value === null || value === undefined || value === '') {
       return 'Não informado';
     }
-    return String(value);
+    // Se for string, normalizar valores técnicos
+    if (typeof value === 'string') {
+      return normalizeTrpValue(value, fieldName);
+    }
+    // Para outros tipos, converter para string e normalizar
+    return normalizeTrpValue(String(value), fieldName);
   };
 
   // Helper para formatar observações (quebrar em linhas)
@@ -311,25 +317,25 @@ export const TrpExportTemplate: React.FC<TrpExportTemplateProps> = ({ viewModel 
           <div style={resumoItemStyles}>
             <div style={resumoLabelStyles}>Contrato</div>
             <div style={resumoValueStyles}>
-              {normalizeField(campos.numero_contrato)}
+              {normalizeField(campos.numero_contrato, 'numero_contrato')}
             </div>
           </div>
           <div style={resumoItemStyles}>
             <div style={resumoLabelStyles}>Nota Fiscal</div>
             <div style={resumoValueStyles}>
-              {normalizeField(campos.numero_nf)}
+              {normalizeField(campos.numero_nf, 'numero_nf')}
             </div>
           </div>
           <div style={resumoItemStyles}>
             <div style={resumoLabelStyles}>Valor</div>
             <div style={resumoValueStyles}>
-              {normalizeField(campos.valor_efetivo_formatado || campos.valor_efetivo_numero)}
+              {normalizeField(campos.valor_efetivo_formatado || campos.valor_efetivo_numero, 'valor_efetivo_formatado')}
             </div>
           </div>
           <div style={resumoItemStyles}>
             <div style={resumoLabelStyles}>Data de Entrega</div>
             <div style={resumoValueStyles}>
-              {normalizeField(campos.data_entrega)}
+              {normalizeField(campos.data_entrega, 'data_entrega')}
             </div>
           </div>
         </div>
@@ -373,7 +379,7 @@ export const TrpExportTemplate: React.FC<TrpExportTemplateProps> = ({ viewModel 
                           {field.label}
                         </p>
                         <div style={assinaturaLineStyles}>
-                          {field.value ? normalizeField(field.value) : '_________________'}
+                          {field.value ? normalizeField(field.value, field.fieldName) : '_________________'}
                         </div>
                       </div>
                     ))}
@@ -383,7 +389,7 @@ export const TrpExportTemplate: React.FC<TrpExportTemplateProps> = ({ viewModel 
                   return (
                     <div style={dataAssinaturaStyles}>
                       Data de Assinatura: {dataField?.value 
-                        ? normalizeField(dataField.value) 
+                        ? normalizeField(dataField.value, 'data_assinatura') 
                         : (viewModel.createdAt ? new Date(viewModel.createdAt).toLocaleDateString('pt-BR') : '_________________')}
                     </div>
                   );

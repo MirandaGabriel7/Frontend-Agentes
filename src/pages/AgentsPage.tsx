@@ -284,30 +284,30 @@ export const AgentsPage = () => {
                       {tab.content.description}
                     </Typography>
                     <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={() => navigate(tab.content.route)}
-                        endIcon={<ArrowForwardIcon />}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          fontSize: '0.9375rem',
-                          px: 3,
-                          py: 1.5,
-                          borderRadius: 2,
-                          bgcolor: theme.palette.primary.main,
-                          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-                          '&:hover': {
-                            bgcolor: theme.palette.primary.dark,
-                            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-                            transform: 'translateY(-2px)',
-                          },
-                          transition: 'all 0.2s ease-out',
-                        }}
-                      >
-                        {tab.content.buttonText}
-                      </Button>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={() => navigate(tab.content.route)}
+                      endIcon={<ArrowForwardIcon />}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.9375rem',
+                        px: 3,
+                        py: 1.5,
+                        borderRadius: 2,
+                        bgcolor: theme.palette.primary.main,
+                        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                        '&:hover': {
+                          bgcolor: theme.palette.primary.dark,
+                          boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                          transform: 'translateY(-2px)',
+                        },
+                        transition: 'all 0.2s ease-out',
+                      }}
+                    >
+                      {tab.content.buttonText}
+                    </Button>
                       {tab.value === 'trp' && (
                         <Button
                           variant="outlined"

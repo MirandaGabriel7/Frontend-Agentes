@@ -39,7 +39,7 @@ export function formatTipoBasePrazo(value: string | null | undefined): string {
   
   const mapping: Record<string, string> = {
     'DATA_RECEBIMENTO': 'Data de Recebimento',
-    'SERVICO': 'Conclusão do Serviço',
+    'SERVICO': 'Serviço',
   };
   
   return mapping[value] || value;
@@ -73,6 +73,7 @@ export function normalizeTrpValue(value: string | null | undefined, fieldName?: 
   const normalizedValue = value.trim().toUpperCase();
   
   // Mapeamentos obrigatórios (textos institucionais)
+  // ✅ NUNCA exibir valores técnicos - sempre usar textos humanizados
   const institutionalMappings: Record<string, string> = {
     // Condição de prazo
     'NO_PRAZO': 'No prazo',
@@ -82,7 +83,7 @@ export function normalizeTrpValue(value: string | null | undefined, fieldName?: 
     'PARCIAL': 'Parcial',
     // Tipo de base de prazo
     'DATA_RECEBIMENTO': 'Data de Recebimento',
-    'SERVICO': 'Conclusão do Serviço',
+    'SERVICO': 'Serviço',
     // Tipo de contratação
     'BENS': 'Bens',
     'SERVIÇOS': 'Serviços',
