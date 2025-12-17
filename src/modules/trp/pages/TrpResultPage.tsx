@@ -15,17 +15,23 @@ import {
   Chip,
   Fab,
   Zoom,
+  Snackbar,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
 import {
   PictureAsPdf as PdfIcon,
   KeyboardArrowUp as ArrowUpIcon,
   Description as WordIcon,
+  Close as CloseIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import { TrpAgentOutput, TrpCamposNormalizados } from '../../../lib/types/trp';
-import { fetchTrpRun } from '../../../services/api';
+import { fetchTrpRun, downloadTrpRun } from '../../../services/api';
 import { TrpSummaryCards } from '../components/TrpSummaryCards';
 import { TrpMarkdownView } from '../components/TrpMarkdownView';
 import { TrpStructuredDataPanel } from '../components/TrpStructuredDataPanel';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -45,12 +51,19 @@ export const TrpResultPage: React.FC = () => {
   const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [runData, setRunData] = useState<any>(null);
   const [data, setData] = useState<TrpAgentOutput | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
+    open: false,
+    message: '',
+  });
   const contentRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
@@ -138,14 +151,57 @@ export const TrpResultPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDownloadWord = () => {
-    // TODO: Implement Word download
-    console.log('Baixar Word');
+  const handleDownload = async (format: 'pdf' | 'docx') => {
+    // ✅ VALIDAÇÃO: runId deve vir do parâmetro da URL (useParams)
+    if (!runId) {
+      setSnackbar({ open: true, message: 'ID do TRP não encontrado', severity: 'error' });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: Só permitir exportação se status === 'COMPLETED'
+    if (runData?.status !== 'COMPLETED') {
+      setSnackbar({ 
+        open: true, 
+        message: 'Documento ainda não concluído. Aguarde a finalização do processamento.', 
+        severity: 'warning' 
+      });
+      return;
+    }
+
+    const setDownloading = format === 'pdf' ? setDownloadingPdf : setDownloadingDocx;
+    
+    try {
+      setDownloading(true);
+      // ✅ SEMPRE usar runId do parâmetro da URL
+      // Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+      await downloadTrpRun(runId, format);
+      setSnackbar({ 
+        open: true, 
+        message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`, 
+        severity: 'success' 
+      });
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao baixar arquivo';
+      const status = err.status;
+      
+      // Tratar erro de autenticação - forçar logout
+      if (errorMessage === 'AUTENTICACAO_REQUERIDA' || status === 401 || status === 403) {
+        await signOut();
+        navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
+        return;
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  const handleDownloadPdf = () => {
-    // TODO: Implement PDF download
-    console.log('Baixar PDF');
+  const handleDownloadPdf = () => handleDownload('pdf');
+  const handleDownloadWord = () => handleDownload('docx');
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   if (loading) {
@@ -264,7 +320,7 @@ export const TrpResultPage: React.FC = () => {
               Revisão do documento gerado pela IA
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip
               label={`Arquivo: ${data.meta.fileName}`}
               size="small"
@@ -283,6 +339,74 @@ export const TrpResultPage: React.FC = () => {
                 fontWeight: 500,
               }}
             />
+            <Stack direction="row" spacing={1}>
+              <Tooltip title="Ver histórico de TRPs">
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<HistoryIcon />}
+                    onClick={() => navigate('/agents/trp/historico')}
+                    sx={{
+                      textTransform: 'none',
+                      minWidth: 'auto',
+                    }}
+                  >
+                    Histórico
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip 
+                title={
+                  runData?.status !== 'COMPLETED' 
+                    ? 'Documento ainda não concluído' 
+                    : downloadingPdf 
+                      ? 'Exportando documento oficial do TRP...' 
+                      : 'Exportar PDF'
+                }
+              >
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={downloadingPdf ? <CircularProgress size={16} /> : <PdfIcon />}
+                    onClick={handleDownloadPdf}
+                    disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                    sx={{
+                      textTransform: 'none',
+                      minWidth: 'auto',
+                    }}
+                  >
+                    {downloadingPdf ? 'Exportando...' : 'PDF'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip 
+                title={
+                  runData?.status !== 'COMPLETED' 
+                    ? 'Documento ainda não concluído' 
+                    : downloadingDocx 
+                      ? 'Exportando documento oficial do TRP...' 
+                      : 'Exportar DOCX'
+                }
+              >
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={downloadingDocx ? <CircularProgress size={16} /> : <WordIcon />}
+                    onClick={handleDownloadWord}
+                    disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                    sx={{
+                      textTransform: 'none',
+                      minWidth: 'auto',
+                    }}
+                  >
+                    {downloadingDocx ? 'Exportando...' : 'DOCX'}
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
           </Stack>
         </Box>
       </Box>
@@ -443,43 +567,77 @@ export const TrpResultPage: React.FC = () => {
                 }}
               >
                 <Stack spacing={2}>
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    startIcon={<PdfIcon />}
-                    onClick={handleDownloadPdf}
-                    sx={{
-                      bgcolor: theme.palette.primary.main,
-                      color: 'white',
-                      '&:hover': {
-                        bgcolor: theme.palette.primary.dark,
-                      },
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      py: 1.5,
-                    }}
+                  <Tooltip 
+                    title={
+                      runData?.status !== 'COMPLETED' 
+                        ? 'Documento ainda não concluído' 
+                        : downloadingPdf 
+                          ? 'Exportando documento oficial do TRP...' 
+                          : 'Exportar documento oficial do TRP em PDF'
+                    }
                   >
-                    Baixar PDF
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<WordIcon />}
-                    onClick={handleDownloadWord}
-                    sx={{
-                      borderColor: alpha(theme.palette.divider, 0.2),
-                      color: theme.palette.text.primary,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.04),
-                        borderColor: theme.palette.primary.main,
-                      },
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      py: 1.5,
-                    }}
+                    <span>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={downloadingPdf ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
+                        onClick={handleDownloadPdf}
+                        disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                        sx={{
+                          bgcolor: theme.palette.primary.main,
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: theme.palette.primary.dark,
+                          },
+                          '&:disabled': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.5),
+                            color: 'white',
+                          },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          py: 1.5,
+                        }}
+                      >
+                        {downloadingPdf ? 'Exportando documento oficial do TRP...' : 'Baixar PDF'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip 
+                    title={
+                      runData?.status !== 'COMPLETED' 
+                        ? 'Documento ainda não concluído' 
+                        : downloadingDocx 
+                          ? 'Exportando documento oficial do TRP...' 
+                          : 'Exportar documento oficial do TRP em Word (DOCX)'
+                    }
                   >
-                    Baixar Word
-                  </Button>
+                    <span>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        startIcon={downloadingDocx ? <CircularProgress size={20} /> : <WordIcon />}
+                        onClick={handleDownloadWord}
+                        disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                        sx={{
+                          borderColor: alpha(theme.palette.divider, 0.2),
+                          color: theme.palette.text.primary,
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.04),
+                            borderColor: theme.palette.primary.main,
+                          },
+                          '&:disabled': {
+                            borderColor: alpha(theme.palette.divider, 0.1),
+                            color: alpha(theme.palette.text.primary, 0.5),
+                          },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          py: 1.5,
+                        }}
+                      >
+                        {downloadingDocx ? 'Exportando documento oficial do TRP...' : 'Baixar Word'}
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Typography
                     variant="caption"
                     sx={{
@@ -529,6 +687,20 @@ export const TrpResultPage: React.FC = () => {
           <ArrowUpIcon />
         </Fab>
       </Zoom>
+
+      {/* Snackbar para feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        action={
+          <IconButton size="small" aria-label="close" color="inherit" onClick={handleCloseSnackbar}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        }
+      />
     </Box>
   );
 };

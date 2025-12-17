@@ -28,8 +28,13 @@ import {
   Sync,
   Schedule,
   History as HistoryIcon,
+  PictureAsPdf as PdfIcon,
+  Description as WordIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import { fetchTrpRuns, fetchTrpRunsSummary, TrpRunListItem, FetchTrpRunsParams } from '../../../services/api';
+import { fetchTrpRuns, fetchTrpRunsSummary, TrpRunListItem, FetchTrpRunsParams, downloadTrpRun } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import { Snackbar, IconButton, Tooltip } from '@mui/material';
 import dayjs from 'dayjs';
 import 'dayjs/locale/pt-br';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -67,6 +72,12 @@ const formatDate = (dateString: string) => {
 export const TrpHistoryPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
+    open: false,
+    message: '',
+  });
+  const [downloading, setDownloading] = useState<{ [runId: string]: 'pdf' | 'docx' | null }>({});
 
   const [runs, setRuns] = useState<TrpRunListItem[]>([]);
   const [summary, setSummary] = useState<{ total: number; completed: number; failed: number; lastExecution?: string } | null>(null);
@@ -98,9 +109,21 @@ export const TrpHistoryPage: React.FC = () => {
 
     try {
       const data = await fetchTrpRunsSummary();
-      setSummary(data);
+      // ✅ GARANTIR que data é um objeto válido
+      if (data && typeof data === 'object') {
+        setSummary({
+          total: typeof data.total === 'number' ? data.total : 0,
+          completed: typeof data.completed === 'number' ? data.completed : 0,
+          failed: typeof data.failed === 'number' ? data.failed : 0,
+          lastExecution: data.lastExecution || undefined,
+        });
+      } else {
+        setSummary({ total: 0, completed: 0, failed: 0 });
+      }
     } catch (err) {
+      // ✅ Tratar erro silenciosamente - não é crítico para a página funcionar
       console.warn('[TrpHistoryPage] Erro ao carregar resumo:', err);
+      setSummary({ total: 0, completed: 0, failed: 0 });
     }
   }, []);
 
@@ -131,10 +154,17 @@ export const TrpHistoryPage: React.FC = () => {
 
       const result = await fetchTrpRuns(params);
 
+      // ✅ GARANTIR que result.items é sempre um array
+      const items = Array.isArray(result.items) ? result.items : [];
+
       if (append) {
-        setRuns((prev) => [...prev, ...result.items]);
+        setRuns((prev) => {
+          // ✅ GARANTIR que prev é sempre um array
+          const prevArray = Array.isArray(prev) ? prev : [];
+          return [...prevArray, ...items];
+        });
       } else {
-        setRuns(result.items);
+        setRuns(items);
         lastFetchAt.current = Date.now();
       }
 
@@ -175,6 +205,64 @@ export const TrpHistoryPage: React.FC = () => {
     setError(null);
     loadSummary();
     loadRuns(false);
+  };
+
+  const handleDownload = async (runId: string, format: 'pdf' | 'docx') => {
+    // ✅ VALIDAÇÃO: runId deve vir do item da lista (nunca usar estado global ou "último run")
+    if (!runId) {
+      setSnackbar({ open: true, message: 'ID do TRP não encontrado', severity: 'error' });
+      return;
+    }
+
+    // ✅ GARANTIR que runs é sempre um array
+    const runsArray = Array.isArray(runs) ? runs : [];
+
+    // ✅ VALIDAÇÃO: Buscar o run específico da lista para verificar status
+    const run = runsArray.find(r => r && r.runId === runId);
+    if (!run) {
+      setSnackbar({ open: true, message: 'TRP não encontrado na lista', severity: 'error' });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: Só permitir exportação se status === 'COMPLETED'
+    if (run.status !== 'COMPLETED') {
+      setSnackbar({ 
+        open: true, 
+        message: 'Documento ainda não concluído. Aguarde a finalização do processamento.', 
+        severity: 'warning' 
+      });
+      return;
+    }
+
+    try {
+      setDownloading({ ...downloading, [runId]: format });
+      // ✅ SEMPRE usar runId do item da lista
+      // Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+      await downloadTrpRun(runId, format);
+      setSnackbar({ 
+        open: true, 
+        message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`, 
+        severity: 'success' 
+      });
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao baixar arquivo';
+      const status = err.status;
+      
+      // Tratar erro de autenticação - forçar logout
+      if (errorMessage === 'AUTENTICACAO_REQUERIDA' || status === 401 || status === 403) {
+        await signOut();
+        navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
+        return;
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    } finally {
+      setDownloading({ ...downloading, [runId]: null });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   return (
@@ -352,7 +440,8 @@ export const TrpHistoryPage: React.FC = () => {
         ) : (
           <>
             <Box sx={{ p: 0 }}>
-              {runs.map((run) => (
+              {/* ✅ GARANTIR que runs é sempre um array antes de fazer map */}
+              {Array.isArray(runs) && runs.length > 0 ? runs.map((run) => (
                 <Box
                   key={run.runId}
                   sx={{
@@ -401,17 +490,108 @@ export const TrpHistoryPage: React.FC = () => {
                         </Box>
                       </Box>
                     </Box>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => navigate(`/agents/trp/resultado/${run.runId}`)}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Abrir
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {run.status === 'COMPLETED' ? (
+                        <>
+                          <Tooltip 
+                            title={
+                              downloading[run.runId] === 'pdf' 
+                                ? 'Exportando documento oficial do TRP...' 
+                                : 'Exportar documento oficial do TRP em PDF'
+                            }
+                          >
+                            <span>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloading[run.runId] === 'pdf' ? <CircularProgress size={16} /> : <PdfIcon />}
+                                onClick={() => handleDownload(run.runId, 'pdf')}
+                                disabled={!!downloading[run.runId]}
+                                sx={{
+                                  textTransform: 'none',
+                                  minWidth: 'auto',
+                                  color: theme.palette.error.main,
+                                  borderColor: alpha(theme.palette.error.main, 0.5),
+                                  '&:hover': {
+                                    borderColor: theme.palette.error.main,
+                                    bgcolor: alpha(theme.palette.error.main, 0.08),
+                                  },
+                                  '&:disabled': {
+                                    borderColor: alpha(theme.palette.error.main, 0.3),
+                                    color: alpha(theme.palette.error.main, 0.5),
+                                  },
+                                }}
+                              >
+                                {downloading[run.runId] === 'pdf' ? 'Exportando...' : 'PDF'}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip 
+                            title={
+                              downloading[run.runId] === 'docx' 
+                                ? 'Exportando documento oficial do TRP...' 
+                                : 'Exportar documento oficial do TRP em DOCX'
+                            }
+                          >
+                            <span>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloading[run.runId] === 'docx' ? <CircularProgress size={16} /> : <WordIcon />}
+                                onClick={() => handleDownload(run.runId, 'docx')}
+                                disabled={!!downloading[run.runId]}
+                                sx={{
+                                  textTransform: 'none',
+                                  minWidth: 'auto',
+                                  color: theme.palette.info.main,
+                                  borderColor: alpha(theme.palette.info.main, 0.5),
+                                  '&:hover': {
+                                    borderColor: theme.palette.info.main,
+                                    bgcolor: alpha(theme.palette.info.main, 0.08),
+                                  },
+                                  '&:disabled': {
+                                    borderColor: alpha(theme.palette.info.main, 0.3),
+                                    color: alpha(theme.palette.info.main, 0.5),
+                                  },
+                                }}
+                              >
+                                {downloading[run.runId] === 'docx' ? 'Exportando...' : 'DOCX'}
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Tooltip title="Documento ainda não concluído">
+                          <span>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled
+                              sx={{
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                color: theme.palette.text.disabled,
+                                borderColor: alpha(theme.palette.divider, 0.2),
+                                cursor: 'not-allowed',
+                              }}
+                            >
+                              Exportar
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => navigate(`/agents/trp/resultado/${run.runId}`)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Abrir
+                      </Button>
+                    </Box>
                   </Box>
                 </Box>
-              ))}
+              )) : null}
             </Box>
 
             {/* Load More */}
@@ -430,6 +610,20 @@ export const TrpHistoryPage: React.FC = () => {
           </>
         )}
       </Paper>
+
+      {/* Snackbar para feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        action={
+          <IconButton size="small" aria-label="close" color="inherit" onClick={handleCloseSnackbar}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        }
+      />
     </Box>
   );
 };

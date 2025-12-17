@@ -8,19 +8,28 @@ import {
   useTheme,
   Button,
   Paper,
+  Snackbar,
+  IconButton,
 } from '@mui/material';
+import { Close as CloseIcon, History as HistoryIcon } from '@mui/icons-material';
 import { TrpUploadCard } from '../components/TrpUploadCard';
 import { TrpFormCard } from '../components/TrpFormCard';
 import { TrpActionsBar } from '../components/TrpActionsBar';
 import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
 import { TrpInputForm } from '../../../lib/types/trp';
-import { generateTrp, listTrpRuns } from '../../../services/api';
+import { generateTrp, listTrpRuns, downloadTrpRun } from '../../../services/api';
 import type { DadosRecebimentoPayload } from '../../../types/trp';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
+    open: false,
+    message: '',
+  });
 
   // Estados dos arquivos
   const [fichaContratualizacaoFile, setFichaContratualizacaoFile] = useState<File | null>(null);
@@ -297,8 +306,11 @@ export const TrpPage: React.FC = () => {
         setHistoryLoading(true);
         const runs = await listTrpRuns(20);
         
-        const items: TrpHistoryItem[] = runs
-          .filter(run => run.status === 'COMPLETED')
+        // ✅ GARANTIR que runs é sempre um array antes de fazer filter
+        const runsArray = Array.isArray(runs) ? runs : [];
+        
+        const items: TrpHistoryItem[] = runsArray
+          .filter(run => run && run.status === 'COMPLETED')
           .map(run => ({
             id: run.runId,
             fileName: `TRP_${run.runId.substring(0, 8)}.pdf`,
@@ -322,6 +334,29 @@ export const TrpPage: React.FC = () => {
     loadHistory();
   }, []);
 
+  const handleDownload = async (runId: string, format: 'pdf' | 'docx') => {
+    try {
+      await downloadTrpRun(runId, format);
+      setSnackbar({ open: true, message: `Download de ${format.toUpperCase()} iniciado`, severity: 'success' });
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao baixar arquivo';
+      const status = err.status;
+      
+      // Tratar erro de autenticação - forçar logout
+      if (errorMessage === 'AUTENTICACAO_REQUERIDA' || status === 401 || status === 403) {
+        await signOut();
+        navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
+        return;
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   return (
     <Box
       sx={{
@@ -333,30 +368,54 @@ export const TrpPage: React.FC = () => {
       }}
     >
       <Box sx={{ mb: 8, textAlign: 'center' }}>
-        <Typography
-          variant="h4"
-          component="h1"
+        <Box
           sx={{
-            fontWeight: 700,
-            mb: 1.5,
-            color: theme.palette.text.primary,
-            letterSpacing: '-0.02em',
-            fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            mb: 2,
+            flexWrap: 'wrap',
+            gap: 2,
           }}
         >
-          Novo Termo de Recebimento Provisório
-        </Typography>
-        <Typography
-          variant="body1"
-          sx={{
-            color: theme.palette.text.secondary,
-            fontSize: '1rem',
-            maxWidth: '600px',
-            mx: 'auto',
-          }}
-        >
-          Preencha os dados abaixo para gerar um novo TRP com assistência da nossa IA.
-        </Typography>
+          <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                mb: 1.5,
+                color: theme.palette.text.primary,
+                letterSpacing: '-0.02em',
+                fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+              }}
+            >
+              Novo Termo de Recebimento Provisório
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: theme.palette.text.secondary,
+                fontSize: '1rem',
+                maxWidth: '600px',
+                mx: 'auto',
+              }}
+            >
+              Preencha os dados abaixo para gerar um novo TRP com assistência da nossa IA.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<HistoryIcon />}
+            onClick={() => navigate('/agents/trp/historico')}
+            sx={{
+              textTransform: 'none',
+              minWidth: 'auto',
+            }}
+          >
+            Histórico
+          </Button>
+        </Box>
       </Box>
 
       {errorMessage && (
@@ -397,13 +456,25 @@ export const TrpPage: React.FC = () => {
             onView={(id) => {
               navigate(`/agents/trp/resultado/${id}`);
             }}
-            onDownload={(id) => {
-              // TODO: Implementar download
-              console.log('Baixar TRP:', id);
-            }}
+            onDownloadPdf={(id) => handleDownload(id, 'pdf')}
+            onDownloadDocx={(id) => handleDownload(id, 'docx')}
           />
         </Box>
       )}
+
+      {/* Snackbar para feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        action={
+          <IconButton size="small" aria-label="close" color="inherit" onClick={handleCloseSnackbar}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        }
+      />
     </Box>
   );
 };

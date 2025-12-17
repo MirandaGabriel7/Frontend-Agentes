@@ -18,6 +18,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import HistoryIcon from '@mui/icons-material/History';
 
 export const AgentsPage = () => {
   const navigate = useNavigate();
@@ -282,32 +283,58 @@ export const AgentsPage = () => {
                     >
                       {tab.content.description}
                     </Typography>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={() => navigate(tab.content.route)}
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{
-                        width: 'fit-content',
-                        mt: 1,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '0.9375rem',
-                        px: 3,
-                        py: 1.5,
-                        borderRadius: 2,
-                        bgcolor: theme.palette.primary.main,
-                        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-                        '&:hover': {
-                          bgcolor: theme.palette.primary.dark,
-                          boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-                          transform: 'translateY(-2px)',
-                        },
-                        transition: 'all 0.2s ease-out',
-                      }}
-                    >
-                      {tab.content.buttonText}
-                    </Button>
+                    <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => navigate(tab.content.route)}
+                        endIcon={<ArrowForwardIcon />}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.9375rem',
+                          px: 3,
+                          py: 1.5,
+                          borderRadius: 2,
+                          bgcolor: theme.palette.primary.main,
+                          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                          '&:hover': {
+                            bgcolor: theme.palette.primary.dark,
+                            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                            transform: 'translateY(-2px)',
+                          },
+                          transition: 'all 0.2s ease-out',
+                        }}
+                      >
+                        {tab.content.buttonText}
+                      </Button>
+                      {tab.value === 'trp' && (
+                        <Button
+                          variant="outlined"
+                          size="large"
+                          onClick={() => navigate('/agents/trp/historico')}
+                          startIcon={<HistoryIcon />}
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.9375rem',
+                            px: 3,
+                            py: 1.5,
+                            borderRadius: 2,
+                            borderColor: alpha(theme.palette.divider, 0.3),
+                            color: theme.palette.text.primary,
+                            '&:hover': {
+                              borderColor: theme.palette.primary.main,
+                              bgcolor: alpha(theme.palette.primary.main, 0.04),
+                              transform: 'translateY(-2px)',
+                            },
+                            transition: 'all 0.2s ease-out',
+                          }}
+                        >
+                          Histórico
+                        </Button>
+                      )}
+                    </Stack>
                   </Box>
 
                   {/* Right: Image/Visual - Before/After Slider */}

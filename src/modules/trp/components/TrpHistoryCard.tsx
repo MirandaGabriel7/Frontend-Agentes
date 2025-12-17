@@ -26,6 +26,8 @@ import {
   Description,
   Visibility,
   Download,
+  PictureAsPdf as PdfIcon,
+  Description as WordIcon,
 } from '@mui/icons-material';
 
 export interface TrpHistoryItem {
@@ -42,6 +44,8 @@ interface TrpHistoryCardProps {
   items: TrpHistoryItem[];
   onView?: (id: string) => void;
   onDownload?: (id: string) => void;
+  onDownloadPdf?: (id: string) => void;
+  onDownloadDocx?: (id: string) => void;
   emptyMessage?: string;
 }
 
@@ -49,6 +53,8 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
   items,
   onView,
   onDownload,
+  onDownloadPdf,
+  onDownloadDocx,
   emptyMessage = 'Nenhum TRP gerado ainda.',
 }) => {
   const theme = useTheme();
@@ -303,7 +309,7 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                           {formatDate(item.createdAt)}
                         </Typography>
                         {item.status === 'completed' && (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                             {onView && (
                               <Button
                                 size="small"
@@ -321,6 +327,44 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                                 }}
                               >
                                 Ver
+                              </Button>
+                            )}
+                            {onDownloadPdf && (
+                              <Button
+                                size="small"
+                                startIcon={<PdfIcon sx={{ fontSize: 16 }} />}
+                                onClick={() => onDownloadPdf(item.id)}
+                                sx={{
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  minWidth: 'auto',
+                                  px: 1.5,
+                                  color: theme.palette.error.main,
+                                  '&:hover': {
+                                    bgcolor: alpha(theme.palette.error.main, 0.08),
+                                  },
+                                }}
+                              >
+                                PDF
+                              </Button>
+                            )}
+                            {onDownloadDocx && (
+                              <Button
+                                size="small"
+                                startIcon={<WordIcon sx={{ fontSize: 16 }} />}
+                                onClick={() => onDownloadDocx(item.id)}
+                                sx={{
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  minWidth: 'auto',
+                                  px: 1.5,
+                                  color: theme.palette.info.main,
+                                  '&:hover': {
+                                    bgcolor: alpha(theme.palette.info.main, 0.08),
+                                  },
+                                }}
+                              >
+                                DOCX
                               </Button>
                             )}
                             {onDownload && (

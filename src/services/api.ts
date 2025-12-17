@@ -2,6 +2,9 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { supabase } from '../infra/supabaseClient';
 import { isUuid } from '../utils/uuid';
 
+// Configuração do baseURL:
+// - Se VITE_TRP_API_URL estiver definido: usa `${VITE_TRP_API_URL}/api` (ex: http://localhost:4000/api)
+// - Caso contrário: usa '/api' que será proxyado pelo Vite (vite.config.ts) para http://localhost:4000
 const baseURL = import.meta.env.VITE_TRP_API_URL
   ? `${import.meta.env.VITE_TRP_API_URL}/api`
   : '/api';
@@ -115,7 +118,8 @@ export interface TrpRunListItem {
 
 export interface TrpListRunsApiResponse {
   success: boolean;
-  data?: TrpRunListItem[];
+  // ✅ Backend retorna: { items: TrpRunListItem[], nextCursor?: string }
+  data?: TrpRunListItem[] | { items: TrpRunListItem[]; nextCursor?: string };
   nextCursor?: string;
   message?: string;
 }
@@ -282,6 +286,8 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
 /**
  * Lista os últimos TRPs gerados
  * Fonte da verdade: backend (Supabase)
+ * 
+ * ✅ Backend retorna: { success: true, data: { items: [...], nextCursor: "..." } }
  */
 export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]> {
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
@@ -297,7 +303,9 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
       keys: Object.keys(response.data),
       hasSuccess: 'success' in response.data,
       hasData: 'data' in response.data,
-      dataLength: response.data?.data?.length,
+      dataType: typeof response.data?.data,
+      isArray: Array.isArray(response.data?.data),
+      hasItems: 'items' in (response.data?.data || {}),
     });
   }
 
@@ -311,7 +319,19 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
     throw new Error(errorMessage);
   }
 
-  return wrapper.data || [];
+  // ✅ CORRETO: Backend retorna { items: [...], nextCursor: "..." }
+  // Se wrapper.data for um objeto com items, usar items
+  // Se wrapper.data for um array (compatibilidade), usar diretamente
+  if (wrapper.data && typeof wrapper.data === 'object' && 'items' in wrapper.data) {
+    return (wrapper.data as { items: TrpRunListItem[] }).items || [];
+  }
+  
+  // Fallback para compatibilidade (se backend retornar array diretamente)
+  if (Array.isArray(wrapper.data)) {
+    return wrapper.data;
+  }
+
+  return [];
 }
 
 /**
@@ -355,8 +375,27 @@ export async function fetchTrpRuns(params: FetchTrpRunsParams = {}): Promise<Fet
     throw new Error(errorMessage);
   }
 
+  // ✅ CORRETO: Backend retorna { success: true, data: { items: [...], nextCursor: "..." } }
+  // Se wrapper.data for um objeto com items, usar items e nextCursor de dentro
+  // Se wrapper.data for um array (compatibilidade), usar diretamente
+  if (wrapper.data && typeof wrapper.data === 'object' && 'items' in wrapper.data) {
+    const dataObj = wrapper.data as { items: TrpRunListItem[]; nextCursor?: string };
+    return {
+      items: dataObj.items || [],
+      nextCursor: dataObj.nextCursor || wrapper.nextCursor,
+    };
+  }
+  
+  // Fallback para compatibilidade (se backend retornar array diretamente)
+  if (Array.isArray(wrapper.data)) {
+    return {
+      items: wrapper.data,
+      nextCursor: wrapper.nextCursor,
+    };
+  }
+
   return {
-    items: wrapper.data || [],
+    items: [],
     nextCursor: wrapper.nextCursor,
   };
 }
@@ -424,5 +463,160 @@ export async function uploadFile(file: File): Promise<UploadFileResponse> {
 export async function runTrpAgent(data: TrpRunRequest): Promise<TrpRunResponse> {
   const response = await api.post<TrpRunResponse>('/agents/trp/run', data);
   return response.data;
+}
+
+/**
+ * Extrai o filename do header Content-Disposition
+ * Suporta formatos: filename="arquivo.pdf", filename=arquivo.pdf, filename*=UTF-8''arquivo.pdf
+ */
+function extractFilenameFromDisposition(header?: string | null): string | null {
+  if (!header) return null;
+
+  // Buscar por filename= ou filename*=
+  const filenameMatch = header.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+  if (!filenameMatch) return null;
+
+  let filename = filenameMatch[1];
+  
+  // Remover aspas
+  if (filename.startsWith('"') && filename.endsWith('"')) {
+    filename = filename.slice(1, -1);
+  } else if (filename.startsWith("'") && filename.endsWith("'")) {
+    filename = filename.slice(1, -1);
+  }
+
+  // Tratar formato filename*=UTF-8''arquivo.pdf
+  if (filename.includes("''")) {
+    filename = filename.split("''")[1];
+  }
+
+  // Decodificar URI encoding se necessário
+  try {
+    filename = decodeURIComponent(filename);
+  } catch {
+    // Se falhar, usar o filename como está
+  }
+
+  // Sanitizar mínimo: remover caracteres perigosos
+  filename = filename.replace(/[<>:"/\\|?*]/g, '_').trim();
+
+  return filename || null;
+}
+
+/**
+ * Faz download de um TRP em PDF ou DOCX
+ * 
+ * ✅ ENDPOINT SEMPRE: GET /api/trp/runs/${runId}/download?format=pdf|docx
+ * ✅ runId DEVE vir do parâmetro da URL (TrpResultPage) ou do item da lista (TrpHistoryPage)
+ * ✅ NUNCA usar estado global, "último run" ou qualquer outra fonte
+ * 
+ * @param runId ID do run do TRP (obrigatório, deve ser validado antes de chamar esta função)
+ * @param format Formato do arquivo: 'pdf' ou 'docx'
+ * @throws Error com mensagem apropriada para cada tipo de erro
+ */
+export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Promise<void> {
+  const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
+
+  // ✅ VALIDAÇÃO: runId é obrigatório
+  if (!runId || typeof runId !== 'string' || runId.trim() === '') {
+    throw new Error('runId é obrigatório e deve ser uma string válida');
+  }
+
+  if (isDev) {
+    console.debug('[TRP Download] Iniciando download:', { runId, format });
+  }
+
+  // IMPORTANT: validateStatus: () => true para tratar erros manualmente
+  // Quando responseType: 'blob', erros HTTP ainda retornam como blob (JSON de erro)
+  // ✅ Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+  const res = await api.get(`/trp/runs/${runId}/download`, {
+    params: { format },
+    responseType: 'blob',
+    validateStatus: () => true, // Não lançar exceção automaticamente
+  });
+
+  if (isDev) {
+    console.debug('[TRP Download] Resposta recebida:', {
+      status: res.status,
+      contentType: res.headers['content-type'] || res.headers['Content-Type'],
+      contentDisposition: res.headers['content-disposition'] || res.headers['Content-Disposition'],
+    });
+  }
+
+  // Se backend retornou erro (status >= 400), o blob pode conter JSON de erro
+  if (res.status >= 400) {
+    try {
+      // Tentar converter blob para texto e parsear como JSON
+      const text = await new Response(res.data).text();
+      let msg = `Falha no download (${res.status})`;
+      
+      try {
+        const json = JSON.parse(text);
+        msg = json.message || json.error || msg;
+      } catch {
+        // Se não for JSON, usar o texto como está (ou mensagem padrão)
+        if (text && text.length < 200) {
+          msg = text;
+        }
+      }
+
+      if (isDev) {
+        console.error('[TRP Download] Erro HTTP:', { status: res.status, message: msg });
+      }
+
+      // Criar erro com status para tratamento específico
+      const error = Object.assign(new Error(msg), { status: res.status });
+      
+      // Mapear status codes para mensagens específicas
+      switch (res.status) {
+        case 409:
+          throw Object.assign(new Error('A execução ainda não foi concluída'), { status: 409 });
+        case 429:
+          throw Object.assign(new Error('Aguarde alguns segundos e tente novamente'), { status: 429 });
+        case 401:
+        case 403:
+          throw Object.assign(new Error('AUTENTICACAO_REQUERIDA'), { status: res.status });
+        case 404:
+          throw Object.assign(new Error('Arquivo não encontrado'), { status: 404 });
+        default:
+          throw error;
+      }
+    } catch (err: any) {
+      // Se já é um erro nosso (com status), re-lançar
+      if (err.status) {
+        throw err;
+      }
+      // Caso contrário, lançar erro genérico
+      throw Object.assign(new Error(err.message || `Erro ao baixar arquivo (${res.status})`), { status: res.status });
+    }
+  }
+
+  // Sucesso: extrair filename e fazer download
+  const disposition = res.headers['content-disposition'] || res.headers['Content-Disposition'];
+  const filename = extractFilenameFromDisposition(disposition) ?? `TRP_${runId}.${format}`;
+
+  if (isDev) {
+    console.debug('[TRP Download] Filename extraído:', filename);
+  }
+
+  // Criar blob com o tipo correto do header ou fallback
+  const contentType = res.headers['content-type'] || res.headers['Content-Type'];
+  const blob = new Blob([res.data], {
+    type: contentType || (format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  });
+
+  // Criar link temporário e fazer download
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+
+  if (isDev) {
+    console.debug('[TRP Download] Download concluído:', filename);
+  }
 }
 
