@@ -19,6 +19,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { TrpRun } from '../../../lib/types/trp';
 import { TrpSummaryStrip } from './TrpSummaryStrip';
 import { TrpMarkdownView } from './TrpMarkdownView';
+import { normalizeTrpValue } from '../utils/formatTrpValues';
 
 interface TrpResultPanelProps {
   run: TrpRun;
@@ -137,7 +138,9 @@ export const TrpResultPanel: React.FC<TrpResultPanelProps> = ({ run }) => {
                     <TableCell sx={{ fontWeight: 500 }}>
                       {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </TableCell>
-                    <TableCell>{String(value)}</TableCell>
+                    <TableCell>
+                      {normalizeTrpValue(typeof value === 'string' ? value : String(value), key)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

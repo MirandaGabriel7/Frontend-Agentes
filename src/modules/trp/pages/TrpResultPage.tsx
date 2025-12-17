@@ -26,12 +26,14 @@ import {
   Close as CloseIcon,
   History as HistoryIcon,
 } from '@mui/icons-material';
-import { TrpAgentOutput, TrpCamposNormalizados } from '../../../lib/types/trp';
-import { fetchTrpRun, downloadTrpRun } from '../../../services/api';
+import { TrpAgentOutput } from '../../../lib/types/trp';
+import { fetchTrpRun, downloadTrpRun, TrpRunData } from '../../../services/api';
 import { TrpSummaryCards } from '../components/TrpSummaryCards';
 import { TrpMarkdownView } from '../components/TrpMarkdownView';
 import { TrpStructuredDataPanel } from '../components/TrpStructuredDataPanel';
 import { useAuth } from '../../../contexts/AuthContext';
+import { isUuid } from '../../../utils/uuid';
+import { createTrpViewModel, TrpViewModel } from '../utils/trpViewModel';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -54,8 +56,8 @@ export const TrpResultPage: React.FC = () => {
   const { signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [runData, setRunData] = useState<any>(null);
-  const [data, setData] = useState<TrpAgentOutput | null>(null);
+  const [runData, setRunData] = useState<TrpRunData | null>(null);
+  const [viewModel, setViewModel] = useState<TrpViewModel | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -67,8 +69,16 @@ export const TrpResultPage: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
+    // ✅ VALIDAÇÃO: runId deve vir EXCLUSIVAMENTE do useParams (rota)
     if (!runId) {
-      setError('ID do TRP não fornecido');
+      setError('ID do TRP não fornecido na URL');
+      setLoading(false);
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: runId deve ser um UUID válido
+    if (!isUuid(runId)) {
+      setError('ID do TRP inválido');
       setLoading(false);
       return;
     }
@@ -77,8 +87,18 @@ export const TrpResultPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // ✅ SEMPRE buscar do backend (fonte da verdade)
+      // ✅ SEMPRE buscar do backend usando runId da rota (fonte da verdade)
+      // ✅ GARANTIA: O run carregado é exatamente o runId da rota /agents/trp/resultado/:runId
       const run = await fetchTrpRun(runId);
+      
+      // ✅ VALIDAÇÃO: Verificar se o run retornado corresponde ao runId da rota
+      if (run.runId !== runId) {
+        const errorMsg = `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`;
+        console.error('[TrpResultPage]', errorMsg);
+        setError('Erro ao carregar TRP: inconsistência de dados');
+        setLoading(false);
+        return;
+      }
       
       const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
       if (isDev) {
@@ -88,41 +108,17 @@ export const TrpResultPage: React.FC = () => {
           hasDocumentoMarkdownFinal: !!run.documento_markdown_final,
           documentoMarkdownFinalLength: run.documento_markdown_final?.length,
           hasCamposTrpNormalizados: !!run.campos_trp_normalizados,
+          hasContextoRecebimentoRaw: !!run.contexto_recebimento_raw,
           camposKeys: run.campos_trp_normalizados ? Object.keys(run.campos_trp_normalizados) : [],
-          camposCriticos: {
-            vencimento_nf: run.campos_trp_normalizados?.vencimento_nf,
-            data_entrega: run.campos_trp_normalizados?.data_entrega,
-            condicao_prazo: run.campos_trp_normalizados?.condicao_prazo,
-            condicao_quantidade: run.campos_trp_normalizados?.condicao_quantidade,
-            observacoes: run.campos_trp_normalizados?.observacoes,
-          },
+          contextoKeys: run.contexto_recebimento_raw ? Object.keys(run.contexto_recebimento_raw) : [],
         });
       }
       
       setRunData(run);
       
-      // Mapear para o formato esperado pelos componentes
-      // Prioridade: documento_markdown_final > documento_markdown > ''
-      const documento_markdown = run.documento_markdown_final 
-        ?? run.documento_markdown 
-        ?? '';
-      
-      // Prioridade: campos_trp_normalizados > campos_trp > campos > {}
-      const campos = (run.campos_trp_normalizados 
-        ?? run.campos_trp 
-        ?? run.campos 
-        ?? {}) as TrpCamposNormalizados;
-      
-      const trpOutput: TrpAgentOutput = {
-        documento_markdown,
-        campos,
-        meta: {
-          fileName: run.runId || 'TRP_Gerado.pdf',
-          hash_tdr: run.runId || '',
-        },
-      };
-      
-      setData(trpOutput);
+      // ✅ Criar viewModel único que combina todas as fontes de dados
+      const vm = createTrpViewModel(run);
+      setViewModel(vm);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao carregar TRP';
       console.error('[TrpResultPage] Erro ao carregar TRP:', err);
@@ -152,9 +148,34 @@ export const TrpResultPage: React.FC = () => {
   };
 
   const handleDownload = async (format: 'pdf' | 'docx') => {
-    // ✅ VALIDAÇÃO: runId deve vir do parâmetro da URL (useParams)
+    // ✅ VALIDAÇÃO CRÍTICA: runId deve vir EXCLUSIVAMENTE do useParams (rota)
+    // ✅ BLOQUEIO: Nunca usar runId de state, cache, último run, ou qualquer outra fonte
     if (!runId) {
-      setSnackbar({ open: true, message: 'ID do TRP não encontrado', severity: 'error' });
+      setSnackbar({ 
+        open: true, 
+        message: 'ID do TRP não encontrado na URL', 
+        severity: 'error' 
+      });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: runId deve ser UUID válido
+    if (!isUuid(runId)) {
+      setSnackbar({ 
+        open: true, 
+        message: 'ID do TRP inválido', 
+        severity: 'error' 
+      });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: Verificar se runData corresponde ao runId da rota
+    if (runData && runData.runId !== runId) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Inconsistência: o documento carregado não corresponde ao ID da URL', 
+        severity: 'error' 
+      });
       return;
     }
 
@@ -172,8 +193,9 @@ export const TrpResultPage: React.FC = () => {
     
     try {
       setDownloading(true);
-      // ✅ SEMPRE usar runId do parâmetro da URL
-      // Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+      // ✅ GARANTIA ABSOLUTA: runId vem EXCLUSIVAMENTE do useParams (rota)
+      // ✅ Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+      // ✅ NUNCA usar: data.runId, runData.runId, currentRun, último run, cache, etc.
       await downloadTrpRun(runId, format);
       setSnackbar({ 
         open: true, 
@@ -184,14 +206,47 @@ export const TrpResultPage: React.FC = () => {
       const errorMessage = err.message || 'Erro ao baixar arquivo';
       const status = err.status;
       
-      // Tratar erro de autenticação - forçar logout
-      if (errorMessage === 'AUTENTICACAO_REQUERIDA' || status === 401 || status === 403) {
+      // Tratar erros específicos conforme requisitos
+      if (status === 401 || status === 403) {
+        // ✅ Erro 401/403: Sessão expirada / sem permissão
+        setSnackbar({ 
+          open: true, 
+          message: 'Sessão expirada / sem permissão', 
+          severity: 'error' 
+        });
         await signOut();
         navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
         return;
       }
       
-      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+      if (status === 404) {
+        // ✅ Erro 404: Documento não encontrado
+        setSnackbar({ 
+          open: true, 
+          message: 'Documento não encontrado', 
+          severity: 'error' 
+        });
+      } else if (status === 409) {
+        // ✅ Erro 409: Documento ainda não finalizado
+        setSnackbar({ 
+          open: true, 
+          message: 'Documento ainda não finalizado', 
+          severity: 'warning' 
+        });
+      } else if (status === 429) {
+        // ✅ Erro 429: Aguarde antes de gerar novamente
+        setSnackbar({ 
+          open: true, 
+          message: 'Aguarde antes de gerar novamente', 
+          severity: 'warning' 
+        });
+      } else {
+        setSnackbar({ 
+          open: true, 
+          message: errorMessage, 
+          severity: 'error' 
+        });
+      }
     } finally {
       setDownloading(false);
     }
@@ -268,7 +323,7 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
-  if (!data || !runData) {
+  if (!viewModel || !runData) {
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
         <Alert severity="warning">
@@ -277,6 +332,16 @@ export const TrpResultPage: React.FC = () => {
       </Box>
     );
   }
+  
+  // Converter viewModel para formato compatível com componentes existentes
+  const data: TrpAgentOutput = {
+    documento_markdown: viewModel.documento_markdown,
+    campos: viewModel.campos,
+    meta: {
+      fileName: viewModel.runId || 'TRP_Gerado.pdf',
+      hash_tdr: viewModel.runId || '',
+    },
+  };
 
   return (
     <Box
@@ -358,11 +423,13 @@ export const TrpResultPage: React.FC = () => {
               </Tooltip>
               <Tooltip 
                 title={
-                  runData?.status !== 'COMPLETED' 
-                    ? 'Documento ainda não concluído' 
-                    : downloadingPdf 
-                      ? 'Exportando documento oficial do TRP...' 
-                      : 'Exportar PDF'
+                  !runId || !isUuid(runId)
+                    ? 'ID do TRP inválido'
+                    : runData?.status !== 'COMPLETED' 
+                      ? 'Aguarde processamento' 
+                      : downloadingPdf 
+                        ? 'Exportando documento oficial do TRP...' 
+                        : 'Exportar PDF'
                 }
               >
                 <span>
@@ -371,7 +438,7 @@ export const TrpResultPage: React.FC = () => {
                     size="small"
                     startIcon={downloadingPdf ? <CircularProgress size={16} /> : <PdfIcon />}
                     onClick={handleDownloadPdf}
-                    disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                    disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
                     sx={{
                       textTransform: 'none',
                       minWidth: 'auto',
@@ -383,11 +450,13 @@ export const TrpResultPage: React.FC = () => {
               </Tooltip>
               <Tooltip 
                 title={
-                  runData?.status !== 'COMPLETED' 
-                    ? 'Documento ainda não concluído' 
-                    : downloadingDocx 
-                      ? 'Exportando documento oficial do TRP...' 
-                      : 'Exportar DOCX'
+                  !runId || !isUuid(runId)
+                    ? 'ID do TRP inválido'
+                    : runData?.status !== 'COMPLETED' 
+                      ? 'Aguarde processamento' 
+                      : downloadingDocx 
+                        ? 'Exportando documento oficial do TRP...' 
+                        : 'Exportar DOCX'
                 }
               >
                 <span>
@@ -396,7 +465,7 @@ export const TrpResultPage: React.FC = () => {
                     size="small"
                     startIcon={downloadingDocx ? <CircularProgress size={16} /> : <WordIcon />}
                     onClick={handleDownloadWord}
-                    disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                    disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
                     sx={{
                       textTransform: 'none',
                       minWidth: 'auto',
@@ -569,11 +638,13 @@ export const TrpResultPage: React.FC = () => {
                 <Stack spacing={2}>
                   <Tooltip 
                     title={
-                      runData?.status !== 'COMPLETED' 
-                        ? 'Documento ainda não concluído' 
-                        : downloadingPdf 
-                          ? 'Exportando documento oficial do TRP...' 
-                          : 'Exportar documento oficial do TRP em PDF'
+                      !runId || !isUuid(runId)
+                        ? 'ID do TRP inválido'
+                        : runData?.status !== 'COMPLETED' 
+                          ? 'Aguarde processamento' 
+                          : downloadingPdf 
+                            ? 'Exportando documento oficial do TRP...' 
+                            : 'Exportar documento oficial do TRP em PDF'
                     }
                   >
                     <span>
@@ -582,7 +653,7 @@ export const TrpResultPage: React.FC = () => {
                         fullWidth
                         startIcon={downloadingPdf ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
                         onClick={handleDownloadPdf}
-                        disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                        disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
                         sx={{
                           bgcolor: theme.palette.primary.main,
                           color: 'white',
@@ -604,11 +675,13 @@ export const TrpResultPage: React.FC = () => {
                   </Tooltip>
                   <Tooltip 
                     title={
-                      runData?.status !== 'COMPLETED' 
-                        ? 'Documento ainda não concluído' 
-                        : downloadingDocx 
-                          ? 'Exportando documento oficial do TRP...' 
-                          : 'Exportar documento oficial do TRP em Word (DOCX)'
+                      !runId || !isUuid(runId)
+                        ? 'ID do TRP inválido'
+                        : runData?.status !== 'COMPLETED' 
+                          ? 'Aguarde processamento' 
+                          : downloadingDocx 
+                            ? 'Exportando documento oficial do TRP...' 
+                            : 'Exportar documento oficial do TRP em Word (DOCX)'
                     }
                   >
                     <span>
@@ -617,7 +690,7 @@ export const TrpResultPage: React.FC = () => {
                         fullWidth
                         startIcon={downloadingDocx ? <CircularProgress size={20} /> : <WordIcon />}
                         onClick={handleDownloadWord}
-                        disabled={downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
+                        disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
                         sx={{
                           borderColor: alpha(theme.palette.divider, 0.2),
                           color: theme.palette.text.primary,

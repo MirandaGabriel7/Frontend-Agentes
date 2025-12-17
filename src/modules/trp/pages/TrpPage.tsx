@@ -21,6 +21,7 @@ import { TrpInputForm } from '../../../lib/types/trp';
 import { generateTrp, listTrpRuns, downloadTrpRun } from '../../../services/api';
 import type { DadosRecebimentoPayload } from '../../../types/trp';
 import { useAuth } from '../../../contexts/AuthContext';
+import { isUuid } from '../../../utils/uuid';
 
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
@@ -335,21 +336,50 @@ export const TrpPage: React.FC = () => {
   }, []);
 
   const handleDownload = async (runId: string, format: 'pdf' | 'docx') => {
+    // ✅ VALIDAÇÃO CRÍTICA: runId deve vir EXCLUSIVAMENTE do item do histórico
+    // ✅ BLOQUEIO: Nunca usar runId de state global, cache, último run, ou qualquer outra fonte
+    if (!runId) {
+      setSnackbar({ open: true, message: 'ID do TRP não encontrado', severity: 'error' });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: runId deve ser UUID válido
+    if (!isUuid(runId)) {
+      setSnackbar({ open: true, message: 'ID do TRP inválido', severity: 'error' });
+      return;
+    }
+
     try {
+      // ✅ GARANTIA ABSOLUTA: runId vem EXCLUSIVAMENTE do item do histórico
+      // ✅ Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
+      // ✅ NUNCA usar: estado global, cache, último run, etc.
       await downloadTrpRun(runId, format);
-      setSnackbar({ open: true, message: `Download de ${format.toUpperCase()} iniciado`, severity: 'success' });
+      setSnackbar({ open: true, message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`, severity: 'success' });
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao baixar arquivo';
       const status = err.status;
       
-      // Tratar erro de autenticação - forçar logout
-      if (errorMessage === 'AUTENTICACAO_REQUERIDA' || status === 401 || status === 403) {
+      // Tratar erros específicos conforme requisitos
+      if (status === 401 || status === 403) {
+        setSnackbar({ 
+          open: true, 
+          message: 'Sessão expirada / sem permissão', 
+          severity: 'error' 
+        });
         await signOut();
         navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
         return;
       }
       
-      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+      if (status === 404) {
+        setSnackbar({ open: true, message: 'Documento não encontrado', severity: 'error' });
+      } else if (status === 409) {
+        setSnackbar({ open: true, message: 'Documento ainda não finalizado', severity: 'warning' });
+      } else if (status === 429) {
+        setSnackbar({ open: true, message: 'Aguarde antes de gerar novamente', severity: 'warning' });
+      } else {
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+      }
     }
   };
 

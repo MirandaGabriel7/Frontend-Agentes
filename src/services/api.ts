@@ -93,6 +93,7 @@ export interface TrpRunData {
   campos_trp?: Record<string, unknown>; // fallback
   campos?: Record<string, unknown>; // fallback
   camposTrpNormalizados?: Record<string, unknown>; // fallback camelCase
+  contexto_recebimento_raw?: Record<string, unknown>; // Dados brutos do contexto de recebimento
   createdAt?: string;
   updatedAt?: string;
 }
@@ -517,9 +518,14 @@ function extractFilenameFromDisposition(header?: string | null): string | null {
 export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Promise<void> {
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
 
-  // ✅ VALIDAÇÃO: runId é obrigatório
+  // ✅ VALIDAÇÃO CRÍTICA: runId é obrigatório e deve ser string não vazia
   if (!runId || typeof runId !== 'string' || runId.trim() === '') {
     throw new Error('runId é obrigatório e deve ser uma string válida');
+  }
+
+  // ✅ VALIDAÇÃO: runId deve ser UUID válido
+  if (!isUuid(runId)) {
+    throw new Error('runId deve ser um UUID válido');
   }
 
   if (isDev) {
@@ -567,17 +573,18 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
       // Criar erro com status para tratamento específico
       const error = Object.assign(new Error(msg), { status: res.status });
       
-      // Mapear status codes para mensagens específicas
+      // Mapear status codes para mensagens específicas conforme requisitos
       switch (res.status) {
-        case 409:
-          throw Object.assign(new Error('A execução ainda não foi concluída'), { status: 409 });
-        case 429:
-          throw Object.assign(new Error('Aguarde alguns segundos e tente novamente'), { status: 429 });
         case 401:
+          throw Object.assign(new Error('Sessão expirada / sem permissão'), { status: 401 });
         case 403:
-          throw Object.assign(new Error('AUTENTICACAO_REQUERIDA'), { status: res.status });
+          throw Object.assign(new Error('Sessão expirada / sem permissão'), { status: 403 });
         case 404:
-          throw Object.assign(new Error('Arquivo não encontrado'), { status: 404 });
+          throw Object.assign(new Error('Documento não encontrado'), { status: 404 });
+        case 409:
+          throw Object.assign(new Error('Documento ainda não finalizado'), { status: 409 });
+        case 429:
+          throw Object.assign(new Error('Aguarde antes de gerar novamente'), { status: 429 });
         default:
           throw error;
       }
@@ -593,7 +600,13 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
 
   // Sucesso: extrair filename e fazer download
   const disposition = res.headers['content-disposition'] || res.headers['Content-Disposition'];
-  const filename = extractFilenameFromDisposition(disposition) ?? `TRP_${runId}.${format}`;
+  let filename = extractFilenameFromDisposition(disposition);
+  
+  // ✅ Fallback: usar runId se não encontrar no header
+  // O backend deve enviar o filename correto no Content-Disposition
+  if (!filename) {
+    filename = `TRP_${runId}.${format}`;
+  }
 
   if (isDev) {
     console.debug('[TRP Download] Filename extraído:', filename);

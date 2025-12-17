@@ -8,7 +8,8 @@ import {
   Divider,
 } from '@mui/material';
 import { TrpCamposNormalizados } from '../../../lib/types/trp';
-import { formatCondicaoPrazo, formatCondicaoQuantidade } from '../utils/formatTrpValues';
+import { normalizeTrpValue } from '../utils/formatTrpValues';
+import { organizeFieldsBySections } from '../utils/trpFieldSections';
 
 interface TrpStructuredDataPanelProps {
   campos: TrpCamposNormalizados;
@@ -73,78 +74,37 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
   console.debug('TrpStructuredDataPanel - condicao_quantidade:', (campos as any).condicao_quantidade);
   console.debug('TrpStructuredDataPanel - observacoes:', (campos as any).observacoes);
 
-  // Helper para obter campo do objeto snake_case com fallbacks
-  const getCampo = (key: string): string | null | undefined => {
-    // Acessar diretamente o objeto, sem depender do tipo
-    const value = (campos as any)[key];
-    // Se for number, converter para string
-    if (typeof value === 'number') {
-      return value.toString();
-    }
-    // Se for string, retornar
-    if (typeof value === 'string') {
-      return value;
-    }
-    // Se for null ou undefined, retornar null
-    return value ?? null;
-  };
-
-  const sections = [
-    {
-      title: 'Contrato',
-      fields: [
-        { label: 'Número do contrato', value: normalizeField(getCampo('numero_contrato')) },
-        { label: 'Processo licitatório', value: normalizeField(getCampo('processo_licitatorio')) },
-        { label: 'Vigência', value: normalizeField(getCampo('vigencia')) },
-        { label: 'Tipo de contrato', value: normalizeField(getCampo('tipo_contrato')) },
-        { label: 'Objeto do contrato', value: normalizeField(getCampo('objeto_contrato')) },
-      ],
-    },
-    {
-      title: 'Fornecedor',
-      fields: [
-        { label: 'Contratada', value: normalizeField(getCampo('contratada')) },
-        { label: 'CNPJ', value: normalizeField(getCampo('cnpj')) },
-      ],
-    },
-    {
-      title: 'Documento Fiscal',
-      fields: [
-        { label: 'Número da NF', value: normalizeField(getCampo('numero_nf')) },
-        { label: 'Vencimento da NF', value: normalizeField(getCampo('vencimento_nf')) },
-        { label: 'Número do Empenho', value: normalizeField(getCampo('numero_empenho')) },
-        {
-          label: 'Valor efetivo',
-          value: getCampo('valor_efetivo_formatado') as string || normalizeField(getCampo('valor_efetivo_numero')?.toString()),
-        },
-        { label: 'Competência (Mês/Ano)', value: normalizeField(getCampo('competencia_mes_ano')) },
-      ],
-    },
-    {
-      title: 'Recebimento',
-      fields: [
-        { label: 'Data da entrega', value: normalizeField(getCampo('data_entrega')) },
-        { label: 'Condição do prazo', value: formatCondicaoPrazo(getCampo('condicao_prazo')) },
-        { label: 'Condição da quantidade', value: formatCondicaoQuantidade(getCampo('condicao_quantidade')) },
-      ],
-    },
-    {
-      title: 'Observações',
-      fields: [
-        {
-          label: 'Observações',
-          value: (() => {
-            const obs = getCampo('observacoes');
-            // Só exibir "Não há observações adicionais" se o valor for null/undefined/"" ou "NAO_DECLARADO"
-            if (obs === null || obs === undefined || obs === '' || obs === 'NAO_DECLARADO') {
-              return 'Não há observações adicionais';
-            }
-            return obs;
-          })(),
-        },
-      ],
-    },
-  ];
+  // ✅ RENDERIZAÇÃO DINÂMICA: Organizar campos por seções automaticamente
+  const sectionsWithFields = organizeFieldsBySections(campos as Record<string, unknown>);
+  
+  // Converter para formato esperado pelo componente
+  const sections = sectionsWithFields
+    .filter(({ section }) => section.title !== 'ASSINATURAS') // Assinaturas não aparecem na aba de dados estruturados
+    .map(({ section, fields }) => ({
+      title: section.title,
+      fields: fields.map((field) => {
+        let displayValue = '';
+        if (field.value === null || field.value === undefined || field.value === '') {
+          // Tratamento especial para observações
+          if (field.fieldName === 'observacoes') {
+            displayValue = 'Não há observações adicionais';
+          } else {
+            displayValue = 'Não informado';
+          }
+        } else if (typeof field.value === 'string') {
+          displayValue = normalizeTrpValue(field.value, field.fieldName);
+        } else if (typeof field.value === 'number') {
+          displayValue = field.value.toString();
+        } else {
+          displayValue = String(field.value);
+        }
+        
+        return {
+          label: field.label,
+          value: displayValue,
+        };
+      }),
+    }));
 
   return (
     <Box>
