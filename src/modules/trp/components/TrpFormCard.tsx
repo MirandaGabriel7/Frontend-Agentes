@@ -17,7 +17,13 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { TrpInputForm, TrpCondicaoPrazo, TrpCondicaoQuantidade, TrpTipoBasePrazo, TrpTipoContrato } from '../../../lib/types/trp';
+import {
+  TrpInputForm,
+  TrpCondicaoPrazo,
+  TrpCondicaoQuantidade,
+  TrpTipoBasePrazo,
+  TrpTipoContrato,
+} from '../../../lib/types/trp';
 
 dayjs.locale('pt-br');
 
@@ -30,15 +36,15 @@ interface TrpFormCardProps {
 // Função para formatar valores de select para exibição
 const formatSelectValue = (value: string): string => {
   const formatMap: Record<string, string> = {
-    'BENS': 'Bens',
+    BENS: 'Bens',
     'SERVIÇOS': 'Serviços',
-    'OBRA': 'Obra',
-    'DATA_RECEBIMENTO': 'Data de Recebimento',
-    'SERVICO': 'Conclusão do Serviço',
-    'NO_PRAZO': 'No Prazo',
-    'FORA_DO_PRAZO': 'Fora do Prazo',
-    'TOTAL': 'Total',
-    'PARCIAL': 'Parcial',
+    OBRA: 'Obra',
+    DATA_RECEBIMENTO: 'Data de Recebimento',
+    SERVICO: 'Conclusão do Serviço',
+    NO_PRAZO: 'No Prazo',
+    FORA_DO_PRAZO: 'Fora do Prazo',
+    TOTAL: 'Total',
+    PARCIAL: 'Parcial',
   };
   return formatMap[value] || value;
 };
@@ -104,20 +110,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     onChange({ ...value, ...updates });
   };
 
-  const handleCondicaoQuantidadeNFChange = (newValue: TrpCondicaoQuantidade) => {
-    const updates: Partial<TrpInputForm> = { condicao_quantidade_nf: newValue };
-    if (newValue === 'TOTAL') {
-      updates.comentarios_quantidade_nf = undefined;
-    }
-    onChange({ ...value, ...updates });
-  };
-
   const showCompetenciaField = value.tipo_contratacao === 'SERVIÇOS';
   const showDataRecebimento = value.tipo_base_prazo === 'DATA_RECEBIMENTO';
   const showDataConclusaoServico = value.tipo_base_prazo === 'SERVICO';
   const showAtrasoFields = value.condicao_prazo === 'FORA_DO_PRAZO';
   const showPendenciasOrdem = value.condicao_quantidade_ordem === 'PARCIAL';
-  const showPendenciasNF = value.condicao_quantidade_nf === 'PARCIAL';
 
   const inputSx = {
     '& .MuiOutlinedInput-root': {
@@ -146,11 +143,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       fontSize: '0.9375rem',
       color: theme.palette.text.primary,
     },
-      '& .MuiInputBase-input::placeholder': {
-        color: alpha(theme.palette.text.secondary, 0.65),
-        opacity: 1,
-        fontSize: '0.9375rem',
-      },
+    '& .MuiInputBase-input::placeholder': {
+      color: alpha(theme.palette.text.secondary, 0.65),
+      opacity: 1,
+      fontSize: '0.9375rem',
+    },
   };
 
   const selectSx = {
@@ -216,10 +213,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
         {/* SEÇÃO 1: Tipo de Contrato e Competência */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography 
-              variant="body2" 
-              fontWeight={600} 
-              sx={{ 
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{
                 mb: 1,
                 fontSize: '0.9375rem',
                 color: theme.palette.text.primary,
@@ -251,10 +248,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
           {showCompetenciaField && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography 
-                variant="body1" 
-                fontWeight={600} 
-                sx={{ 
+              <Typography
+                variant="body1"
+                fontWeight={600}
+                sx={{
                   mb: 0.5,
                   fontSize: '1rem',
                   color: theme.palette.text.primary,
@@ -262,10 +259,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               >
                 Mês/Ano de competência
               </Typography>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  mb: 1.5, 
+              <Typography
+                variant="body2"
+                sx={{
+                  mb: 1.5,
                   fontSize: '0.8125rem',
                   lineHeight: 1.5,
                   color: alpha(theme.palette.text.secondary, 0.8),
@@ -303,10 +300,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
         {/* SEÇÃO 2: Base para Contagem de Prazo e Datas */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography 
-              variant="body2" 
-              fontWeight={600} 
-              sx={{ 
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{
                 mb: 1,
                 fontSize: '0.9375rem',
                 color: theme.palette.text.primary,
@@ -315,10 +312,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             >
               Base para contagem de prazo
             </Typography>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                mb: 1.5, 
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 1.5,
                 fontSize: '0.8125rem',
                 lineHeight: 1.5,
                 color: alpha(theme.palette.text.secondary, 0.8),
@@ -340,18 +337,22 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 }}
                 sx={selectSx}
               >
-                <MenuItem value="DATA_RECEBIMENTO">Data de Recebimento — Prazo contado a partir da data de recebimento dos itens</MenuItem>
-                <MenuItem value="SERVICO">Conclusão do Serviço — Prazo contado a partir da conclusão do serviço</MenuItem>
+                <MenuItem value="DATA_RECEBIMENTO">
+                  Data de Recebimento — Prazo contado a partir da data de recebimento dos itens
+                </MenuItem>
+                <MenuItem value="SERVICO">
+                  Conclusão do Serviço — Prazo contado a partir da conclusão do serviço
+                </MenuItem>
               </Select>
             </FormControl>
           </Box>
 
           {showDataRecebimento && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography 
-                variant="body2" 
-                fontWeight={600} 
-                sx={{ 
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
                   mb: 1,
                   fontSize: '0.9375rem',
                   color: theme.palette.text.primary,
@@ -386,10 +387,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
           {showDataConclusaoServico && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography 
-                variant="body2" 
-                fontWeight={600} 
-                sx={{ 
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
                   mb: 1,
                   fontSize: '0.9375rem',
                   color: theme.palette.text.primary,
@@ -421,7 +422,6 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               </LocalizationProvider>
             </Box>
           )}
-
         </Box>
 
         <Divider sx={{ my: 1 }} />
@@ -429,10 +429,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
         {/* SEÇÃO 3: Condição de Prazo */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography 
-              variant="body2" 
-              fontWeight={600} 
-              sx={{ 
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{
                 mb: 1,
                 fontSize: '0.9375rem',
                 color: theme.palette.text.primary,
@@ -472,19 +472,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               }}
             >
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {/* Datas de entrega - Primeiro */}
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
                   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Typography 
-                      variant="body2" 
-                      fontWeight={600} 
-                      sx={{ 
-                        mb: 1,
-                        fontSize: '0.9375rem',
-                        color: theme.palette.text.primary,
-                        lineHeight: 1.5,
-                      }}
-                    >
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: '0.9375rem' }}>
                       Data prevista de entrega (contrato)
                     </Typography>
                     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
@@ -508,17 +498,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                       />
                     </LocalizationProvider>
                   </Box>
+
                   <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <Typography 
-                      variant="body2" 
-                      fontWeight={600} 
-                      sx={{ 
-                        mb: 1,
-                        fontSize: '0.9375rem',
-                        color: theme.palette.text.primary,
-                        lineHeight: 1.5,
-                      }}
-                    >
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: '0.9375rem' }}>
                       Data de entrega real
                     </Typography>
                     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
@@ -544,18 +526,8 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   </Box>
                 </Box>
 
-                {/* Motivo do atraso - Segundo */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Typography 
-                    variant="body2" 
-                    fontWeight={600} 
-                    sx={{ 
-                      mb: 1,
-                      fontSize: '0.9375rem',
-                      color: theme.palette.text.primary,
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: '0.9375rem' }}>
                     Motivo do atraso
                   </Typography>
                   <TextField
@@ -587,13 +559,13 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
         <Divider sx={{ my: 1 }} />
 
-        {/* SEÇÃO 4: Condições de Quantidade */}
+        {/* SEÇÃO 4: Condições de Quantidade (SÓ ORDEM - NF REMOVIDA) */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography 
-              variant="body2" 
-              fontWeight={600} 
-              sx={{ 
+            <Typography
+              variant="body2"
+              fontWeight={600}
+              sx={{
                 mb: 1,
                 fontSize: '0.9375rem',
                 color: theme.palette.text.primary,
@@ -659,20 +631,13 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                     lineHeight: 1.6,
                   }}
                 >
-                  Descreva detalhadamente a divergência entre a quantidade prevista na Ordem de Fornecimento e a quantidade efetivamente recebida, incluindo informações sobre pendências ou remessas futuras, se aplicável.
+                  Descreva detalhadamente a divergência entre a quantidade prevista na Ordem de Fornecimento e a
+                  quantidade efetivamente recebida, incluindo informações sobre pendências ou remessas futuras, se aplicável.
                 </Typography>
               </Box>
+
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography 
-                  variant="body2" 
-                  fontWeight={600} 
-                  sx={{ 
-                    mb: 1,
-                    fontSize: '0.9375rem',
-                    color: theme.palette.text.primary,
-                    lineHeight: 1.5,
-                  }}
-                >
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: '0.9375rem' }}>
                   Comentários sobre divergência/pendências
                 </Typography>
                 <TextField
@@ -697,125 +662,16 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               </Box>
             </Box>
           )}
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography 
-              variant="body2" 
-              fontWeight={600} 
-              sx={{ 
-                mb: 1,
-                fontSize: '0.9375rem',
-                color: theme.palette.text.primary,
-                lineHeight: 1.5,
-              }}
-            >
-              Quantidade conforme Nota Fiscal
-            </Typography>
-            <FormControl fullWidth variant="outlined" required>
-              <Select
-                value={value.condicao_quantidade_nf || ''}
-                onChange={(e) => handleCondicaoQuantidadeNFChange(e.target.value as TrpCondicaoQuantidade)}
-                disabled={disabled}
-                displayEmpty
-                renderValue={(selected) => {
-                  if (!selected) {
-                    return <Box sx={{ color: 'text.secondary', opacity: 0.7 }}>Selecione a condição da quantidade</Box>;
-                  }
-                  return formatSelectValue(selected);
-                }}
-                sx={selectSx}
-              >
-                <MenuItem value="TOTAL">Total</MenuItem>
-                <MenuItem value="PARCIAL">Parcial</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-
-          {showPendenciasNF && (
-            <Box
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                bgcolor: alpha(theme.palette.info.main, 0.04),
-                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 1.5,
-                  mb: 2.5,
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.info.main, 0.06),
-                }}
-              >
-                <InfoOutlinedIcon
-                  sx={{
-                    color: theme.palette.info.main,
-                    fontSize: 20,
-                    mt: 0.25,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: theme.palette.text.primary,
-                    fontSize: '0.8125rem',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Descreva detalhadamente a divergência entre a quantidade descrita na Nota Fiscal e a quantidade efetivamente recebida, incluindo pendências ou remessas futuras, se aplicável.
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography 
-                  variant="body2" 
-                  fontWeight={600} 
-                  sx={{ 
-                    mb: 1,
-                    fontSize: '0.9375rem',
-                    color: theme.palette.text.primary,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Comentários sobre divergência/pendências
-                </Typography>
-                <TextField
-                  value={value.comentarios_quantidade_nf || ''}
-                  onChange={(e) => updateField('comentarios_quantidade_nf')(e.target.value)}
-                  fullWidth
-                  multiline
-                  rows={4}
-                  variant="outlined"
-                  placeholder="Descreva a divergência entre a quantidade descrita na Nota Fiscal e a quantidade efetivamente recebida"
-                  required
-                  disabled={disabled}
-                  InputLabelProps={{ shrink: false }}
-                  label=""
-                  sx={{
-                    ...inputSx,
-                    '& .MuiInputBase-input.MuiInputBase-inputMultiline': {
-                      padding: '16px',
-                    },
-                  }}
-                />
-              </Box>
-            </Box>
-          )}
         </Box>
 
         <Divider sx={{ my: 1 }} />
 
         {/* SEÇÃO 5: Observações */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography 
-            variant="body2" 
-            fontWeight={600} 
-            sx={{ 
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{
               mb: 1,
               fontSize: '0.9375rem',
               color: theme.palette.text.primary,
@@ -824,10 +680,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           >
             Observações do recebimento
           </Typography>
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              mb: 1.5, 
+          <Typography
+            variant="body2"
+            sx={{
+              mb: 1.5,
               fontSize: '0.8125rem',
               lineHeight: 1.5,
               color: alpha(theme.palette.text.secondary, 0.8),

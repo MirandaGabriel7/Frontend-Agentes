@@ -151,8 +151,6 @@ export interface GenerateTrpParams {
     motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
     condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
     comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
-    condicaoQuantidadeNF: string; // "TOTAL" | "PARCIAL"
-    comentariosQuantidadeNF?: string | null; // (quando PARCIAL)
     observacoesRecebimento?: string | null;
     // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
     // serão preenchidas automaticamente pelo sistema a partir dos documentos

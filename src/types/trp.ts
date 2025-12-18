@@ -34,9 +34,6 @@ export interface DadosRecebimentoPayload {
   condicaoQuantidadeOrdem: CondicaoQuantidade;
   comentariosQuantidadeOrdem?: string; // Obrigatório quando PARCIAL
   
-  // Condição da Quantidade - Nota Fiscal
-  condicaoQuantidadeNF: CondicaoQuantidade;
-  comentariosQuantidadeNF?: string; // Obrigatório quando PARCIAL
   
   // Observações do recebimento
   observacoesRecebimento?: string;

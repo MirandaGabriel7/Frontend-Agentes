@@ -4,10 +4,8 @@ import {
   Box,
   Typography,
   Alert,
-  alpha,
   useTheme,
   Button,
-  Paper,
   Snackbar,
   IconButton,
 } from '@mui/material';
@@ -15,7 +13,6 @@ import { Close as CloseIcon, History as HistoryIcon } from '@mui/icons-material'
 import { TrpUploadCard } from '../components/TrpUploadCard';
 import { TrpFormCard } from '../components/TrpFormCard';
 import { TrpActionsBar } from '../components/TrpActionsBar';
-import { TrpResultPanel } from '../components/TrpResultPanel';
 import { TrpHistoryCard, TrpHistoryItem } from '../components/TrpHistoryCard';
 import { TrpInputForm } from '../../../lib/types/trp';
 import { generateTrp, listTrpRuns, downloadTrpRun } from '../../../services/api';
@@ -27,10 +24,15 @@ export const TrpPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
-    open: false,
-    message: '',
-  });
+const [snackbar, setSnackbar] = useState<{
+  open: boolean;
+  message: string;
+  severity?: 'error' | 'success' | 'warning';
+}>({
+  open: false,
+  message: '',
+});
+
 
   // Estados dos arquivos
   const [fichaContratualizacaoFile, setFichaContratualizacaoFile] = useState<File | null>(null);
@@ -120,16 +122,6 @@ export const TrpPage: React.FC = () => {
       return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Ordem de Fornecimento é PARCIAL.';
     }
 
-    // Condição de quantidade NF obrigatória
-    if (!form.condicao_quantidade_nf) {
-      return 'O campo "Quantidade conforme Nota Fiscal" é obrigatório.';
-    }
-
-    // Comentários obrigatórios quando PARCIAL na NF
-    if (form.condicao_quantidade_nf === 'PARCIAL' && !form.comentarios_quantidade_nf) {
-      return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Nota Fiscal é PARCIAL.';
-    }
-
     return null;
   };
 
@@ -152,14 +144,13 @@ export const TrpPage: React.FC = () => {
       }
 
       // Mapear campos do formulário para o payload da API
-      const payload: DadosRecebimentoPayload = {
-        tipoContratacao: form.tipo_contratacao!,
-        tipoBasePrazo: form.tipo_base_prazo!,
-        condicaoPrazo: form.condicao_prazo!,
-        condicaoQuantidadeOrdem: form.condicao_quantidade_ordem!,
-        condicaoQuantidadeNF: form.condicao_quantidade_nf!,
-        // Assinaturas serão preenchidas automaticamente pelo sistema
-      };
+const payload: DadosRecebimentoPayload = {
+  tipoContratacao: form.tipo_contratacao!,
+  tipoBasePrazo: form.tipo_base_prazo!,
+  condicaoPrazo: form.condicao_prazo!,
+  condicaoQuantidadeOrdem: form.condicao_quantidade_ordem!,
+};
+
 
       // Campos condicionais
       if (form.tipo_contratacao === 'SERVIÇOS' && form.competencia_mes_ano) {
@@ -192,9 +183,6 @@ export const TrpPage: React.FC = () => {
         payload.comentariosQuantidadeOrdem = form.comentarios_quantidade_ordem;
       }
 
-      if (form.condicao_quantidade_nf === 'PARCIAL' && form.comentarios_quantidade_nf) {
-        payload.comentariosQuantidadeNF = form.comentarios_quantidade_nf;
-      }
 
       if (form.observacoes_recebimento) {
         payload.observacoesRecebimento = form.observacoes_recebimento;
@@ -217,8 +205,6 @@ export const TrpPage: React.FC = () => {
           motivoAtraso: payload.motivoAtraso || null,
           condicaoQuantidadeOrdem: payload.condicaoQuantidadeOrdem,
           comentariosQuantidadeOrdem: payload.comentariosQuantidadeOrdem || null,
-          condicaoQuantidadeNF: payload.condicaoQuantidadeNF,
-          comentariosQuantidadeNF: payload.comentariosQuantidadeNF || null,
           observacoesRecebimento: payload.observacoesRecebimento || null,
           // Assinaturas serão preenchidas automaticamente pelo sistema a partir dos documentos
         },
