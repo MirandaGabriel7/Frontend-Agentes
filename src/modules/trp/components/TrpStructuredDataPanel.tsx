@@ -15,14 +15,6 @@ interface TrpStructuredDataPanelProps {
   campos: TrpCamposNormalizados;
 }
 
-const normalizeField = (value: string | null | undefined): string => {
-  // Só exibir "Não informado" se o valor for null/undefined/"" ou "NAO_DECLARADO"
-  if (value === null || value === undefined || value === '' || value === 'NAO_DECLARADO') {
-    return 'Não informado';
-  }
-  return value;
-};
-
 interface DataFieldProps {
   label: string;
   value: string;
@@ -30,6 +22,7 @@ interface DataFieldProps {
 
 const DataField: React.FC<DataFieldProps> = ({ label, value }) => {
   const theme = useTheme();
+
   return (
     <Box sx={{ mb: 2.5 }}>
       <Typography
@@ -52,6 +45,7 @@ const DataField: React.FC<DataFieldProps> = ({ label, value }) => {
           color: theme.palette.text.primary,
           fontSize: '0.9375rem',
           lineHeight: 1.6,
+          wordBreak: 'break-word',
         }}
       >
         {value}
@@ -60,56 +54,106 @@ const DataField: React.FC<DataFieldProps> = ({ label, value }) => {
   );
 };
 
+// ✅ valores que nunca devem aparecer pro usuário (mesmo se vierem do backend/markdown)
+const HIDDEN_STRINGS = new Set([
+  'NAO_DECLARADO',
+  'NÃO_DECLARADO',
+  'NAO INFORMADO',
+  'NÃO INFORMADO',
+  'NAO_INFORMADO',
+  'NÃO_INFORMADO',
+  'Não informado',
+  'Nao informado',
+  'Não há observações adicionais',
+]);
+
+function isHiddenOrEmptyString(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v !== 'string') return false;
+
+  const s = v.trim();
+  if (!s) return true;
+  if (HIDDEN_STRINGS.has(s)) return true;
+  if (HIDDEN_STRINGS.has(s.toUpperCase())) return true;
+  return false;
+}
+
+function toDisplayString(fieldName: string, raw: unknown): string {
+  if (raw === null || raw === undefined) return '';
+
+  if (typeof raw === 'string') {
+    // ✅ normalizeTrpValue é o "gate" anti-enum-técnico
+    const normalized = normalizeTrpValue(raw, fieldName);
+    // normalize pode retornar 'Não informado' quando vier vazio -> a gente corta depois
+    return normalized?.trim?.() ? normalized : '';
+  }
+
+  if (typeof raw === 'number' || typeof raw === 'boolean') {
+    return String(raw);
+  }
+
+  try {
+    const str = JSON.stringify(raw);
+    return str && str !== '{}' && str !== '[]' ? str : '';
+  } catch {
+    return String(raw);
+  }
+}
+
 export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
   campos,
 }) => {
   const theme = useTheme();
 
-  // Debug temporário
-  console.debug('TrpStructuredDataPanel - campos recebido:', campos);
-  console.debug('TrpStructuredDataPanel - campos keys:', Object.keys(campos));
-  console.debug('TrpStructuredDataPanel - vencimento_nf:', (campos as any).vencimento_nf);
-  console.debug('TrpStructuredDataPanel - data_entrega:', (campos as any).data_entrega);
-  console.debug('TrpStructuredDataPanel - condicao_prazo:', (campos as any).condicao_prazo);
-  console.debug('TrpStructuredDataPanel - condicao_quantidade:', (campos as any).condicao_quantidade);
-  console.debug('TrpStructuredDataPanel - observacoes:', (campos as any).observacoes);
+  // ✅ CAST CORRETO E SEGURO PARA O TYPESCRIPT (evita TS2352)
+  const camposAsRecord = campos as unknown as Record<string, unknown>;
 
-  // ✅ RENDERIZAÇÃO DINÂMICA: Organizar campos por seções automaticamente
-  const sectionsWithFields = organizeFieldsBySections(campos as Record<string, unknown>);
-  
-  // Converter para formato esperado pelo componente
+  // ✅ Organizar campos dinamicamente por seções (este util já vem filtrando/normalizando também)
+  const sectionsWithFields = organizeFieldsBySections(camposAsRecord);
+
   const sections = sectionsWithFields
-    .filter(({ section }) => section.title !== 'ASSINATURAS') // Assinaturas não aparecem na aba de dados estruturados
-    .map(({ section, fields }) => ({
-      title: section.title,
-      fields: fields.map((field) => {
-        let displayValue = '';
-        if (field.value === null || field.value === undefined || field.value === '') {
-          // Tratamento especial para observações
-          if (field.fieldName === 'observacoes') {
-            displayValue = 'Não há observações adicionais';
-          } else {
-            displayValue = 'Não informado';
+    // Assinaturas não aparecem na aba de dados estruturados
+    .filter(({ section }) => section.title !== 'ASSINATURAS')
+    .map(({ section, fields }) => {
+      const normalizedFields = fields
+        .map((field) => {
+          const raw = field.value;
+
+          // ✅ converte SEMPRE via normalizeTrpValue (anti enum técnico)
+          const displayValue = toDisplayString(field.fieldName, raw);
+
+          // ✅ regra especial: observações vazias não entram (não polui UI)
+          if (field.fieldName === 'observacoes' && isHiddenOrEmptyString(displayValue)) {
+            return null;
           }
-        } else if (typeof field.value === 'string') {
-          displayValue = normalizeTrpValue(field.value, field.fieldName);
-        } else if (typeof field.value === 'number') {
-          displayValue = field.value.toString();
-        } else {
-          displayValue = String(field.value);
-        }
-        
-        return {
-          label: field.label,
-          value: displayValue,
-        };
-      }),
-    }));
+
+          // ✅ cortar qualquer "não declarado"/vazio/placeholder
+          if (isHiddenOrEmptyString(displayValue)) {
+            return null;
+          }
+
+          return {
+            label: field.label,
+            value: displayValue,
+          };
+        })
+        .filter(Boolean) as Array<{ label: string; value: string }>;
+
+      return {
+        title: section.title,
+        fields: normalizedFields,
+      };
+    })
+    // ❌ Não renderizar seção vazia
+    .filter((section) => section.fields.length > 0);
 
   return (
     <Box>
       {sections.map((section, sectionIndex) => (
-        <Box key={section.title} sx={{ mb: sectionIndex < sections.length - 1 ? 4 : 0 }}>
+        <Box
+          key={section.title}
+          sx={{ mb: sectionIndex < sections.length - 1 ? 4 : 0 }}
+        >
           <Typography
             variant="h6"
             sx={{
@@ -121,6 +165,7 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
           >
             {section.title}
           </Typography>
+
           <Grid container spacing={3}>
             {section.fields.map((field, fieldIndex) => (
               <Grid key={fieldIndex} size={{ xs: 12, sm: 6 }}>
@@ -128,12 +173,14 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
               </Grid>
             ))}
           </Grid>
+
           {sectionIndex < sections.length - 1 && (
-            <Divider sx={{ mt: 4, borderColor: alpha(theme.palette.divider, 0.08) }} />
+            <Divider
+              sx={{ mt: 4, borderColor: alpha(theme.palette.divider, 0.08) }}
+            />
           )}
         </Box>
       ))}
     </Box>
   );
 };
-

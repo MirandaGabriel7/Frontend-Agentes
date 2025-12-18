@@ -1,40 +1,101 @@
 import React from 'react';
-import {
-  Box,
-  Typography,
-  Paper,
-  alpha,
-  useTheme,
-} from '@mui/material';
+import { Box, Typography, Paper, alpha, useTheme } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { normalizeTrpValue } from '../utils/formatTrpValues';
 
 interface TrpMarkdownViewProps {
   content: string;
   showTitle?: boolean;
 }
 
-export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showTitle = true }) => {
+/**
+ * ✅ Regras:
+ * - Continua sanitizando o markdown (remove NAO_DECLARADO + humaniza enums)
+ * - CORTA LINHAS de tabelas quando a coluna "Informação" estiver vazia/não significativa
+ * - Nunca deixa enum técnico “vazar”
+ */
+const HIDDEN_STRINGS = new Set([
+  'NAO_DECLARADO',
+  'NÃO_DECLARADO',
+  'NAO INFORMADO',
+  'NÃO INFORMADO',
+  'NAO_INFORMADO',
+  'NÃO_INFORMADO',
+  'Não informado',
+  'Nao informado',
+]);
+
+function extractText(node: any): string {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join(' ');
+  if (React.isValidElement(node)) return extractText((node as any).props?.children);
+  return '';
+}
+
+function isMeaningfulText(s: string): boolean {
+  const t = (s ?? '').trim();
+  if (!t) return false;
+  if (HIDDEN_STRINGS.has(t)) return false;
+  if (HIDDEN_STRINGS.has(t.toUpperCase())) return false;
+  return true;
+}
+
+/**
+ * Considera como “valor”:
+ * - tabelas 2 colunas: coluna 2
+ * - tabelas >2 colunas: todas exceto a primeira
+ */
+function rowHasValue(cellsNormalizedText: string[]): boolean {
+  if (!cellsNormalizedText.length) return false;
+
+  const candidates =
+    cellsNormalizedText.length >= 2
+      ? cellsNormalizedText.slice(1)
+      : cellsNormalizedText;
+
+  return candidates.some((txt) => isMeaningfulText(txt));
+}
+
+export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
+  content,
+  showTitle = true,
+}) => {
   const theme = useTheme();
 
+  // ✅ Sanitização do markdown (corta placeholders técnicos e humaniza enums)
+  const sanitizedContent = React.useMemo(() => {
+    return (content || '')
+      // Remover "não declarado" do documento
+      .replace(/\bNAO_DECLARADO\b/gi, '')
+      .replace(/\bNÃO_DECLARADO\b/gi, '')
+      .replace(/\bNAO_INFORMADO\b/gi, '')
+      .replace(/\bNÃO_INFORMADO\b/gi, '')
+
+      // Humanizar enums técnicos (mesmo se vierem no markdown)
+      .replace(/\bDATA_RECEBIMENTO\b/gi, 'Data de Recebimento')
+      .replace(/\bSERVICO\b/gi, 'Conclusão do Serviço')
+      .replace(/\bFORA_DO_PRAZO\b/gi, 'Fora do prazo')
+      .replace(/\bNO_PRAZO\b/gi, 'No prazo')
+      .replace(/\bTOTAL\b/gi, 'Total')
+      .replace(/\bPARCIAL\b/gi, 'Parcial')
+
+      // Limpeza de espaços “quebrados” (evita linhas vazias em excesso)
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }, [content]);
+
   // Se o conteúdo estiver vazio ou undefined, exibir fallback
-  if (!content || !content.trim()) {
+  if (!sanitizedContent || !sanitizedContent.trim()) {
     return (
-      <Box
-        sx={{
-          height: '100%',
-          overflow: 'auto',
-        }}
-      >
+      <Box sx={{ height: '100%', overflow: 'auto' }}>
         {showTitle && (
           <Typography
             variant="h6"
-            sx={{
-              fontWeight: 600,
-              mb: 3,
-              color: theme.palette.text.primary,
-            }}
+            sx={{ fontWeight: 600, mb: 3, color: theme.palette.text.primary }}
           >
             Visualização do Documento
           </Typography>
@@ -49,12 +110,7 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
             textAlign: 'center',
           }}
         >
-          <Typography
-            variant="body1"
-            sx={{
-              color: theme.palette.text.secondary,
-            }}
-          >
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
             Documento não disponível
           </Typography>
         </Paper>
@@ -63,24 +119,16 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
   }
 
   return (
-    <Box
-      sx={{
-        height: '100%',
-        overflow: 'auto',
-      }}
-    >
+    <Box sx={{ height: '100%', overflow: 'auto' }}>
       {showTitle && (
         <Typography
           variant="h6"
-          sx={{
-            fontWeight: 600,
-            mb: 3,
-            color: theme.palette.text.primary,
-          }}
+          sx={{ fontWeight: 600, mb: 3, color: theme.palette.text.primary }}
         >
           Visualização do Documento
         </Typography>
       )}
+
       <Paper
         elevation={0}
         sx={{
@@ -88,7 +136,10 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
           borderRadius: 3,
           border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
           bgcolor: theme.palette.background.paper,
-          boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 4px 12px ${alpha('#000', 0.02)}`,
+          boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 4px 12px ${alpha(
+            '#000',
+            0.02
+          )}`,
         }}
       >
         <Box
@@ -144,6 +195,7 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
                 padding: 1.5,
                 textAlign: 'left',
                 fontSize: '0.9375rem',
+                verticalAlign: 'top',
               },
               '& th': {
                 backgroundColor: alpha(theme.palette.grey[500], 0.08),
@@ -181,11 +233,44 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({ content, showT
             },
           }}
         >
-          <ReactMarkdown 
+          <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
+            components={{
+              /**
+               * ✅ CORTA LINHAS (tr) quando a coluna de valor estiver vazia
+               * - Mantém header
+               * - Remove linhas com valor vazio / NAO_DECLARADO / Não informado
+               */
+              tr: ({ node, children, ...props }) => {
+                const parentTag = (node as any)?.parent?.tagName;
+                const isHeaderRow = parentTag === 'thead';
+
+                if (isHeaderRow) return <tr {...props}>{children}</tr>;
+
+                const cells = React.Children.toArray(children);
+
+                // Se for algo estranho (sem cells), não mexe
+                if (!cells.length) return <tr {...props}>{children}</tr>;
+
+                const cellsText = cells.map((cell: any) => extractText(cell));
+
+                // Normaliza textos (humaniza enums) antes de decidir se exibe
+                const cellsTextNormalized = cellsText.map((txt) => {
+                  if (!txt) return '';
+                  return normalizeTrpValue(txt, undefined);
+                });
+
+                const keep = rowHasValue(cellsTextNormalized);
+
+                // ✅ Se não tem valor real, some a linha inteira
+                if (!keep) return null;
+
+                return <tr {...props}>{children}</tr>;
+              },
+            }}
           >
-            {content}
+            {sanitizedContent}
           </ReactMarkdown>
         </Box>
       </Paper>

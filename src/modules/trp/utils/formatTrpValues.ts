@@ -1,125 +1,149 @@
 /**
  * Utilitários para formatar valores do TRP para exibição na UI
  * NUNCA exibir valores técnicos internos - sempre usar textos institucionais
+ *
+ * ✅ REGRA-OURO:
+ * - Se for "não declarado" -> retornar '' (vazio) para a UI cortar (não poluir)
+ * - Se for enum técnico conhecido -> retornar texto institucional
  */
+
+const HIDDEN = new Set([
+  '',
+  'NAO_DECLARADO',
+  'NÃO_DECLARADO',
+  'NAO INFORMADO',
+  'NÃO INFORMADO',
+  'NAO_INFORMADO',
+  'NÃO_INFORMADO',
+  'NAO DECLARADO',
+  'NÃO DECLARADO',
+]);
+
+function isHidden(v: string): boolean {
+  const s = v.trim();
+  if (!s) return true;
+  const upper = s.toUpperCase();
+  return HIDDEN.has(s) || HIDDEN.has(upper);
+}
 
 /**
  * Mapeia valores de condição de prazo para texto legível
  */
 export function formatCondicaoPrazo(value: string | null | undefined): string {
-  if (!value) return 'Não informado';
-  
+  if (!value) return '';
+  if (isHidden(value)) return '';
+
+  const key = value.trim().toUpperCase();
   const mapping: Record<string, string> = {
-    'NO_PRAZO': 'No prazo',
-    'FORA_DO_PRAZO': 'Fora do prazo',
+    NO_PRAZO: 'No prazo',
+    FORA_DO_PRAZO: 'Fora do prazo',
   };
-  
-  return mapping[value] || value;
+
+  return mapping[key] ?? value.trim();
 }
 
 /**
  * Mapeia valores de condição de quantidade para texto legível
  */
 export function formatCondicaoQuantidade(value: string | null | undefined): string {
-  if (!value) return 'Não informado';
-  
+  if (!value) return '';
+  if (isHidden(value)) return '';
+
+  const key = value.trim().toUpperCase();
   const mapping: Record<string, string> = {
-    'TOTAL': 'Total',
-    'PARCIAL': 'Parcial',
+    TOTAL: 'Total',
+    PARCIAL: 'Parcial',
   };
-  
-  return mapping[value] || value;
+
+  return mapping[key] ?? value.trim();
 }
 
 /**
  * Mapeia tipo de base de prazo para texto legível
  */
 export function formatTipoBasePrazo(value: string | null | undefined): string {
-  if (!value) return 'Não informado';
-  
+  if (!value) return '';
+  if (isHidden(value)) return '';
+
+  const key = value.trim().toUpperCase();
   const mapping: Record<string, string> = {
-    'DATA_RECEBIMENTO': 'Data de Recebimento',
-    'SERVICO': 'Serviço',
+    DATA_RECEBIMENTO: 'Data de Recebimento',
+    SERVICO: 'Conclusão do Serviço',
   };
-  
-  return mapping[value] || value;
+
+  return mapping[key] ?? value.trim();
 }
 
 /**
  * Mapeia tipo de contratação para texto legível
  */
 export function formatTipoContratacao(value: string | null | undefined): string {
-  if (!value) return 'Não informado';
-  
+  if (!value) return '';
+  if (isHidden(value)) return '';
+
+  const key = value.trim().toUpperCase();
   const mapping: Record<string, string> = {
-    'BENS': 'Bens',
-    'SERVIÇOS': 'Serviços',
-    'SERVICOS': 'Serviços', // Variante sem acento
-    'OBRA': 'Obra',
+    BENS: 'Bens',
+    SERVIÇOS: 'Serviços',
+    SERVICOS: 'Serviços',
+    OBRA: 'Obra',
   };
-  
-  return mapping[value] || value;
+
+  return mapping[key] ?? value.trim();
 }
 
 /**
  * Normaliza qualquer valor técnico do TRP para texto institucional
- * Esta é a função principal que deve ser usada para garantir que valores técnicos
- * nunca sejam exibidos diretamente ao usuário
+ * ✅ Se for "não declarado" retorna '' (para a UI remover)
  */
 export function normalizeTrpValue(value: string | null | undefined, fieldName?: string): string {
-  if (!value) return 'Não informado';
-  
-  // Normalizar espaços e converter para maiúsculas para comparação
-  const normalizedValue = value.trim().toUpperCase();
-  
-  // Mapeamentos obrigatórios (textos institucionais)
-  // ✅ NUNCA exibir valores técnicos - sempre usar textos humanizados
+  if (value === null || value === undefined) return '';
+
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (isHidden(raw)) return '';
+
+  const normalizedValue = raw.toUpperCase();
+
+  // mapeamentos globais
   const institutionalMappings: Record<string, string> = {
     // Condição de prazo
-    'NO_PRAZO': 'No prazo',
-    'FORA_DO_PRAZO': 'Fora do prazo',
+    NO_PRAZO: 'No prazo',
+    FORA_DO_PRAZO: 'Fora do prazo',
+
     // Condição de quantidade
-    'TOTAL': 'Total',
-    'PARCIAL': 'Parcial',
+    TOTAL: 'Total',
+    PARCIAL: 'Parcial',
+
     // Tipo de base de prazo
-    'DATA_RECEBIMENTO': 'Data de Recebimento',
-    'SERVICO': 'Serviço',
-    // Tipo de contratação
-    'BENS': 'Bens',
-    'SERVIÇOS': 'Serviços',
-    'SERVICOS': 'Serviços',
-    'OBRA': 'Obra',
+    DATA_RECEBIMENTO: 'Data de Recebimento',
+    SERVICO: 'Conclusão do Serviço',
+
+    // Tipo de contratação / contrato
+    BENS: 'Bens',
+    SERVIÇOS: 'Serviços',
+    SERVICOS: 'Serviços',
+    OBRA: 'Obra',
   };
-  
-  // Se encontrar mapeamento, retornar texto institucional
+
   if (institutionalMappings[normalizedValue]) {
     return institutionalMappings[normalizedValue];
   }
-  
-  // Se o campo for especificamente conhecido, usar função específica
-  if (fieldName === 'condicao_prazo') {
-    return formatCondicaoPrazo(value);
-  }
-  if (fieldName === 'condicao_quantidade') {
-    return formatCondicaoQuantidade(value);
-  }
-  if (fieldName === 'tipo_base_prazo' || fieldName === 'tipoBasePrazo') {
-    return formatTipoBasePrazo(value);
-  }
-  if (fieldName === 'tipo_contratacao' || fieldName === 'tipoContratacao' || fieldName === 'tipo_contrato') {
-    return formatTipoContratacao(value);
-  }
-  
-  // Se não for um valor técnico conhecido, retornar o valor original
-  return value;
+
+  // por campo (se precisar)
+  if (fieldName === 'condicao_prazo') return formatCondicaoPrazo(raw);
+  if (fieldName === 'condicao_quantidade') return formatCondicaoQuantidade(raw);
+  if (fieldName === 'tipo_base_prazo' || fieldName === 'tipoBasePrazo') return formatTipoBasePrazo(raw);
+  if (fieldName === 'tipo_contratacao' || fieldName === 'tipoContratacao' || fieldName === 'tipo_contrato')
+    return formatTipoContratacao(raw);
+
+  // default: devolve o valor limpo (não técnico)
+  return raw;
 }
 
 /**
- * Formata qualquer valor enum do TRP para texto legível
- * Tenta identificar automaticamente o tipo e aplicar o mapper correto
- * @deprecated Use normalizeTrpValue em vez disso para garantir normalização completa
+ * @deprecated Use normalizeTrpValue
  */
 export function formatTrpEnumValue(value: string | null | undefined, fieldName?: string): string {
-  // Delegar para normalizeTrpValue para manter consistência
   return normalizeTrpValue(value, fieldName);
 }
