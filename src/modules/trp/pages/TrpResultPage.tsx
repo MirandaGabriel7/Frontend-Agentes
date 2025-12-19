@@ -62,21 +62,23 @@ export const TrpResultPage: React.FC = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity?: 'error' | 'success' | 'warning';
+  }>({
     open: false,
     message: '',
   });
   const contentRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
-    // ✅ VALIDAÇÃO: runId deve vir EXCLUSIVAMENTE do useParams (rota)
     if (!runId) {
       setError('ID do TRP não fornecido na URL');
       setLoading(false);
       return;
     }
 
-    // ✅ VALIDAÇÃO: runId deve ser um UUID válido
     if (!isUuid(runId)) {
       setError('ID do TRP inválido');
       setLoading(false);
@@ -86,12 +88,9 @@ export const TrpResultPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // ✅ SEMPRE buscar do backend usando runId da rota (fonte da verdade)
-      // ✅ GARANTIA: O run carregado é exatamente o runId da rota /agents/trp/resultado/:runId
+
       const run = await fetchTrpRun(runId);
-      
-      // ✅ VALIDAÇÃO: Verificar se o run retornado corresponde ao runId da rota
+
       if (run.runId !== runId) {
         const errorMsg = `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`;
         console.error('[TrpResultPage]', errorMsg);
@@ -99,7 +98,7 @@ export const TrpResultPage: React.FC = () => {
         setLoading(false);
         return;
       }
-      
+
       const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
       if (isDev) {
         console.debug('[TrpResultPage] Run carregado:', {
@@ -113,10 +112,9 @@ export const TrpResultPage: React.FC = () => {
           contextoKeys: run.contexto_recebimento_raw ? Object.keys(run.contexto_recebimento_raw) : [],
         });
       }
-      
+
       setRunData(run);
-      
-      // ✅ Criar viewModel único que combina todas as fontes de dados
+
       const vm = createTrpViewModel(run);
       setViewModel(vm);
     } catch (err) {
@@ -130,9 +128,9 @@ export const TrpResultPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
-  // Scroll to top button visibility
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -148,104 +146,63 @@ export const TrpResultPage: React.FC = () => {
   };
 
   const handleDownload = async (format: 'pdf' | 'docx') => {
-    // ✅ VALIDAÇÃO CRÍTICA: runId deve vir EXCLUSIVAMENTE do useParams (rota)
-    // ✅ BLOQUEIO: Nunca usar runId de state, cache, último run, ou qualquer outra fonte
     if (!runId) {
-      setSnackbar({ 
-        open: true, 
-        message: 'ID do TRP não encontrado na URL', 
-        severity: 'error' 
-      });
+      setSnackbar({ open: true, message: 'ID do TRP não encontrado na URL', severity: 'error' });
       return;
     }
 
-    // ✅ VALIDAÇÃO: runId deve ser UUID válido
     if (!isUuid(runId)) {
-      setSnackbar({ 
-        open: true, 
-        message: 'ID do TRP inválido', 
-        severity: 'error' 
-      });
+      setSnackbar({ open: true, message: 'ID do TRP inválido', severity: 'error' });
       return;
     }
 
-    // ✅ VALIDAÇÃO: Verificar se runData corresponde ao runId da rota
     if (runData && runData.runId !== runId) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Inconsistência: o documento carregado não corresponde ao ID da URL', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: 'Inconsistência: o documento carregado não corresponde ao ID da URL',
+        severity: 'error',
       });
       return;
     }
 
-    // ✅ VALIDAÇÃO: Só permitir exportação se status === 'COMPLETED'
     if (runData?.status !== 'COMPLETED') {
-      setSnackbar({ 
-        open: true, 
-        message: 'Documento ainda não concluído. Aguarde a finalização do processamento.', 
-        severity: 'warning' 
+      setSnackbar({
+        open: true,
+        message: 'Documento ainda não concluído. Aguarde a finalização do processamento.',
+        severity: 'warning',
       });
       return;
     }
 
     const setDownloading = format === 'pdf' ? setDownloadingPdf : setDownloadingDocx;
-    
+
     try {
       setDownloading(true);
-      // ✅ GARANTIA ABSOLUTA: runId vem EXCLUSIVAMENTE do useParams (rota)
-      // ✅ Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
-      // ✅ NUNCA usar: data.runId, runData.runId, currentRun, último run, cache, etc.
       await downloadTrpRun(runId, format);
-      setSnackbar({ 
-        open: true, 
-        message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`, 
-        severity: 'success' 
+      setSnackbar({
+        open: true,
+        message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`,
+        severity: 'success',
       });
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao baixar arquivo';
       const status = err.status;
-      
-      // Tratar erros específicos conforme requisitos
+
       if (status === 401 || status === 403) {
-        // ✅ Erro 401/403: Sessão expirada / sem permissão
-        setSnackbar({ 
-          open: true, 
-          message: 'Sessão expirada / sem permissão', 
-          severity: 'error' 
-        });
+        setSnackbar({ open: true, message: 'Sessão expirada / sem permissão', severity: 'error' });
         await signOut();
         navigate('/login', { replace: true, state: { message: 'Sua sessão expirou. Faça login novamente.' } });
         return;
       }
-      
+
       if (status === 404) {
-        // ✅ Erro 404: Documento não encontrado
-        setSnackbar({ 
-          open: true, 
-          message: 'Documento não encontrado', 
-          severity: 'error' 
-        });
+        setSnackbar({ open: true, message: 'Documento não encontrado', severity: 'error' });
       } else if (status === 409) {
-        // ✅ Erro 409: Documento ainda não finalizado
-        setSnackbar({ 
-          open: true, 
-          message: 'Documento ainda não finalizado', 
-          severity: 'warning' 
-        });
+        setSnackbar({ open: true, message: 'Documento ainda não finalizado', severity: 'warning' });
       } else if (status === 429) {
-        // ✅ Erro 429: Aguarde antes de gerar novamente
-        setSnackbar({ 
-          open: true, 
-          message: 'Aguarde antes de gerar novamente', 
-          severity: 'warning' 
-        });
+        setSnackbar({ open: true, message: 'Aguarde antes de gerar novamente', severity: 'warning' });
       } else {
-        setSnackbar({ 
-          open: true, 
-          message: errorMessage, 
-          severity: 'error' 
-        });
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
       }
     } finally {
       setDownloading(false);
@@ -261,14 +218,7 @@ export const TrpResultPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress />
       </Box>
     );
@@ -291,14 +241,13 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
-  // Se o run existe mas não está completo, mostrar status
   if (runData && runData.status !== 'COMPLETED') {
     const statusLabels: Record<string, string> = {
       PENDING: 'Pendente',
       RUNNING: 'Em processamento',
       FAILED: 'Falhou',
     };
-    
+
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
         <Alert severity={runData.status === 'FAILED' ? 'error' : 'info'}>
@@ -310,12 +259,7 @@ export const TrpResultPage: React.FC = () => {
             {runData.status === 'RUNNING' && 'O TRP está sendo processado. Aguarde alguns instantes e recarregue a página.'}
             {runData.status === 'FAILED' && 'O processamento do TRP falhou. Tente gerar novamente.'}
           </Typography>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            onClick={() => runId && window.location.reload()}
-            sx={{ mt: 2 }}
-          >
+          <Button variant="outlined" size="small" onClick={() => runId && window.location.reload()} sx={{ mt: 2 }}>
             Recarregar
           </Button>
         </Alert>
@@ -326,14 +270,11 @@ export const TrpResultPage: React.FC = () => {
   if (!viewModel || !runData) {
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
-        <Alert severity="warning">
-          Não foi possível carregar os dados do TRP.
-        </Alert>
+        <Alert severity="warning">Não foi possível carregar os dados do TRP.</Alert>
       </Box>
     );
   }
-  
-  // Converter viewModel para formato compatível com componentes existentes
+
   const data: TrpAgentOutput = {
     documento_markdown: viewModel.documento_markdown,
     campos: viewModel.campos,
@@ -342,6 +283,9 @@ export const TrpResultPage: React.FC = () => {
       hash_tdr: viewModel.runId || '',
     },
   };
+
+  // ✅ REGRA: objeto_fornecido NUNCA aparece fora do documento.
+  // ✅ Ele deve existir apenas dentro do markdown gerado pelo PRIME.
 
   return (
     <Box
@@ -352,6 +296,7 @@ export const TrpResultPage: React.FC = () => {
         px: { xs: 2, sm: 3, md: 4 },
         py: { xs: 3, sm: 4, md: 5 },
       }}
+      ref={contentRef}
     >
       {/* Header */}
       <Box sx={{ mb: 4 }}>
@@ -366,25 +311,14 @@ export const TrpResultPage: React.FC = () => {
           }}
         >
           <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                color: theme.palette.text.primary,
-                mb: 1,
-              }}
-            >
+            <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 1 }}>
               Termo de Recebimento Provisório
             </Typography>
-            <Typography
-              variant="body1"
-              sx={{
-                color: theme.palette.text.secondary,
-              }}
-            >
+            <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
               Revisão do documento gerado pela IA
             </Typography>
           </Box>
+
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip
               label={`Arquivo: ${data.meta.fileName}`}
@@ -412,24 +346,22 @@ export const TrpResultPage: React.FC = () => {
                     size="small"
                     startIcon={<HistoryIcon />}
                     onClick={() => navigate('/agents/trp/historico')}
-                    sx={{
-                      textTransform: 'none',
-                      minWidth: 'auto',
-                    }}
+                    sx={{ textTransform: 'none', minWidth: 'auto' }}
                   >
                     Histórico
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip 
+
+              <Tooltip
                 title={
                   !runId || !isUuid(runId)
                     ? 'ID do TRP inválido'
-                    : runData?.status !== 'COMPLETED' 
-                      ? 'Aguarde processamento' 
-                      : downloadingPdf 
-                        ? 'Exportando documento oficial do TRP...' 
-                        : 'Exportar PDF'
+                    : runData?.status !== 'COMPLETED'
+                    ? 'Aguarde processamento'
+                    : downloadingPdf
+                    ? 'Exportando documento oficial do TRP...'
+                    : 'Exportar PDF'
                 }
               >
                 <span>
@@ -439,24 +371,22 @@ export const TrpResultPage: React.FC = () => {
                     startIcon={downloadingPdf ? <CircularProgress size={16} /> : <PdfIcon />}
                     onClick={handleDownloadPdf}
                     disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
-                    sx={{
-                      textTransform: 'none',
-                      minWidth: 'auto',
-                    }}
+                    sx={{ textTransform: 'none', minWidth: 'auto' }}
                   >
                     {downloadingPdf ? 'Exportando...' : 'PDF'}
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip 
+
+              <Tooltip
                 title={
                   !runId || !isUuid(runId)
                     ? 'ID do TRP inválido'
-                    : runData?.status !== 'COMPLETED' 
-                      ? 'Aguarde processamento' 
-                      : downloadingDocx 
-                        ? 'Exportando documento oficial do TRP...' 
-                        : 'Exportar DOCX'
+                    : runData?.status !== 'COMPLETED'
+                    ? 'Aguarde processamento'
+                    : downloadingDocx
+                    ? 'Exportando documento oficial do TRP...'
+                    : 'Exportar DOCX'
                 }
               >
                 <span>
@@ -466,10 +396,7 @@ export const TrpResultPage: React.FC = () => {
                     startIcon={downloadingDocx ? <CircularProgress size={16} /> : <WordIcon />}
                     onClick={handleDownloadWord}
                     disabled={!runId || !isUuid(runId) || downloadingPdf || downloadingDocx || runData?.status !== 'COMPLETED'}
-                    sx={{
-                      textTransform: 'none',
-                      minWidth: 'auto',
-                    }}
+                    sx={{ textTransform: 'none', minWidth: 'auto' }}
                   >
                     {downloadingDocx ? 'Exportando...' : 'DOCX'}
                   </Button>
@@ -494,19 +421,8 @@ export const TrpResultPage: React.FC = () => {
             gap: 2,
           }}
         >
-          <Box
-            sx={{
-              color: theme.palette.info.main,
-              mt: 0.5,
-            }}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+          <Box sx={{ color: theme.palette.info.main, mt: 0.5 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
                 fill="currentColor"
@@ -514,23 +430,10 @@ export const TrpResultPage: React.FC = () => {
             </svg>
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontWeight: 600,
-                color: theme.palette.info.dark,
-                mb: 1,
-              }}
-            >
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: theme.palette.info.dark, mb: 1 }}>
               Revisão do Documento
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: theme.palette.text.primary,
-                lineHeight: 1.6,
-              }}
-            >
+            <Typography variant="body2" sx={{ color: theme.palette.text.primary, lineHeight: 1.6 }}>
               Por favor, revise cuidadosamente todas as informações apresentadas no Termo de Recebimento Provisório antes de salvar o documento no processo. Verifique se os dados do contrato, fornecedor, nota fiscal e condições de recebimento estão corretos e completos. Após a revisão, você poderá baixar o documento em PDF ou Word e salvá-lo no sistema de gestão de processos.
             </Typography>
           </Box>
@@ -616,13 +519,13 @@ export const TrpResultPage: React.FC = () => {
               p: { xs: 3, sm: 4, md: 5 },
             }}
           >
-            {/* Markdown Viewer - Left (2/3) */}
-            {/* data.documento_markdown já contém documento_markdown_final (mapeado em generateTrp) */}
+            {/* Left */}
             <Box sx={{ flex: { xs: 1, lg: 2 }, minWidth: 0 }}>
+              {/* ✅ Apenas markdown (objeto_fornecido deve estar aqui dentro, gerado pelo PRIME) */}
               <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
             </Box>
 
-            {/* Actions Card - Right (1/3) */}
+            {/* Right */}
             <Box sx={{ flex: { xs: 1, lg: 1 }, minWidth: 0 }}>
               <Paper
                 elevation={0}
@@ -636,15 +539,15 @@ export const TrpResultPage: React.FC = () => {
                 }}
               >
                 <Stack spacing={2}>
-                  <Tooltip 
+                  <Tooltip
                     title={
                       !runId || !isUuid(runId)
                         ? 'ID do TRP inválido'
-                        : runData?.status !== 'COMPLETED' 
-                          ? 'Aguarde processamento' 
-                          : downloadingPdf 
-                            ? 'Exportando documento oficial do TRP...' 
-                            : 'Exportar documento oficial do TRP em PDF'
+                        : runData?.status !== 'COMPLETED'
+                        ? 'Aguarde processamento'
+                        : downloadingPdf
+                        ? 'Exportando documento oficial do TRP...'
+                        : 'Exportar documento oficial do TRP em PDF'
                     }
                   >
                     <span>
@@ -657,13 +560,8 @@ export const TrpResultPage: React.FC = () => {
                         sx={{
                           bgcolor: theme.palette.primary.main,
                           color: 'white',
-                          '&:hover': {
-                            bgcolor: theme.palette.primary.dark,
-                          },
-                          '&:disabled': {
-                            bgcolor: alpha(theme.palette.primary.main, 0.5),
-                            color: 'white',
-                          },
+                          '&:hover': { bgcolor: theme.palette.primary.dark },
+                          '&:disabled': { bgcolor: alpha(theme.palette.primary.main, 0.5), color: 'white' },
                           textTransform: 'none',
                           fontWeight: 600,
                           py: 1.5,
@@ -673,15 +571,16 @@ export const TrpResultPage: React.FC = () => {
                       </Button>
                     </span>
                   </Tooltip>
-                  <Tooltip 
+
+                  <Tooltip
                     title={
                       !runId || !isUuid(runId)
                         ? 'ID do TRP inválido'
-                        : runData?.status !== 'COMPLETED' 
-                          ? 'Aguarde processamento' 
-                          : downloadingDocx 
-                            ? 'Exportando documento oficial do TRP...' 
-                            : 'Exportar documento oficial do TRP em Word (DOCX)'
+                        : runData?.status !== 'COMPLETED'
+                        ? 'Aguarde processamento'
+                        : downloadingDocx
+                        ? 'Exportando documento oficial do TRP...'
+                        : 'Exportar documento oficial do TRP em Word (DOCX)'
                     }
                   >
                     <span>
@@ -711,6 +610,7 @@ export const TrpResultPage: React.FC = () => {
                       </Button>
                     </span>
                   </Tooltip>
+
                   <Typography
                     variant="caption"
                     sx={{
@@ -729,15 +629,12 @@ export const TrpResultPage: React.FC = () => {
         </TabPanel>
 
         {/* Tab 2: Dados Estruturados */}
-        {/* data.campos já contém campos_trp_normalizados (mapeado em generateTrp) */}
         <TabPanel value={activeTab} index={1}>
           <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
             <TrpStructuredDataPanel campos={data.campos} />
           </Box>
         </TabPanel>
-
       </Paper>
-
 
       {/* Floating scroll to top button */}
       <Zoom in={showScrollTop}>
@@ -751,9 +648,7 @@ export const TrpResultPage: React.FC = () => {
             right: 32,
             zIndex: 1000,
             boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-            '&:hover': {
-              boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
-            },
+            '&:hover': { boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}` },
           }}
           aria-label="Voltar ao topo"
         >
@@ -761,7 +656,7 @@ export const TrpResultPage: React.FC = () => {
         </Fab>
       </Zoom>
 
-      {/* Snackbar para feedback */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -777,4 +672,3 @@ export const TrpResultPage: React.FC = () => {
     </Box>
   );
 };
-

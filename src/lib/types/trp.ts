@@ -12,45 +12,48 @@ export type TrpTipoContrato = 'BENS' | 'SERVIÇOS' | 'OBRA';
 export interface TrpInputForm {
   // Campo obrigatório no início
   tipo_contratacao?: TrpTipoContrato; // "BENS" | "SERVIÇOS" | "OBRA" - obrigatório
-  
+
   // Campo condicional: competência (só quando tipo_contratacao == "SERVIÇOS")
   competencia_mes_ano?: string; // MM/AAAA
-  
+
   // Base para contagem de prazo
   tipo_base_prazo?: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
-  
+
   // Data de recebimento (quando base = DATA_RECEBIMENTO)
   data_recebimento?: string; // DD/MM/AAAA ou YYYY-MM-DD
-  
+
   // Data de conclusão do serviço (quando base = SERVICO)
   data_conclusao_servico?: string; // DD/MM/AAAA ou YYYY-MM-DD
-  
+
   // Datas de entrega
   data_prevista_entrega_contrato?: string; // DD/MM/AAAA ou YYYY-MM-DD
   data_entrega_real?: string; // DD/MM/AAAA ou YYYY-MM-DD
-  
+
   // Condição do Prazo
   condicao_prazo?: TrpCondicaoPrazo; // "NO_PRAZO" | "FORA_DO_PRAZO"
-  
+
   // Campos condicionais quando condicao_prazo = "FORA_DO_PRAZO"
   motivo_atraso?: string;
 
   // Condição da Quantidade - Ordem de Fornecimento
   condicao_quantidade_ordem?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
   comentarios_quantidade_ordem?: string; // Obrigatório quando PARCIAL
-  
+
   // Condição da Quantidade - Nota Fiscal (NOVO)
   condicao_quantidade_nf?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
   comentarios_quantidade_nf?: string; // Obrigatório quando PARCIAL
-  
+
+  // ✅ NOVO CAMPO (manual do fiscal) — Fornecimentos ou Serviços Prestados
+  objeto_fornecido?: string;
+
   // Observações do recebimento
   observacoes_recebimento?: string;
-  
+
   // Assinaturas (NOVO)
   fiscal_contrato_nome?: string; // Obrigatório
   data_assinatura?: string; // DD/MM/AAAA ou YYYY-MM-DD - Obrigatório
   area_demandante_nome?: string; // Opcional
-  
+
   // Campo auxiliar para upload
   arquivoTdrNome?: string;
 }
@@ -95,4 +98,3 @@ export interface TrpRun {
   output?: TrpAgentOutput;
   errorMessage?: string;
 }
-

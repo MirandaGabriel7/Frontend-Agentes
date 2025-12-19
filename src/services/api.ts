@@ -151,8 +151,10 @@ export interface GenerateTrpParams {
     motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
     condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
     comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
+    objetoFornecido?: string | null;
+
     observacoesRecebimento?: string | null;
-    // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome) 
+    // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome)
     // serão preenchidas automaticamente pelo sistema a partir dos documentos
   };
   files: {
@@ -161,6 +163,7 @@ export interface GenerateTrpParams {
     ordemFornecimento: File | null;
   };
 }
+
 
 /**
  * Gera um novo TRP e retorna apenas runId, status e createdAt

@@ -12,33 +12,55 @@ interface TrpSummaryCardsProps {
   campos: TrpCamposNormalizados;
 }
 
+/**
+ * Normaliza campos para exibição em cards-resumo.
+ * ⚠️ REGRA DE UX:
+ * - Este componente NUNCA deve renderizar:
+ *   objeto_fornecido / objetoFornecido / objeto_prestado
+ *   (esses campos pertencem exclusivamente ao documento oficial)
+ */
 const normalizeField = (value: string | null | undefined): string => {
-  // Só exibir "Não informado" se o valor for null/undefined/"" ou "NAO_DECLARADO"
-  if (value === null || value === undefined || value === '' || value === 'NAO_DECLARADO') {
+  if (
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    value === 'NAO_DECLARADO'
+  ) {
     return 'Não informado';
   }
   return value;
 };
 
 // Helper para obter campo do objeto snake_case
-const getCampo = (campos: TrpCamposNormalizados, key: string): string | null | undefined => {
-  // Acessar diretamente o objeto, sem depender do tipo
+const getCampo = (
+  campos: TrpCamposNormalizados,
+  key: string
+): string | null | undefined => {
   const value = (campos as any)[key];
-  // Se for number, converter para string
+
   if (typeof value === 'number') {
     return value.toString();
   }
-  // Se for string, retornar
+
   if (typeof value === 'string') {
     return value;
   }
-  // Se for null ou undefined, retornar null
+
   return value ?? null;
 };
 
 export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
   const theme = useTheme();
 
+  /**
+   * ⚠️ LISTA FIXA DE CARDS
+   * NÃO adicionar aqui:
+   * - objeto_fornecido
+   * - objetoFornecido
+   * - objeto prestado
+   *
+   * Esses dados aparecem SOMENTE no markdown do documento.
+   */
   const cards = [
     {
       label: 'CONTRATO',
@@ -60,7 +82,9 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
     },
     {
       label: 'VALOR',
-      primary: (getCampo(campos, 'valor_efetivo_formatado') as string) || 'Não informado',
+      primary:
+        (getCampo(campos, 'valor_efetivo_formatado') as string) ||
+        'Não informado',
       icon: <ValueIcon />,
       color: theme.palette.warning.main,
     },
@@ -70,7 +94,11 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, 1fr)',
+          lg: 'repeat(4, 1fr)',
+        },
         gap: 3,
         mb: 4,
       }}
@@ -84,7 +112,10 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
             borderRadius: 3,
             border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
             background: theme.palette.background.paper,
-            boxShadow: `0 1px 2px ${alpha('#000', 0.04)}, 0 2px 8px ${alpha('#000', 0.03)}`,
+            boxShadow: `0 1px 2px ${alpha('#000', 0.04)}, 0 2px 8px ${alpha(
+              '#000',
+              0.03
+            )}`,
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'relative',
             overflow: 'hidden',
@@ -97,12 +128,18 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
               left: 0,
               right: 0,
               height: 3,
-              background: `linear-gradient(90deg, ${card.color}, ${alpha(card.color, 0.6)})`,
+              background: `linear-gradient(90deg, ${card.color}, ${alpha(
+                card.color,
+                0.6
+              )})`,
               opacity: 0,
               transition: 'opacity 0.3s ease',
             },
             '&:hover': {
-              boxShadow: `0 4px 12px ${alpha('#000', 0.08)}, 0 8px 24px ${alpha('#000', 0.06)}`,
+              boxShadow: `0 4px 12px ${alpha('#000', 0.08)}, 0 8px 24px ${alpha(
+                '#000',
+                0.06
+              )}`,
               transform: 'translateY(-4px)',
               borderColor: alpha(card.color, 0.3),
               '&::before': {
@@ -161,7 +198,7 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
               fontSize: '1.0625rem',
               lineHeight: 1.35,
               wordBreak: 'break-word',
-              pl: 5.75, // Align with icon (36px icon + 1.25 gap = ~5.75 spacing units)
+              pl: 5.75, // alinhamento visual com o ícone
             }}
           >
             {card.primary}
@@ -171,4 +208,3 @@ export const TrpSummaryCards: React.FC<TrpSummaryCardsProps> = ({ campos }) => {
     </Box>
   );
 };
-

@@ -33,6 +33,9 @@ export const trpFieldSections: FieldSection[] = [
       'vigencia',
       'tipo_contrato',
       'objeto_contrato',
+
+      // ✅ NOVO: Fornecimento(s) ou Serviço(s) Prestado(s)
+      'objeto_fornecido',
     ],
   },
   {

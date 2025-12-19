@@ -8,6 +8,9 @@ export interface DadosRecebimentoPayload {
   // Campo obrigatório
   tipoContratacao: string; // "BENS" | "SERVIÇOS" | "OBRA"
   
+  // ✅ NOVO: Fornecimento(s) ou Serviço(s) Prestado(s)
+  objetoFornecido?: string;
+
   // Campo condicional (só quando tipoContratacao == "SERVIÇOS")
   competenciaMesAno?: string; // MM/AAAA
   
@@ -34,7 +37,6 @@ export interface DadosRecebimentoPayload {
   condicaoQuantidadeOrdem: CondicaoQuantidade;
   comentariosQuantidadeOrdem?: string; // Obrigatório quando PARCIAL
   
-  
   // Observações do recebimento
   observacoesRecebimento?: string;
   
@@ -48,6 +50,8 @@ export interface TrpApiResponse {
     numero_contrato: string | null;
     processo_licitatorio: string | null;
     objeto_contrato: string | null;
+
+    objeto_fornecido: string | null;
     contratada: string | null;
     cnpj: string | null;
     vigencia: string | null;
@@ -69,4 +73,3 @@ export interface TrpApiResponse {
     hash_tdr: string | null;
   };
 }
-

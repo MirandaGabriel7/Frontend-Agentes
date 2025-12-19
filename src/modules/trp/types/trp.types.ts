@@ -6,6 +6,10 @@ export interface DadosRecebimento {
   dataRecebimento: string;
   condicaoPrazo: CondicaoPrazo;
   condicaoQuantidade: CondicaoQuantidade;
+
+  // ✅ NOVO CAMPO (o fiscal informa manualmente)
+  objetoFornecido: string;
+
   observacoes?: string;
 }
 
@@ -40,4 +44,3 @@ export interface TrpListItem {
   situacao: TrpStatus;
   data: string;
 }
-

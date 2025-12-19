@@ -13,11 +13,11 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/pt-br';
-import { TrpInputForm } from '../../../lib/types/trp';
+import { DadosRecebimento } from '../types/trp.types';
 
 interface TrpRecebimentoFormProps {
-  data: TrpInputForm;
-  onChange: (data: TrpInputForm) => void;
+  data: DadosRecebimento;
+  onChange: (data: DadosRecebimento) => void;
 }
 
 dayjs.locale('pt-br');
@@ -28,7 +28,7 @@ export const TrpRecebimentoForm: React.FC<TrpRecebimentoFormProps> = ({
 }) => {
   const theme = useTheme();
 
-  const handleChange = (field: keyof TrpInputForm, value: any) => {
+  const handleChange = (field: keyof DadosRecebimento, value: any) => {
     onChange({
       ...data,
       [field]: value,
@@ -100,6 +100,18 @@ export const TrpRecebimentoForm: React.FC<TrpRecebimentoFormProps> = ({
           <MenuItem value="MAIOR">Quantidade superior</MenuItem>
         </TextField>
 
+        {/* ✅ NOVO CAMPO */}
+        <TextField
+          label="Fornecimentos ou Serviços Prestados"
+          value={data.objetoFornecido || ''}
+          onChange={(e) => handleChange('objetoFornecido', e.target.value)}
+          fullWidth
+          multiline
+          rows={2}
+          variant="outlined"
+          placeholder="Descreva o objeto fornecido/prestado referente a este recebimento..."
+        />
+
         <TextField
           label="Observações"
           value={data.observacoes || ''}
@@ -114,4 +126,3 @@ export const TrpRecebimentoForm: React.FC<TrpRecebimentoFormProps> = ({
     </Paper>
   );
 };
-

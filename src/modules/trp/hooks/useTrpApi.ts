@@ -1,3 +1,4 @@
+// src/modules/trp/hooks/useTrpApi.ts
 import { useState } from 'react';
 import axios from 'axios';
 import { TrpRunRequest, TrpRunResponse, TrpListItem } from '../types/trp.types';
@@ -14,6 +15,8 @@ export const useTrpApi = () => {
     setLoading(true);
     setError(null);
     try {
+      // ✅ Mantém exatamente o mesmo endpoint e estrutura.
+      // ✅ Agora o payload inclui objetoFornecido automaticamente via types/trp.types.
       const response = await api.post<TrpRunResponse>('/agents/trp/run', data);
       return response.data;
     } catch (err: any) {
@@ -63,4 +66,3 @@ export const useTrpApi = () => {
     error,
   };
 };
-

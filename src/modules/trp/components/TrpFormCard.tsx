@@ -52,6 +52,7 @@ const formatSelectValue = (value: string): string => {
 // Labels mais simples (curtos) para o fiscal
 const FIELD_LABELS = {
   tipo_contratacao: "Qual é o tipo de contrato?",
+   objeto_fornecido: "Quais foram os objetos entregues ou serviços prestados?",
   competencia_mes_ano: "Qual é o mês/ano de competência?",
   tipo_base_prazo: "Qual é a base do prazo?",
   data_recebimento: "Qual é a data de recebimento?",
@@ -339,6 +340,54 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
         </Box>
 
         <Divider sx={{ my: 1 }} />
+
+{/* NOVO CAMPO: Fornecimentos ou Serviços Prestados */}
+<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+  <Typography
+    variant="body2"
+    fontWeight={600}
+    sx={{
+      mb: 1,
+      fontSize: "0.9375rem",
+      color: theme.palette.text.primary,
+      lineHeight: 1.5,
+    }}
+  >
+    {FIELD_LABELS.objeto_fornecido}
+  </Typography>
+
+  <Typography
+    variant="body2"
+    sx={{
+      mb: 1.5,
+      fontSize: "0.8125rem",
+      lineHeight: 1.5,
+      color: alpha(theme.palette.text.secondary, 0.8),
+    }}
+  >
+    Descreva qual foi o fornecimento ou serviço prestado referente a este recebimento
+  </Typography>
+
+  <TextField
+    value={value.objeto_fornecido || ""}
+    onChange={(e) => updateField("objeto_fornecido")(e.target.value)}
+    fullWidth
+    multiline
+    rows={2}
+    variant="outlined"
+    placeholder="Ex: Fornecimento de medicamentos / Prestação de serviço de manutenção / etc."
+    disabled={disabled}
+    InputLabelProps={{ shrink: false }}
+    label=""
+    sx={{
+      ...inputSx,
+      "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+        padding: "16px",
+      },
+    }}
+  />
+</Box>
+
 
         {/* SEÇÃO 2: Base para Contagem de Prazo e Datas */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>

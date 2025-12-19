@@ -42,6 +42,7 @@ const [snackbar, setSnackbar] = useState<{
   // Estados do formulário
   const [form, setForm] = useState<TrpInputForm>({
     tipo_contratacao: undefined,
+    objeto_fornecido: undefined,
     data_recebimento: undefined,
     data_conclusao_servico: undefined,
     tipo_base_prazo: undefined,
@@ -157,6 +158,10 @@ const payload: DadosRecebimentoPayload = {
         payload.competenciaMesAno = form.competencia_mes_ano;
       }
 
+      if (form.objeto_fornecido) {
+        payload.objetoFornecido = form.objeto_fornecido;
+      }
+
       if (form.tipo_base_prazo === 'DATA_RECEBIMENTO' && form.data_recebimento) {
         payload.dataRecebimento = form.data_recebimento;
       }
@@ -195,6 +200,7 @@ const payload: DadosRecebimentoPayload = {
       const result = await generateTrp({
         dadosRecebimento: {
           tipoContratacao: payload.tipoContratacao,
+          objetoFornecido: payload.objetoFornecido || null,
           competenciaMesAno: payload.competenciaMesAno || null,
           tipoBasePrazo: payload.tipoBasePrazo,
           dataRecebimento: payload.dataRecebimento || null,
@@ -257,6 +263,7 @@ const payload: DadosRecebimentoPayload = {
     setOrdemFornecimentoFile(null);
     setForm({
       tipo_contratacao: undefined,
+      objeto_fornecido: undefined,
       data_recebimento: undefined,
       data_conclusao_servico: undefined,
       tipo_base_prazo: undefined,

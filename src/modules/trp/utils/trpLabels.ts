@@ -13,6 +13,9 @@ export const trpFieldLabels: Record<string, string> = {
   vigencia: 'Vigência',
   tipo_contrato: 'Tipo de Contrato',
   objeto_contrato: 'Objeto do Contrato',
+
+  // ✅ NOVO — Fornecimento(s) ou Serviço(s) Prestado(s)
+  objeto_fornecido: 'Fornecimento(s) ou Serviço(s) Prestado(s)',
   
   // Regime de Fornecimento
   regime_fornecimento: 'Regime de Fornecimento',
@@ -52,5 +55,10 @@ export const trpFieldLabels: Record<string, string> = {
  * Retorna o label humanizado para um campo
  */
 export function getTrpFieldLabel(fieldName: string): string {
-  return trpFieldLabels[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  return (
+    trpFieldLabels[fieldName] ||
+    fieldName
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  );
 }
