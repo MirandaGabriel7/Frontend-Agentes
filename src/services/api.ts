@@ -141,6 +141,7 @@ export interface TrpRunsSummaryApiResponse {
 export interface GenerateTrpParams {
   dadosRecebimento: {
     tipoContratacao: string; // "BENS" | "SERVIÇOS" | "OBRA"
+
     competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
     tipoBasePrazo: string; // "DATA_RECEBIMENTO" | "SERVICO"
     dataRecebimento?: string | null; // DD/MM/AAAA ou YYYY-MM-DD (quando base = DATA_RECEBIMENTO)
@@ -149,11 +150,20 @@ export interface GenerateTrpParams {
     dataEntregaReal?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
     condicaoPrazo: string; // "NO_PRAZO" | "FORA_DO_PRAZO"
     motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
+
     condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
     comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
+
     objetoFornecido?: string | null;
 
+    // ✅ NOVOS CAMPOS (manual do fiscal) — cálculo do valor total
+    unidade_medida?: string | null;
+    quantidade_recebida?: number | null;
+    valor_unitario?: number | null;
+    valor_total_calculado?: number | null;
+
     observacoesRecebimento?: string | null;
+
     // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome)
     // serão preenchidas automaticamente pelo sistema a partir dos documentos
   };
@@ -163,6 +173,7 @@ export interface GenerateTrpParams {
     ordemFornecimento: File | null;
   };
 }
+
 
 
 /**

@@ -1,13 +1,20 @@
-export type TrpStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+export type TrpStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
 
 // Valores permitidos pelo backend (node TDR 03)
-export type TrpCondicaoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO';
+export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 
-export type TrpCondicaoQuantidade = 'TOTAL' | 'PARCIAL';
+export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
 
-export type TrpTipoBasePrazo = 'DATA_RECEBIMENTO' | 'SERVICO';
+export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "SERVICO";
 
-export type TrpTipoContrato = 'BENS' | 'SERVIÇOS' | 'OBRA';
+export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
+
+/**
+ * ✅ NOVO: Unidade de medida (livre por enquanto)
+ * - Pode ser "UN", "CX", "FR", "KG", "L", "M", "M2", "M3", etc.
+ * - Vou deixar como string pra não travar o fiscal e você poder evoluir pra enum depois.
+ */
+export type TrpUnidadeMedida = string;
 
 export interface TrpInputForm {
   // Campo obrigatório no início
@@ -39,12 +46,25 @@ export interface TrpInputForm {
   condicao_quantidade_ordem?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
   comentarios_quantidade_ordem?: string; // Obrigatório quando PARCIAL
 
-  // Condição da Quantidade - Nota Fiscal (NOVO)
+  // Condição da Quantidade - Nota Fiscal (legado / ainda existe no form atual)
   condicao_quantidade_nf?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
   comentarios_quantidade_nf?: string; // Obrigatório quando PARCIAL
 
   // ✅ NOVO CAMPO (manual do fiscal) — Fornecimentos ou Serviços Prestados
   objeto_fornecido?: string;
+
+  /**
+   * ✅ NOVOS CAMPOS: Quantidade e valores (manual do fiscal)
+   * Motivação: parar de depender do valor extraído da NF quando pode estar errado.
+   *
+   * Regras esperadas no front:
+   * - quantidade_recebida e valor_unitario: input do usuário
+   * - valor_total_calculado: calculado automaticamente (quantidade_recebida * valor_unitario)
+   */
+  unidade_medida?: TrpUnidadeMedida; // Ex: "UN", "CX", "KG" etc.
+  quantidade_recebida?: number; // Ex: 10
+  valor_unitario?: number; // Ex: 15.5
+  valor_total_calculado?: number; // Ex: 155.0 (calculado no front)
 
   // Observações do recebimento
   observacoes_recebimento?: string;
@@ -69,8 +89,14 @@ export interface TrpCamposNormalizados {
   numero_nf: string | null;
   vencimento_nf: string | null;
   numero_empenho: string | null;
+
+  /**
+   * Obs: esses campos ainda existem no output normalizado (extraídos / calculados pelo pipeline).
+   * No novo fluxo, a gente vai passar a usar principalmente os valores manuais do fiscal (run.input).
+   */
   valor_efetivo_numero: number | null;
   valor_efetivo_formatado: string | null;
+
   regime_fornecimento: string | null;
   tipo_contrato: string | null;
   data_entrega: string | null;

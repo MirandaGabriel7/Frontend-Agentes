@@ -10,6 +10,7 @@ import {
   Select,
   FormControl,
   Divider,
+  InputAdornment,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -52,7 +53,11 @@ const formatSelectValue = (value: string): string => {
 // Labels mais simples (curtos) para o fiscal
 const FIELD_LABELS = {
   tipo_contratacao: "Qual é o tipo de contrato?",
-   objeto_fornecido: "Quais foram os objetos entregues ou serviços prestados?",
+  objeto_fornecido: "Quais foram os objetos entregues ou serviços prestados?",
+  unidade_medida: "Qual é a unidade de medida?",
+  quantidade_recebida: "Qual foi a quantidade recebida?",
+  valor_unitario: "Qual é o valor unitário?",
+  valor_total_calculado: "Valor total calculado (quantidade × valor unitário)",
   competencia_mes_ano: "Qual é o mês/ano de competência?",
   tipo_base_prazo: "Qual é a base do prazo?",
   data_recebimento: "Qual é a data de recebimento?",
@@ -67,6 +72,37 @@ const FIELD_LABELS = {
   comentarios_quantidade_ordem: "Explique a divergência/pendência",
   observacoes_recebimento: "Deseja registrar observações?",
 } as const;
+
+function clampDecimals(value: string, maxDecimals: number): string {
+  if (!value) return value;
+  const [intPart, decPart] = value.split(".");
+  if (!decPart) return value;
+  return `${intPart}.${decPart.slice(0, maxDecimals)}`;
+}
+
+function parseMoneyToNumber(raw: string): number | null {
+  if (!raw) return null;
+  // aceita "1.234,56" e "1234.56"
+  const cleaned = raw
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const n = Number(cleaned);
+  if (!isFinite(n)) return null;
+  return n;
+}
+
+function formatBRL(value: number): string {
+  try {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  } catch {
+    return String(value);
+  }
+}
 
 export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   value,
@@ -203,6 +239,39 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       color: theme.palette.text.primary,
     },
   };
+
+  // Cálculo do total (somente para exibição / salvar no form)
+  const quantidadeNumber =
+    value.quantidade_recebida === null ||
+    value.quantidade_recebida === undefined
+      ? null
+      : Number(value.quantidade_recebida);
+
+  const valorUnitarioNumber =
+    typeof value.valor_unitario === "number" ? value.valor_unitario : null;
+
+  const totalCalculado =
+    quantidadeNumber !== null &&
+    isFinite(quantidadeNumber) &&
+    quantidadeNumber > 0 &&
+    valorUnitarioNumber !== null &&
+    isFinite(valorUnitarioNumber) &&
+    valorUnitarioNumber >= 0
+      ? quantidadeNumber * valorUnitarioNumber
+      : null;
+
+  // Sempre que quantidade/valor unitário mudar, refletir no form.valor_total_calculado
+  // (Mantém uma “fonte única” para enviar ao backend sem recalcular em outro lugar)
+  React.useEffect(() => {
+    const nextTotal = totalCalculado ?? undefined;
+
+    if (
+      nextTotal !== value.valor_total_calculado &&
+      !(Number.isNaN(nextTotal) && Number.isNaN(value.valor_total_calculado))
+    ) {
+      onChange({ ...value, valor_total_calculado: nextTotal });
+    }
+  }, [totalCalculado]);
 
   return (
     <Paper
@@ -341,53 +410,224 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
         <Divider sx={{ my: 1 }} />
 
-{/* NOVO CAMPO: Fornecimentos ou Serviços Prestados */}
-<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-  <Typography
-    variant="body2"
-    fontWeight={600}
-    sx={{
-      mb: 1,
-      fontSize: "0.9375rem",
-      color: theme.palette.text.primary,
-      lineHeight: 1.5,
-    }}
-  >
-    {FIELD_LABELS.objeto_fornecido}
-  </Typography>
+        {/* OBJETO FORNECIDO / PRESTADO */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{
+              mb: 1,
+              fontSize: "0.9375rem",
+              color: theme.palette.text.primary,
+              lineHeight: 1.5,
+            }}
+          >
+            {FIELD_LABELS.objeto_fornecido}
+          </Typography>
 
-  <Typography
-    variant="body2"
-    sx={{
-      mb: 1.5,
-      fontSize: "0.8125rem",
-      lineHeight: 1.5,
-      color: alpha(theme.palette.text.secondary, 0.8),
-    }}
-  >
-    Descreva qual foi o fornecimento ou serviço prestado referente a este recebimento
-  </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              mb: 1.5,
+              fontSize: "0.8125rem",
+              lineHeight: 1.5,
+              color: alpha(theme.palette.text.secondary, 0.8),
+            }}
+          >
+            Descreva qual foi o fornecimento ou serviço prestado referente a
+            este recebimento
+          </Typography>
 
-  <TextField
-    value={value.objeto_fornecido || ""}
-    onChange={(e) => updateField("objeto_fornecido")(e.target.value)}
-    fullWidth
-    multiline
-    rows={2}
-    variant="outlined"
-    placeholder="Ex: Fornecimento de medicamentos / Prestação de serviço de manutenção / etc."
-    disabled={disabled}
-    InputLabelProps={{ shrink: false }}
-    label=""
-    sx={{
-      ...inputSx,
-      "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
-        padding: "16px",
-      },
-    }}
-  />
-</Box>
+          <TextField
+            value={value.objeto_fornecido || ""}
+            onChange={(e) => updateField("objeto_fornecido")(e.target.value)}
+            fullWidth
+            multiline
+            rows={2}
+            variant="outlined"
+            placeholder="Ex: Fornecimento de medicamentos / Prestação de serviço de manutenção / etc."
+            disabled={disabled}
+            InputLabelProps={{ shrink: false }}
+            label=""
+            sx={{
+              ...inputSx,
+              "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                padding: "16px",
+              },
+            }}
+          />
+        </Box>
 
+        {/* NOVO BLOCO: QUANTIDADE / UNIDADE / VALOR */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <Divider sx={{ my: 0.5 }} />
+
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 3,
+            }}
+          >
+            {/* Unidade de Medida */}
+            <Box
+              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.5,
+                }}
+              >
+                {FIELD_LABELS.unidade_medida}
+              </Typography>
+
+              <TextField
+                value={value.unidade_medida || ""}
+                onChange={(e) => updateField("unidade_medida")(e.target.value)}
+                fullWidth
+                variant="outlined"
+                placeholder="Ex: unidade / caixa / frasco / kg / litro / hora"
+                disabled={disabled}
+                InputLabelProps={{ shrink: false }}
+                label=""
+                sx={inputSx}
+              />
+            </Box>
+
+            {/* Quantidade Recebida */}
+            <Box
+              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.5,
+                }}
+              >
+                {FIELD_LABELS.quantidade_recebida}
+              </Typography>
+
+              <TextField
+                value={value.quantidade_recebida ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const cleaned = raw.replace(/[^\d.,]/g, "").replace(",", ".");
+                  const safe = clampDecimals(cleaned, 3); // se quiser 0 decimais, mude pra 0 e trate
+                  updateField("quantidade_recebida")(
+                    safe ? Number(safe) : undefined
+                  );
+                }}
+                fullWidth
+                variant="outlined"
+                placeholder="Ex: 10"
+                disabled={disabled}
+                InputLabelProps={{ shrink: false }}
+                label=""
+                inputProps={{ inputMode: "decimal" }}
+                sx={inputSx}
+              />
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 3,
+            }}
+          >
+            {/* Valor Unitário */}
+            <Box
+              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.5,
+                }}
+              >
+                {FIELD_LABELS.valor_unitario}
+              </Typography>
+
+              <TextField
+                value={value.valor_unitario ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+
+                  // permitir vazio
+                  if (raw.trim() === "") {
+                    updateField("valor_unitario")(undefined);
+                    return;
+                  }
+
+                  // aceitar vírgula/ponto
+                  const n = parseMoneyToNumber(raw);
+                  if (n === null) return;
+
+                  updateField("valor_unitario")(Number(n.toFixed(2)));
+                }}
+                fullWidth
+                variant="outlined"
+                placeholder="Ex: 12,50"
+                disabled={disabled}
+                InputLabelProps={{ shrink: false }}
+                label=""
+                inputProps={{ inputMode: "decimal" }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">R$</InputAdornment>
+                  ),
+                }}
+                sx={inputSx}
+              />
+            </Box>
+
+            {/* Valor Total Calculado */}
+            <Box
+              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.5,
+                }}
+              >
+                {FIELD_LABELS.valor_total_calculado}
+              </Typography>
+
+              <TextField
+                value={totalCalculado !== null ? formatBRL(totalCalculado) : ""}
+                fullWidth
+                variant="outlined"
+                placeholder="Preencha quantidade e valor unitário"
+                disabled={disabled}
+                InputProps={{ readOnly: true }}
+                InputLabelProps={{ shrink: false }}
+                label=""
+                sx={inputSx}
+              />
+            </Box>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 1 }} />
 
         {/* SEÇÃO 2: Base para Contagem de Prazo e Datas */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
