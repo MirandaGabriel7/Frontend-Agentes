@@ -2,11 +2,17 @@
  * Organização de campos por seções para renderização dinâmica
  * Define quais campos pertencem a cada seção do documento
  *
- * ✅ CORRIGIDO (BLINDADO):
+ * ✅ BLINDADO:
  * - Nunca retorna valor técnico cru (ex: FORA_DO_PRAZO, DATA_RECEBIMENTO, NAO_DECLARADO)
  * - Filtra NAO_DECLARADO / vazios / "Não informado" para não poluir UI
  * - alwaysShowFields mantém estrutura mínima, mas value vem "" (vazio) para UI decidir placeholder
  * - OUTROS também é normalizado + filtrado
+ *
+ * ✅ ATUALIZAÇÃO (Objeto + Quantidades/Valores juntos):
+ * - "OBJETO FORNECIDO/PRESTADO" inclui: objeto_fornecido + unidade_medida + quantidade_recebida + valor_unitario + valor_total_calculado
+ * - Remove seção separada de quantitativos/valores
+ * - Remove "REGIME DE FORNECIMENTO" e remove area_demandante_nome
+ * - Ignora prazos_calculados para não vazar JSON em OUTROS
  */
 
 import { getTrpFieldLabel } from './trpLabels';
@@ -17,31 +23,34 @@ export interface FieldSection {
   fieldNames: string[];
 }
 
-/**
- * Define as seções e seus campos
- * Campos não listados aqui serão exibidos em uma seção "OUTROS" no final
- */
 export const trpFieldSections: FieldSection[] = [
   {
     title: 'IDENTIFICAÇÃO',
     fieldNames: [
       'numero_contrato',
       'processo_licitatorio',
+      'numero_ordem_compra',
       'contratada',
       'fornecedor',
       'cnpj',
       'vigencia',
       'tipo_contrato',
       'objeto_contrato',
-
-      // ✅ NOVO: Fornecimento(s) ou Serviço(s) Prestado(s)
-      'objeto_fornecido',
+      'competencia_mes_ano',
     ],
   },
+
   {
-    title: 'REGIME DE FORNECIMENTO',
-    fieldNames: ['regime_fornecimento', 'competencia_mes_ano'],
+    title: 'OBJETO FORNECIDO/PRESTADO',
+    fieldNames: [
+      'objeto_fornecido',
+      'unidade_medida',
+      'quantidade_recebida',
+      'valor_unitario',
+      'valor_total_calculado',
+    ],
   },
+
   {
     title: 'DOCUMENTO FISCAL',
     fieldNames: [
@@ -50,8 +59,10 @@ export const trpFieldSections: FieldSection[] = [
       'numero_empenho',
       'valor_efetivo_formatado',
       'valor_efetivo_numero',
+      'valor_efetivo',
     ],
   },
+
   {
     title: 'CONDIÇÕES DE RECEBIMENTO',
     fieldNames: [
@@ -59,40 +70,45 @@ export const trpFieldSections: FieldSection[] = [
       'data_recebimento',
       'data_entrega',
       'data_conclusao_servico',
+      'data_prevista_entrega_contrato',
+      'data_entrega_real',
+
       'condicao_prazo',
+
       'condicao_quantidade',
       'condicao_quantidade_ordem',
       'condicao_quantidade_nf',
+
       'motivo_atraso',
       'comentarios_quantidade_ordem',
       'comentarios_quantidade_nf',
     ],
   },
+
   {
     title: 'OBSERVAÇÕES',
     fieldNames: ['observacoes', 'observacoes_recebimento'],
   },
+
   {
     title: 'ASSINATURAS',
-    fieldNames: ['fiscal_contrato_nome', 'area_demandante_nome', 'data_assinatura'],
+    fieldNames: ['fiscal_contrato_nome', 'data_assinatura'],
   },
 ];
 
-/**
- * Campos que devem ser ignorados na renderização (metadados internos)
- */
 export const ignoredFields = new Set([
   'runId',
   'createdAt',
   'updatedAt',
   'status',
   'id',
+
+  // ✅ evita vazar JSON em OUTROS
+  'prazos_calculados',
+  'prazos',
+  'prazos_calculados_raw',
 ]);
 
-/**
- * Campos que devem ser exibidos mesmo se vazios (estrutura mínima)
- * ✅ Aqui a gente inclui o campo, mas o value vem "" para a UI decidir placeholder
- */
 export const alwaysShowFields = new Set([
   'numero_contrato',
   'processo_licitatorio',
@@ -101,12 +117,15 @@ export const alwaysShowFields = new Set([
   'valor_efetivo_formatado',
   'data_entrega',
   'condicao_prazo',
-  'condicao_quantidade',
+
+  // ✅ manter estrutura mínima do bloco Objeto/Valores
+  'objeto_fornecido',
+  'unidade_medida',
+  'quantidade_recebida',
+  'valor_unitario',
+  'valor_total_calculado',
 ]);
 
-/**
- * Valores que NUNCA devem aparecer na UI
- */
 const HIDDEN_STRINGS = new Set([
   '',
   'NAO_DECLARADO',
@@ -136,33 +155,38 @@ function isHiddenString(s: string): boolean {
 /**
  * Converte qualquer valor para string "exibível" e normaliza enums técnicos.
  * Se não for exibível, retorna "" (vazio).
+ *
+ * ✅ IMPORTANTE:
+ * - number/boolean também passam pelo normalizeTrpValue para permitir formatação (moeda/quantidade)
  */
 function toUiString(fieldName: string, value: unknown): string {
   if (value === null || value === undefined) return '';
+
+  // evita vazamento de estruturas
+  if (fieldName === 'prazos_calculados' || fieldName === 'prazos') return '';
 
   // strings
   if (typeof value === 'string') {
     if (isHiddenString(value)) return '';
 
-    // normalizeTrpValue agora deve devolver "" para NAO_DECLARADO (depois que você atualizou)
     const normalized = normalizeTrpValue(value, fieldName);
     if (!normalized || isHiddenString(normalized)) return '';
 
     return normalized;
   }
 
-  // number / boolean
+  // number / boolean  ✅ agora normaliza também
   if (typeof value === 'number' || typeof value === 'boolean') {
-    const s = String(value);
-    if (isHiddenString(s)) return '';
-    return s;
+    const normalized = normalizeTrpValue(String(value), fieldName);
+    if (!normalized || isHiddenString(normalized)) return '';
+    return normalized;
   }
 
   // objeto/array
   try {
     const s = JSON.stringify(value);
     if (!s || s === '{}' || s === '[]' || s === 'null') return '';
-    // ainda passa pelo normalizador para evitar enums técnicos dentro de string
+
     const normalized = normalizeTrpValue(s, fieldName);
     if (!normalized || isHiddenString(normalized)) return '';
     return normalized;
@@ -173,10 +197,6 @@ function toUiString(fieldName: string, value: unknown): string {
   }
 }
 
-/**
- * Organiza campos por seções
- * ✅ Retorna valores prontos para UI (string normalizada + filtrada)
- */
 export function organizeFieldsBySections(
   campos: Record<string, unknown>
 ): Array<{
@@ -196,7 +216,6 @@ export function organizeFieldsBySections(
 
     for (const fieldName of section.fieldNames) {
       if (!allFieldNames.has(fieldName)) {
-        // Se for alwaysShowFields e não existe, ainda pode entrar com vazio
         if (alwaysShowFields.has(fieldName)) {
           fields.push({
             fieldName,
@@ -211,8 +230,6 @@ export function organizeFieldsBySections(
       const rawValue = campos[fieldName];
       const uiValue = toUiString(fieldName, rawValue);
 
-      // ✅ Se alwaysShowFields: entra sempre, mas value pode ser ""
-      // ✅ Se não é alwaysShow: só entra se tiver valor útil (uiValue != "")
       if (alwaysShowFields.has(fieldName) || uiValue !== '') {
         fields.push({
           fieldName,
@@ -223,9 +240,7 @@ export function organizeFieldsBySections(
       }
     }
 
-    // adicionar seção se tiver algo (mesmo que seja alwaysShow vazio — estrutura)
     if (fields.length > 0) {
-      // Mas se a seção inteira estiver vazia (todos ""), e não houver nenhum alwaysShow nela, não renderiza
       const hasAnyValue = fields.some((f) => f.value !== '');
       const hasAlwaysShow = fields.some((f) => alwaysShowFields.has(f.fieldName));
       if (hasAnyValue || hasAlwaysShow) {
@@ -240,6 +255,7 @@ export function organizeFieldsBySections(
   for (const [fieldName, rawValue] of Object.entries(campos)) {
     if (ignoredFields.has(fieldName)) continue;
     if (usedFields.has(fieldName)) continue;
+    if (fieldName.startsWith('prazos')) continue;
 
     const uiValue = toUiString(fieldName, rawValue);
     if (uiValue === '') continue;

@@ -1,121 +1,165 @@
+// src/lib/types/trp.ts
+
 export type TrpStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
 
-// Valores permitidos pelo backend (node TDR 03)
 export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
-
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
-
 export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "SERVICO";
-
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
 
-/**
- * ✅ NOVO: Unidade de medida (livre por enquanto)
- * - Pode ser "UN", "CX", "FR", "KG", "L", "M", "M2", "M3", etc.
- * - Vou deixar como string pra não travar o fiscal e você poder evoluir pra enum depois.
- */
+// Livre por enquanto (não travar o fiscal)
 export type TrpUnidadeMedida = string;
 
-export interface TrpInputForm {
-  // Campo obrigatório no início
-  tipo_contratacao?: TrpTipoContrato; // "BENS" | "SERVIÇOS" | "OBRA" - obrigatório
+/**
+ * =========================
+ * UI (Form)
+ * =========================
+ * O fiscal digita valor_unitario como string (ex: "12,50").
+ * O total do item pode ser calculado no front.
+ */
+export interface TrpItemObjeto {
+  descricao: string;
+  unidade_medida: TrpUnidadeMedida;
 
-  // Campo condicional: competência (só quando tipo_contratacao == "SERVIÇOS")
+  // No teu fluxo/validação você trata como obrigatório (> 0)
+  quantidade_recebida: number;
+
+  // string digitável "12,50"
+  valor_unitario: string;
+
+  // calculado no front (quantidade * valor_unitario_num)
+  valor_total_calculado?: number;
+}
+
+/**
+ * =========================
+ * Payload (Backend)
+ * =========================
+ * Modelo OFICIAL para envio ao backend (n8n/Supabase-first).
+ * - raw: exatamente o que o fiscal digitou
+ * - num: normalizado para number (ex: 12.5)
+ * - total: qtd * num
+ */
+export interface TrpItemObjetoPayload {
+  descricao: string;
+  unidade_medida: TrpUnidadeMedida;
+  quantidade_recebida: number;
+
+  valor_unitario_raw: string;
+  valor_unitario_num: number;
+
+  valor_total_calculado: number;
+}
+
+export interface TrpInputForm {
+  tipo_contratacao?: TrpTipoContrato;
+
+  // serviços
   competencia_mes_ano?: string; // MM/AAAA
 
-  // Base para contagem de prazo
-  tipo_base_prazo?: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
+  // base prazo
+  tipo_base_prazo?: TrpTipoBasePrazo;
+  data_recebimento?: string; // DD/MM/AAAA ou ISO
+  data_conclusao_servico?: string; // DD/MM/AAAA ou ISO
 
-  // Data de recebimento (quando base = DATA_RECEBIMENTO)
-  data_recebimento?: string; // DD/MM/AAAA ou YYYY-MM-DD
-
-  // Data de conclusão do serviço (quando base = SERVICO)
-  data_conclusao_servico?: string; // DD/MM/AAAA ou YYYY-MM-DD
-
-  // Datas de entrega
-  data_prevista_entrega_contrato?: string; // DD/MM/AAAA ou YYYY-MM-DD
-  data_entrega_real?: string; // DD/MM/AAAA ou YYYY-MM-DD
-
-  // Condição do Prazo
-  condicao_prazo?: TrpCondicaoPrazo; // "NO_PRAZO" | "FORA_DO_PRAZO"
-
-  // Campos condicionais quando condicao_prazo = "FORA_DO_PRAZO"
+  // prazo
+  condicao_prazo?: TrpCondicaoPrazo;
   motivo_atraso?: string;
+  data_prevista_entrega_contrato?: string;
+  data_entrega_real?: string;
 
-  // Condição da Quantidade - Ordem de Fornecimento
-  condicao_quantidade_ordem?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
-  comentarios_quantidade_ordem?: string; // Obrigatório quando PARCIAL
+  // quantidade (ordem)
+  condicao_quantidade_ordem?: TrpCondicaoQuantidade;
+  comentarios_quantidade_ordem?: string;
 
-  // Condição da Quantidade - Nota Fiscal (legado / ainda existe no form atual)
-  condicao_quantidade_nf?: TrpCondicaoQuantidade; // "TOTAL" | "PARCIAL"
-  comentarios_quantidade_nf?: string; // Obrigatório quando PARCIAL
+  // ✅ NOVO: itens (1+)
+  itens_objeto: TrpItemObjeto[];
 
-  // ✅ NOVO CAMPO (manual do fiscal) — Fornecimentos ou Serviços Prestados
-  objeto_fornecido?: string;
+  // total geral (opcional)
+  valor_total_geral?: number;
 
-  /**
-   * ✅ NOVOS CAMPOS: Quantidade e valores (manual do fiscal)
-   * Motivação: parar de depender do valor extraído da NF quando pode estar errado.
-   *
-   * Regras esperadas no front:
-   * - quantidade_recebida e valor_unitario: input do usuário
-   * - valor_total_calculado: calculado automaticamente (quantidade_recebida * valor_unitario)
-   */
-  unidade_medida?: TrpUnidadeMedida; // Ex: "UN", "CX", "KG" etc.
-  quantidade_recebida?: number; // Ex: 10
-  valor_unitario?: number; // Ex: 15.5
-  valor_total_calculado?: number; // Ex: 155.0 (calculado no front)
-
-  // Observações do recebimento
+  // observações
   observacoes_recebimento?: string;
 
-  // Assinaturas (NOVO)
-  fiscal_contrato_nome?: string; // Obrigatório
-  data_assinatura?: string; // DD/MM/AAAA ou YYYY-MM-DD - Obrigatório
-  area_demandante_nome?: string; // Opcional
+  // assinaturas (você pode obrigar no validateForm)
+  fiscal_contrato_nome?: string;
+  data_assinatura?: string;
+  area_demandante_nome?: string;
 
-  // Campo auxiliar para upload
+  // auxiliar upload
   arquivoTdrNome?: string;
 }
 
-export interface TrpCamposNormalizados {
-  numero_contrato: string | null;
-  processo_licitatorio: string | null;
-  objeto_contrato: string | null;
-  contratada: string | null;
-  cnpj: string | null;
-  vigencia: string | null;
-  competencia_mes_ano: string | null;
-  numero_nf: string | null;
-  vencimento_nf: string | null;
-  numero_empenho: string | null;
+/**
+ * Payload consolidado que vai no FormData (dadosRecebimento)
+ * ✅ você consegue tipar o generateTrp sem usar "any"
+ */
+export interface DadosRecebimentoPayload {
+  tipoContratacao: TrpTipoContrato;
+
+  // ✅ oficial
+  itens_objeto: TrpItemObjetoPayload[];
+
+  // ✅ total geral dos itens
+  valor_total_geral?: number | null;
+
+  // serviços
+  competenciaMesAno?: string | null; // MM/AAAA
+
+  // base prazo
+  tipoBasePrazo: TrpTipoBasePrazo;
+  dataRecebimento?: string | null;
+  dataConclusaoServico?: string | null;
+
+  // datas extras (se necessário)
+  dataPrevistaEntregaContrato?: string | null;
+  dataEntregaReal?: string | null;
+
+  // prazo
+  condicaoPrazo: TrpCondicaoPrazo;
+  motivoAtraso?: string | null;
+
+  // quantidade (ordem)
+  condicaoQuantidadeOrdem: TrpCondicaoQuantidade;
+  comentariosQuantidadeOrdem?: string | null;
+
+  // observações
+  observacoesRecebimento?: string | null;
 
   /**
-   * Obs: esses campos ainda existem no output normalizado (extraídos / calculados pelo pipeline).
-   * No novo fluxo, a gente vai passar a usar principalmente os valores manuais do fiscal (run.input).
+   * ⚠️ LEGADO (compatibilidade) — manter enquanto o backend ainda aceita/gera isso
+   * No novo fluxo, NÃO usar como fonte principal.
    */
-  valor_efetivo_numero: number | null;
-  valor_efetivo_formatado: string | null;
-
-  regime_fornecimento: string | null;
-  tipo_contrato: string | null;
-  data_entrega: string | null;
-  condicao_prazo: string | null;
-  condicao_quantidade: string | null;
-  observacoes: string | null;
+  objetoFornecido?: string | null;
+  unidade_medida?: string | null;
+  quantidade_recebida?: number | null;
+  valor_unitario?: number | null;
+  valor_total_calculado?: number | null;
 }
 
+/**
+ * ✅ Compatível com o TrpResultPage:
+ * ele cria meta.fileName + meta.hash_tdr
+ */
 export interface TrpMeta {
   fileName: string;
   hash_tdr: string;
 }
 
+/**
+ * ⚠️ "campos" aqui é o viewModel que você monta no front.
+ * Como você ainda está mudando o formato no backend,
+ * manter Record<string, any> evita quebrar componente enquanto estabiliza.
+ */
 export interface TrpAgentOutput {
   documento_markdown: string;
-  campos: TrpCamposNormalizados;
+  campos: Record<string, any>;
   meta: TrpMeta;
 }
 
+/**
+ * Run "do front" (se você usa em algum lugar). O backend tem outro shape (TrpRunData).
+ */
 export interface TrpRun {
   id: string;
   createdAt: string;

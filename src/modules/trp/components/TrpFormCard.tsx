@@ -11,6 +11,7 @@ import {
   FormControl,
   Divider,
   InputAdornment,
+  Button,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -53,11 +54,7 @@ const formatSelectValue = (value: string): string => {
 // Labels mais simples (curtos) para o fiscal
 const FIELD_LABELS = {
   tipo_contratacao: "Qual é o tipo de contrato?",
-  objeto_fornecido: "Quais foram os objetos entregues ou serviços prestados?",
-  unidade_medida: "Qual é a unidade de medida?",
-  quantidade_recebida: "Qual foi a quantidade recebida?",
-  valor_unitario: "Qual é o valor unitário?",
-  valor_total_calculado: "Valor total calculado (quantidade × valor unitário)",
+  itens_objeto: "Quais foram os itens entregues ou serviços prestados?",
   competencia_mes_ano: "Qual é o mês/ano de competência?",
   tipo_base_prazo: "Qual é a base do prazo?",
   data_recebimento: "Qual é a data de recebimento?",
@@ -67,30 +64,25 @@ const FIELD_LABELS = {
   data_entrega_real: "Qual foi a data real da entrega/serviço?",
   motivo_atraso:
     "Qual foi o motivo do atraso? Você entrou em contato com o fornecedor para saber o motivo?",
-  condicao_quantidade_ordem:
-    "A quantidade confere com a Ordem de Fornecimento?",
+  condicao_quantidade_ordem: "A quantidade confere com a Ordem de Fornecimento?",
   comentarios_quantidade_ordem: "Explique a divergência/pendência",
   observacoes_recebimento: "Deseja registrar observações?",
 } as const;
+
+// ✅ Tipo local do item no FORM (valor_unitario como string para permitir digitação pt-BR)
+type TrpItemObjetoForm = {
+  descricao: string;
+  unidade_medida: string;
+  quantidade_recebida?: number;
+  valor_unitario?: string; // string digitada (ex: "12,50")
+  valor_total_calculado?: number; // calculado no front
+};
 
 function clampDecimals(value: string, maxDecimals: number): string {
   if (!value) return value;
   const [intPart, decPart] = value.split(".");
   if (!decPart) return value;
   return `${intPart}.${decPart.slice(0, maxDecimals)}`;
-}
-
-function parseMoneyToNumber(raw: string): number | null {
-  if (!raw) return null;
-  // aceita "1.234,56" e "1234.56"
-  const cleaned = raw
-    .trim()
-    .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const n = Number(cleaned);
-  if (!isFinite(n)) return null;
-  return n;
 }
 
 function formatBRL(value: number): string {
@@ -104,6 +96,26 @@ function formatBRL(value: number): string {
   }
 }
 
+function parseMoneyBR(raw?: string): number | null {
+  if (raw === undefined || raw === null) return null;
+
+  const trimmed = String(raw).trim();
+  if (trimmed === "" || trimmed === "," || trimmed === ".") return null;
+
+  const cleaned = trimmed.replace(/[^\d.,]/g, "");
+
+  // Se tem vírgula, vírgula é decimal e pontos são milhar
+  if (cleaned.includes(",")) {
+    const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Sem vírgula: ponto como decimal
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   value,
   onChange,
@@ -111,9 +123,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 }) => {
   const theme = useTheme();
 
-  const updateField = (field: keyof TrpInputForm) => (newValue: unknown) => {
-    onChange({ ...value, [field]: newValue });
-  };
+  const updateField =
+    (field: keyof TrpInputForm) =>
+    (newValue: unknown) => {
+      onChange({ ...value, [field]: newValue } as TrpInputForm);
+    };
 
   const formatDateToDDMMYYYY = (date: Dayjs | null): string => {
     if (!date) return "";
@@ -134,7 +148,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     if (newValue !== "SERVIÇOS") {
       updates.competencia_mes_ano = undefined;
     }
-    onChange({ ...value, ...updates });
+    onChange({ ...value, ...updates } as TrpInputForm);
   };
 
   const handleTipoBasePrazoChange = (newValue: TrpTipoBasePrazo) => {
@@ -144,7 +158,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     } else if (newValue === "SERVICO") {
       updates.data_recebimento = undefined;
     }
-    onChange({ ...value, ...updates });
+    onChange({ ...value, ...updates } as TrpInputForm);
   };
 
   const handleCondicaoPrazoChange = (newValue: TrpCondicaoPrazo) => {
@@ -154,19 +168,15 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       updates.data_prevista_entrega_contrato = undefined;
       updates.data_entrega_real = undefined;
     }
-    onChange({ ...value, ...updates });
+    onChange({ ...value, ...updates } as TrpInputForm);
   };
 
-  const handleCondicaoQuantidadeOrdemChange = (
-    newValue: TrpCondicaoQuantidade
-  ) => {
-    const updates: Partial<TrpInputForm> = {
-      condicao_quantidade_ordem: newValue,
-    };
+  const handleCondicaoQuantidadeOrdemChange = (newValue: TrpCondicaoQuantidade) => {
+    const updates: Partial<TrpInputForm> = { condicao_quantidade_ordem: newValue };
     if (newValue === "TOTAL") {
       updates.comentarios_quantidade_ordem = undefined;
     }
-    onChange({ ...value, ...updates });
+    onChange({ ...value, ...updates } as TrpInputForm);
   };
 
   const showCompetenciaField = value.tipo_contratacao === "SERVIÇOS";
@@ -240,38 +250,86 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     },
   };
 
-  // Cálculo do total (somente para exibição / salvar no form)
-  const quantidadeNumber =
-    value.quantidade_recebida === null ||
-    value.quantidade_recebida === undefined
-      ? null
-      : Number(value.quantidade_recebida);
+  // ============================
+  // ✅ ITENS (sempre 1 item vazio)
+  // ============================
+  const EMPTY_ITEM: TrpItemObjetoForm = {
+    descricao: "",
+    unidade_medida: "",
+    quantidade_recebida: undefined,
+    valor_unitario: "",
+    valor_total_calculado: undefined,
+  };
 
-  const valorUnitarioNumber =
-    typeof value.valor_unitario === "number" ? value.valor_unitario : null;
+  const itens: TrpItemObjetoForm[] =
+    Array.isArray((value as any).itens_objeto) && (value as any).itens_objeto.length > 0
+      ? ((value as any).itens_objeto as TrpItemObjetoForm[])
+      : [EMPTY_ITEM];
 
-  const totalCalculado =
-    quantidadeNumber !== null &&
-    isFinite(quantidadeNumber) &&
-    quantidadeNumber > 0 &&
-    valorUnitarioNumber !== null &&
-    isFinite(valorUnitarioNumber) &&
-    valorUnitarioNumber >= 0
-      ? quantidadeNumber * valorUnitarioNumber
-      : null;
-
-  // Sempre que quantidade/valor unitário mudar, refletir no form.valor_total_calculado
-  // (Mantém uma “fonte única” para enviar ao backend sem recalcular em outro lugar)
+  // ✅ garante que sempre exista ao menos 1 item, sem loop infinito
   React.useEffect(() => {
-    const nextTotal = totalCalculado ?? undefined;
-
-    if (
-      nextTotal !== value.valor_total_calculado &&
-      !(Number.isNaN(nextTotal) && Number.isNaN(value.valor_total_calculado))
-    ) {
-      onChange({ ...value, valor_total_calculado: nextTotal });
+    const curr = (value as any).itens_objeto;
+    if (!Array.isArray(curr) || curr.length === 0) {
+      onChange({ ...(value as any), itens_objeto: [EMPTY_ITEM] } as TrpInputForm);
     }
-  }, [totalCalculado]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [/* apenas quando o array realmente some */ (value as any).itens_objeto?.length]);
+
+  const computeTotalGeral = (items: TrpItemObjetoForm[]) =>
+    Number(
+      items
+        .reduce((acc, it) => acc + (typeof it.valor_total_calculado === "number" ? it.valor_total_calculado : 0), 0)
+        .toFixed(2)
+    );
+
+  const updateItem = (idx: number, patch: Partial<TrpItemObjetoForm>) => {
+    const next = itens.map((it, i) => {
+      if (i !== idx) return it;
+
+      const merged: TrpItemObjetoForm = { ...it, ...patch };
+
+      const q =
+        merged.quantidade_recebida === undefined || merged.quantidade_recebida === null
+          ? null
+          : Number(merged.quantidade_recebida);
+
+      const vu = parseMoneyBR(merged.valor_unitario);
+
+      merged.valor_total_calculado =
+        q !== null && Number.isFinite(q) && vu !== null && Number.isFinite(vu)
+          ? Number((q * vu).toFixed(2))
+          : undefined;
+
+      return merged;
+    });
+
+    const totalGeral = computeTotalGeral(next);
+
+    onChange({
+      ...(value as any),
+      itens_objeto: next,
+      // ✅ mantém o total geral também no form (fonte única)
+      valor_total_geral: totalGeral,
+    } as TrpInputForm);
+  };
+
+  const addItem = () => {
+    const next = [...itens, { ...EMPTY_ITEM }];
+    const totalGeral = computeTotalGeral(next);
+    onChange({ ...(value as any), itens_objeto: next, valor_total_geral: totalGeral } as TrpInputForm);
+  };
+
+  const removeItem = (idx: number) => {
+    if (itens.length === 1) {
+      onChange({ ...(value as any), itens_objeto: [{ ...EMPTY_ITEM }], valor_total_geral: 0 } as TrpInputForm);
+      return;
+    }
+    const next = itens.filter((_, i) => i !== idx);
+    const totalGeral = computeTotalGeral(next);
+    onChange({ ...(value as any), itens_objeto: next, valor_total_geral: totalGeral } as TrpInputForm);
+  };
+
+  const totalGeral = computeTotalGeral(itens);
 
   return (
     <Paper
@@ -322,9 +380,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             <FormControl fullWidth variant="outlined" required>
               <Select
                 value={value.tipo_contratacao || ""}
-                onChange={(e) =>
-                  handleTipoContratacaoChange(e.target.value as TrpTipoContrato)
-                }
+                onChange={(e) => handleTipoContratacaoChange(e.target.value as TrpTipoContrato)}
                 disabled={disabled}
                 displayEmpty
                 renderValue={(selected) => {
@@ -376,9 +432,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 onChange={(e) => {
                   let input = e.target.value.replace(/\D/g, "");
 
-                  if (input.length > 6) {
-                    input = input.slice(0, 6);
-                  }
+                  if (input.length > 6) input = input.slice(0, 6);
 
                   if (input.length <= 2) {
                     updateField("competencia_mes_ano")(input);
@@ -389,9 +443,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   const yyyy = input.slice(2);
                   const mes = Number(mm);
 
-                  if (mes < 1 || mes > 12) {
-                    return;
-                  }
+                  if (mes < 1 || mes > 12) return;
 
                   updateField("competencia_mes_ano")(`${mm}/${yyyy}`);
                 }}
@@ -410,219 +462,224 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
         <Divider sx={{ my: 1 }} />
 
-        {/* OBJETO FORNECIDO / PRESTADO */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {/* ✅ ITENS DO OBJETO (1 ou mais) */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Typography
             variant="body2"
             fontWeight={600}
             sx={{
-              mb: 1,
+              mb: 0.5,
               fontSize: "0.9375rem",
               color: theme.palette.text.primary,
               lineHeight: 1.5,
             }}
           >
-            {FIELD_LABELS.objeto_fornecido}
+            {FIELD_LABELS.itens_objeto}
           </Typography>
 
           <Typography
             variant="body2"
             sx={{
-              mb: 1.5,
+              mb: 1,
               fontSize: "0.8125rem",
               lineHeight: 1.5,
               color: alpha(theme.palette.text.secondary, 0.8),
             }}
           >
-            Descreva qual foi o fornecimento ou serviço prestado referente a
-            este recebimento
+            Adicione 1 ou mais itens. Para cada item, informe a descrição, unidade, quantidade e valor unitário. O total
+            do item e o total geral serão calculados automaticamente.
           </Typography>
 
-          <TextField
-            value={value.objeto_fornecido || ""}
-            onChange={(e) => updateField("objeto_fornecido")(e.target.value)}
-            fullWidth
-            multiline
-            rows={2}
-            variant="outlined"
-            placeholder="Ex: Fornecimento de medicamentos / Prestação de serviço de manutenção / etc."
-            disabled={disabled}
-            InputLabelProps={{ shrink: false }}
-            label=""
-            sx={{
-              ...inputSx,
-              "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
-                padding: "16px",
-              },
-            }}
-          />
-        </Box>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {itens.map((item, idx) => {
+              const totalItem =
+                typeof item.valor_total_calculado === "number" ? item.valor_total_calculado : null;
 
-        {/* NOVO BLOCO: QUANTIDADE / UNIDADE / VALOR */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <Divider sx={{ my: 0.5 }} />
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    p: 3,
+                    borderRadius: 3,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.16)}`,
+                    bgcolor: alpha(theme.palette.background.default, 0.4),
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={700} sx={{ color: theme.palette.text.primary }}>
+                      Item {idx + 1}
+                    </Typography>
 
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              gap: 3,
-            }}
-          >
-            {/* Unidade de Medida */}
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
-              >
-                {FIELD_LABELS.unidade_medida}
-              </Typography>
+                    <Button
+                      variant="text"
+                      onClick={() => removeItem(idx)}
+                      disabled={disabled}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: alpha(theme.palette.error.main, 0.9),
+                      }}
+                    >
+                      Remover
+                    </Button>
+                  </Box>
 
-              <TextField
-                value={value.unidade_medida || ""}
-                onChange={(e) => updateField("unidade_medida")(e.target.value)}
-                fullWidth
-                variant="outlined"
-                placeholder="Ex: unidade / caixa / frasco / kg / litro / hora"
+                  {/* Descrição */}
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                      Descrição do item
+                    </Typography>
+                    <TextField
+                      value={item.descricao || ""}
+                      onChange={(e) => updateItem(idx, { descricao: e.target.value })}
+                      fullWidth
+                      multiline
+                      rows={2}
+                      variant="outlined"
+                      placeholder="Ex: Moto 160cc / Capacete / Serviço de manutenção / etc."
+                      disabled={disabled}
+                      InputLabelProps={{ shrink: false }}
+                      label=""
+                      sx={{
+                        ...inputSx,
+                        "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                          padding: "16px",
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  {/* Unidade + Quantidade */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "column", md: "row" },
+                      gap: 3,
+                      mb: 2,
+                    }}
+                  >
+                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                        Unidade de medida
+                      </Typography>
+                      <TextField
+                        value={item.unidade_medida || ""}
+                        onChange={(e) => updateItem(idx, { unidade_medida: e.target.value })}
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Ex: UN / CX / FR / H / KM"
+                        disabled={disabled}
+                        InputLabelProps={{ shrink: false }}
+                        label=""
+                        sx={inputSx}
+                      />
+                    </Box>
+
+                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                        Quantidade recebida
+                      </Typography>
+                      <TextField
+                        value={item.quantidade_recebida ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const cleaned = raw.replace(/[^\d.,]/g, "").replace(",", ".");
+                          const safe = clampDecimals(cleaned, 3);
+                          const n = safe ? Number(safe) : null;
+                          updateItem(idx, { quantidade_recebida: n === null || !isFinite(n) ? undefined : n });
+                        }}
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Ex: 10"
+                        disabled={disabled}
+                        InputLabelProps={{ shrink: false }}
+                        label=""
+                        inputProps={{ inputMode: "decimal" }}
+                        sx={inputSx}
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* Valor Unitário + Total */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "column", md: "row" },
+                      gap: 3,
+                    }}
+                  >
+                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                        Valor unitário
+                      </Typography>
+
+                      <TextField
+                        value={item.valor_unitario ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const next = raw.replace(/[^\d.,]/g, "");
+                          updateItem(idx, { valor_unitario: next });
+                        }}
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Ex: 12,50"
+                        disabled={disabled}
+                        InputLabelProps={{ shrink: false }}
+                        label=""
+                        inputProps={{ inputMode: "decimal" }}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                        }}
+                        sx={inputSx}
+                      />
+                    </Box>
+
+                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.9375rem" }}>
+                        Valor total (calculado)
+                      </Typography>
+                      <TextField
+                        value={totalItem !== null ? formatBRL(totalItem) : ""}
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Preencha quantidade e valor unitário"
+                        disabled={disabled}
+                        InputProps={{ readOnly: true }}
+                        InputLabelProps={{ shrink: false }}
+                        label=""
+                        sx={inputSx}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })}
+
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Button
+                variant="contained"
+                onClick={addItem}
                 disabled={disabled}
-                InputLabelProps={{ shrink: false }}
-                label=""
-                sx={inputSx}
-              />
-            </Box>
-
-            {/* Quantidade Recebida */}
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
               >
-                {FIELD_LABELS.quantidade_recebida}
-              </Typography>
+                Adicionar item
+              </Button>
 
-              <TextField
-                value={value.quantidade_recebida ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const cleaned = raw.replace(/[^\d.,]/g, "").replace(",", ".");
-                  const safe = clampDecimals(cleaned, 3); // se quiser 0 decimais, mude pra 0 e trate
-                  updateField("quantidade_recebida")(
-                    safe ? Number(safe) : undefined
-                  );
-                }}
-                fullWidth
-                variant="outlined"
-                placeholder="Ex: 10"
-                disabled={disabled}
-                InputLabelProps={{ shrink: false }}
-                label=""
-                inputProps={{ inputMode: "decimal" }}
-                sx={inputSx}
-              />
-            </Box>
-          </Box>
-
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              gap: 3,
-            }}
-          >
-            {/* Valor Unitário */}
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
-              >
-                {FIELD_LABELS.valor_unitario}
-              </Typography>
-
-              <TextField
-                value={value.valor_unitario ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-
-                  // permitir vazio
-                  if (raw.trim() === "") {
-                    updateField("valor_unitario")(undefined);
-                    return;
-                  }
-
-                  // aceitar vírgula/ponto
-                  const n = parseMoneyToNumber(raw);
-                  if (n === null) return;
-
-                  updateField("valor_unitario")(Number(n.toFixed(2)));
-                }}
-                fullWidth
-                variant="outlined"
-                placeholder="Ex: 12,50"
-                disabled={disabled}
-                InputLabelProps={{ shrink: false }}
-                label=""
-                inputProps={{ inputMode: "decimal" }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">R$</InputAdornment>
-                  ),
-                }}
-                sx={inputSx}
-              />
-            </Box>
-
-            {/* Valor Total Calculado */}
-            <Box
-              sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}
-            >
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
-              >
-                {FIELD_LABELS.valor_total_calculado}
-              </Typography>
-
-              <TextField
-                value={totalCalculado !== null ? formatBRL(totalCalculado) : ""}
-                fullWidth
-                variant="outlined"
-                placeholder="Preencha quantidade e valor unitário"
-                disabled={disabled}
-                InputProps={{ readOnly: true }}
-                InputLabelProps={{ shrink: false }}
-                label=""
-                sx={inputSx}
-              />
+              <Box sx={{ textAlign: "right" }}>
+                <Typography variant="body2" sx={{ color: alpha(theme.palette.text.secondary, 0.8) }}>
+                  Total geral
+                </Typography>
+                <Typography variant="body1" fontWeight={800} sx={{ color: theme.palette.text.primary }}>
+                  {formatBRL(totalGeral)}
+                </Typography>
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -658,9 +715,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             <FormControl fullWidth variant="outlined" required>
               <Select
                 value={value.tipo_base_prazo || ""}
-                onChange={(e) =>
-                  handleTipoBasePrazoChange(e.target.value as TrpTipoBasePrazo)
-                }
+                onChange={(e) => handleTipoBasePrazoChange(e.target.value as TrpTipoBasePrazo)}
                 disabled={disabled}
                 displayEmpty
                 renderValue={(selected) => {
@@ -676,12 +731,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 sx={selectSx}
               >
                 <MenuItem value="DATA_RECEBIMENTO">
-                  Data de Recebimento — Prazo contado a partir da data de
-                  recebimento dos itens
+                  Data de Recebimento — Prazo contado a partir da data de recebimento dos itens
                 </MenuItem>
                 <MenuItem value="SERVICO">
-                  Conclusão do Serviço — Prazo contado a partir da conclusão do
-                  serviço
+                  Conclusão do Serviço — Prazo contado a partir da conclusão do serviço
                 </MenuItem>
               </Select>
             </FormControl>
@@ -692,25 +745,15 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               <Typography
                 variant="body2"
                 fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
+                sx={{ mb: 1, fontSize: "0.9375rem", color: theme.palette.text.primary, lineHeight: 1.5 }}
               >
                 {FIELD_LABELS.data_recebimento}
               </Typography>
-              <LocalizationProvider
-                dateAdapter={AdapterDayjs}
-                adapterLocale="pt-br"
-              >
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                 <DatePicker
                   value={parseDateFromDDMMYYYY(value.data_recebimento)}
                   onChange={(newValue: Dayjs | null) => {
-                    updateField("data_recebimento")(
-                      formatDateToDDMMYYYY(newValue)
-                    );
+                    updateField("data_recebimento")(formatDateToDDMMYYYY(newValue));
                   }}
                   disabled={disabled}
                   format="DD/MM/YYYY"
@@ -735,25 +778,15 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               <Typography
                 variant="body2"
                 fontWeight={600}
-                sx={{
-                  mb: 1,
-                  fontSize: "0.9375rem",
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.5,
-                }}
+                sx={{ mb: 1, fontSize: "0.9375rem", color: theme.palette.text.primary, lineHeight: 1.5 }}
               >
                 {FIELD_LABELS.data_conclusao_servico}
               </Typography>
-              <LocalizationProvider
-                dateAdapter={AdapterDayjs}
-                adapterLocale="pt-br"
-              >
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                 <DatePicker
                   value={parseDateFromDDMMYYYY(value.data_conclusao_servico)}
                   onChange={(newValue: Dayjs | null) => {
-                    updateField("data_conclusao_servico")(
-                      formatDateToDDMMYYYY(newValue)
-                    );
+                    updateField("data_conclusao_servico")(formatDateToDDMMYYYY(newValue));
                   }}
                   disabled={disabled}
                   format="DD/MM/YYYY"
@@ -782,21 +815,14 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             <Typography
               variant="body2"
               fontWeight={600}
-              sx={{
-                mb: 1,
-                fontSize: "0.9375rem",
-                color: theme.palette.text.primary,
-                lineHeight: 1.5,
-              }}
+              sx={{ mb: 1, fontSize: "0.9375rem", color: theme.palette.text.primary, lineHeight: 1.5 }}
             >
               {FIELD_LABELS.condicao_prazo}
             </Typography>
             <FormControl fullWidth variant="outlined" required>
               <Select
                 value={value.condicao_prazo || ""}
-                onChange={(e) =>
-                  handleCondicaoPrazoChange(e.target.value as TrpCondicaoPrazo)
-                }
+                onChange={(e) => handleCondicaoPrazoChange(e.target.value as TrpCondicaoPrazo)}
                 disabled={disabled}
                 displayEmpty
                 renderValue={(selected) => {
@@ -828,40 +854,16 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               }}
             >
               <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: { xs: "column", sm: "row" },
-                    gap: 3,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      sx={{ mb: 1, fontSize: "0.9375rem" }}
-                    >
+                <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 3 }}>
+                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: "0.9375rem" }}>
                       {FIELD_LABELS.data_prevista_entrega_contrato}
                     </Typography>
-                    <LocalizationProvider
-                      dateAdapter={AdapterDayjs}
-                      adapterLocale="pt-br"
-                    >
+                    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                       <DatePicker
-                        value={parseDateFromDDMMYYYY(
-                          value.data_prevista_entrega_contrato
-                        )}
+                        value={parseDateFromDDMMYYYY(value.data_prevista_entrega_contrato)}
                         onChange={(newValue: Dayjs | null) => {
-                          updateField("data_prevista_entrega_contrato")(
-                            formatDateToDDMMYYYY(newValue)
-                          );
+                          updateField("data_prevista_entrega_contrato")(formatDateToDDMMYYYY(newValue));
                         }}
                         disabled={disabled}
                         format="DD/MM/YYYY"
@@ -879,31 +881,15 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                     </LocalizationProvider>
                   </Box>
 
-                  <Box
-                    sx={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      sx={{ mb: 1, fontSize: "0.9375rem" }}
-                    >
+                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: "0.9375rem" }}>
                       {FIELD_LABELS.data_entrega_real}
                     </Typography>
-                    <LocalizationProvider
-                      dateAdapter={AdapterDayjs}
-                      adapterLocale="pt-br"
-                    >
+                    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
                       <DatePicker
                         value={parseDateFromDDMMYYYY(value.data_entrega_real)}
                         onChange={(newValue: Dayjs | null) => {
-                          updateField("data_entrega_real")(
-                            formatDateToDDMMYYYY(newValue)
-                          );
+                          updateField("data_entrega_real")(formatDateToDDMMYYYY(newValue));
                         }}
                         disabled={disabled}
                         format="DD/MM/YYYY"
@@ -923,18 +909,12 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 </Box>
 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <Typography
-                    variant="body2"
-                    fontWeight={600}
-                    sx={{ mb: 1, fontSize: "0.9375rem" }}
-                  >
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: "0.9375rem" }}>
                     {FIELD_LABELS.motivo_atraso}
                   </Typography>
                   <TextField
                     value={value.motivo_atraso || ""}
-                    onChange={(e) =>
-                      updateField("motivo_atraso")(e.target.value)
-                    }
+                    onChange={(e) => updateField("motivo_atraso")(e.target.value)}
                     fullWidth
                     multiline
                     rows={3}
@@ -967,12 +947,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             <Typography
               variant="body2"
               fontWeight={600}
-              sx={{
-                mb: 1,
-                fontSize: "0.9375rem",
-                color: theme.palette.text.primary,
-                lineHeight: 1.5,
-              }}
+              sx={{ mb: 1, fontSize: "0.9375rem", color: theme.palette.text.primary, lineHeight: 1.5 }}
             >
               {FIELD_LABELS.condicao_quantidade_ordem}
             </Typography>
@@ -980,9 +955,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               <Select
                 value={value.condicao_quantidade_ordem || ""}
                 onChange={(e) =>
-                  handleCondicaoQuantidadeOrdemChange(
-                    e.target.value as TrpCondicaoQuantidade
-                  )
+                  handleCondicaoQuantidadeOrdemChange(e.target.value as TrpCondicaoQuantidade)
                 }
                 disabled={disabled}
                 displayEmpty
@@ -1041,26 +1014,19 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                     lineHeight: 1.6,
                   }}
                 >
-                  Descreva detalhadamente a divergência entre a quantidade
-                  prevista na Ordem de Fornecimento e a quantidade efetivamente
-                  recebida, incluindo informações sobre pendências ou remessas
-                  futuras, se aplicável.
+                  Descreva detalhadamente a divergência entre a quantidade prevista na Ordem de Fornecimento e a
+                  quantidade efetivamente recebida, incluindo informações sobre pendências ou remessas futuras, se
+                  aplicável.
                 </Typography>
               </Box>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
-                  sx={{ mb: 1, fontSize: "0.9375rem" }}
-                >
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1, fontSize: "0.9375rem" }}>
                   {FIELD_LABELS.comentarios_quantidade_ordem}
                 </Typography>
                 <TextField
                   value={value.comentarios_quantidade_ordem || ""}
-                  onChange={(e) =>
-                    updateField("comentarios_quantidade_ordem")(e.target.value)
-                  }
+                  onChange={(e) => updateField("comentarios_quantidade_ordem")(e.target.value)}
                   fullWidth
                   multiline
                   rows={4}
@@ -1089,12 +1055,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           <Typography
             variant="body2"
             fontWeight={600}
-            sx={{
-              mb: 1,
-              fontSize: "0.9375rem",
-              color: theme.palette.text.primary,
-              lineHeight: 1.5,
-            }}
+            sx={{ mb: 1, fontSize: "0.9375rem", color: theme.palette.text.primary, lineHeight: 1.5 }}
           >
             {FIELD_LABELS.observacoes_recebimento}
           </Typography>
@@ -1111,9 +1072,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           </Typography>
           <TextField
             value={value.observacoes_recebimento || ""}
-            onChange={(e) =>
-              updateField("observacoes_recebimento")(e.target.value)
-            }
+            onChange={(e) => updateField("observacoes_recebimento")(e.target.value)}
             fullWidth
             multiline
             rows={4}

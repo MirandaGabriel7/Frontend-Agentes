@@ -1,5 +1,6 @@
 import { TRP_GENERATE_URL } from '../config/api';
-import type { DadosRecebimentoPayload, TrpApiResponse } from '../types/trp';
+import type { DadosRecebimentoPayload } from '../lib/types/trp';
+
 
 export async function generateTrpDocument(
   dadosRecebimento: DadosRecebimentoPayload,
@@ -8,7 +9,7 @@ export async function generateTrpDocument(
     notaFiscalFile?: File | null;
     ordemFornecimentoFile?: File | null;
   }
-): Promise<TrpApiResponse> {
+): Promise<any> {
   const formData = new FormData();
 
   // JSON com dados do recebimento
@@ -39,7 +40,7 @@ export async function generateTrpDocument(
     );
   }
 
-  const data = (await response.json()) as TrpApiResponse;
+  const data = (await response.json()) as any;
   return data;
 }
 

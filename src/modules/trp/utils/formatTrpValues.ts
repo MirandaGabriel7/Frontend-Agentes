@@ -5,6 +5,7 @@
  * ✅ REGRA-OURO:
  * - Se for "não declarado" -> retornar '' (vazio) para a UI cortar (não poluir)
  * - Se for enum técnico conhecido -> retornar texto institucional
+ * - Campos numéricos (quantidade/moeda) devem ser formatados por fieldName
  */
 
 const HIDDEN = new Set([
@@ -24,6 +25,60 @@ function isHidden(v: string): boolean {
   if (!s) return true;
   const upper = s.toUpperCase();
   return HIDDEN.has(s) || HIDDEN.has(upper);
+}
+
+function formatNumberPtBr(value: number): string {
+  try {
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatBRL(value: number): string {
+  try {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+    })
+      .format(value)
+      .replace(/\u00A0/g, ' ');
+  } catch {
+    const fixed = value.toFixed(2).replace('.', ',');
+    return `R$ ${fixed}`;
+  }
+}
+
+/**
+ * Aceita:
+ * - number
+ * - "44.080,00"
+ * - "44080.00"
+ * - "120000"
+ */
+function parsePtBrNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+
+  // já é number
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const s = String(value).trim();
+  if (!s) return null;
+  if (isHidden(s)) return null;
+
+  const cleaned = s.replace(/\s+/g, '');
+
+  // se tem vírgula, assume pt-BR
+  if (cleaned.includes(',')) {
+    const normalized = cleaned.replace(/\./g, '').replace(/,/g, '.');
+    const num = Number(normalized);
+    return Number.isFinite(num) ? num : null;
+  }
+
+  // senão, tenta número direto
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
 }
 
 /**
@@ -93,8 +148,47 @@ export function formatTipoContratacao(value: string | null | undefined): string 
 }
 
 /**
+ * ✅ Formata quantidade/unidade/valores do bloco "Objeto fornecido/prestado"
+ * - quantidade_recebida -> número pt-BR
+ * - valor_unitario / valor_total_calculado / valor_efetivo_numero / valor_efetivo -> BRL
+ *
+ * Retorna:
+ * - string formatada (ex: "R$ 10,00", "1.234,5")
+ * - '' (vazio) se não for parseável
+ * - null se não for campo tratado aqui
+ */
+function formatQuantidadesEValores(fieldName: string, raw: unknown): string | null {
+  const key = fieldName.trim().toLowerCase();
+
+  // ⚠️ valor_efetivo_formatado já vem pronto
+  if (key === 'valor_efetivo_formatado') return null;
+
+  // quantidade
+  if (key === 'quantidade_recebida') {
+    const n = parsePtBrNumber(raw);
+    if (n === null) return '';
+    return formatNumberPtBr(n);
+  }
+
+  // moeda
+  if (
+    key === 'valor_unitario' ||
+    key === 'valor_total_calculado' ||
+    key === 'valor_efetivo' ||
+    key === 'valor_efetivo_numero'
+  ) {
+    const n = parsePtBrNumber(raw);
+    if (n === null) return '';
+    return formatBRL(n);
+  }
+
+  return null;
+}
+
+/**
  * Normaliza qualquer valor técnico do TRP para texto institucional
  * ✅ Se for "não declarado" retorna '' (para a UI remover)
+ * ✅ Formata quantidade e moeda nos campos certos
  */
 export function normalizeTrpValue(value: string | null | undefined, fieldName?: string): string {
   if (value === null || value === undefined) return '';
@@ -103,23 +197,24 @@ export function normalizeTrpValue(value: string | null | undefined, fieldName?: 
   if (!raw) return '';
   if (isHidden(raw)) return '';
 
+  // ✅ formata campos numéricos específicos
+  if (fieldName) {
+    const formatted = formatQuantidadesEValores(fieldName, raw);
+    if (formatted !== null) return formatted;
+  }
+
   const normalizedValue = raw.toUpperCase();
 
-  // mapeamentos globais
   const institutionalMappings: Record<string, string> = {
-    // Condição de prazo
     NO_PRAZO: 'No prazo',
     FORA_DO_PRAZO: 'Fora do prazo',
 
-    // Condição de quantidade
     TOTAL: 'Total',
     PARCIAL: 'Parcial',
 
-    // Tipo de base de prazo
     DATA_RECEBIMENTO: 'Data de Recebimento',
     SERVICO: 'Conclusão do Serviço',
 
-    // Tipo de contratação / contrato
     BENS: 'Bens',
     SERVIÇOS: 'Serviços',
     SERVICOS: 'Serviços',
@@ -137,7 +232,6 @@ export function normalizeTrpValue(value: string | null | undefined, fieldName?: 
   if (fieldName === 'tipo_contratacao' || fieldName === 'tipoContratacao' || fieldName === 'tipo_contrato')
     return formatTipoContratacao(raw);
 
-  // default: devolve o valor limpo (não técnico)
   return raw;
 }
 

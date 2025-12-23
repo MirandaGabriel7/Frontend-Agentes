@@ -1,6 +1,17 @@
+// src/services/api.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { supabase } from '../infra/supabaseClient';
 import { isUuid } from '../utils/uuid';
+
+// ✅ Tipos TRP (ajuste o path se necessário)
+import type {
+  TrpTipoContrato,
+  TrpCondicaoPrazo,
+  TrpCondicaoQuantidade,
+  TrpTipoBasePrazo,
+  TrpItemObjetoPayload,
+} from '../lib/types/trp';
+
 
 // Configuração do baseURL:
 // - Se VITE_TRP_API_URL estiver definido: usa `${VITE_TRP_API_URL}/api` (ex: http://localhost:4000/api)
@@ -37,7 +48,7 @@ api.interceptors.request.use(
       // 3) Setar headers apenas se token existir
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
-        
+
         // 4) Setar x-org-id apenas se orgId for válido
         if (orgIdValid) {
           config.headers['x-org-id'] = orgIdValid;
@@ -67,7 +78,9 @@ api.interceptors.request.use(
   }
 );
 
+// ===================================================
 // Tipos para a nova API de geração de TRP (Supabase-first)
+// ===================================================
 
 // Resposta do POST /trp/generate
 export interface TrpGenerateResponse {
@@ -138,34 +151,43 @@ export interface TrpRunsSummaryApiResponse {
   message?: string;
 }
 
+// ===================================================
+// ✅ Payload do generate (NOVO) — com itens_objeto
+// ===================================================
+
 export interface GenerateTrpParams {
   dadosRecebimento: {
-    tipoContratacao: string; // "BENS" | "SERVIÇOS" | "OBRA"
+    // ✅ tipado de verdade
+    tipoContratacao: TrpTipoContrato;
 
+    // ✅ NOVO (OFICIAL): itens detalhados (obrigatório)
+    itens_objeto: TrpItemObjetoPayload[];
+
+    // ✅ NOVO: total geral (opcional)
+    valor_total_geral?: number | null;
+
+    // ✅ campos de prazo/datas
     competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
-    tipoBasePrazo: string; // "DATA_RECEBIMENTO" | "SERVICO"
-    dataRecebimento?: string | null; // DD/MM/AAAA ou YYYY-MM-DD (quando base = DATA_RECEBIMENTO)
-    dataConclusaoServico?: string | null; // DD/MM/AAAA ou YYYY-MM-DD (quando base = SERVICO)
-    dataPrevistaEntregaContrato?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
-    dataEntregaReal?: string | null; // DD/MM/AAAA ou YYYY-MM-DD
-    condicaoPrazo: string; // "NO_PRAZO" | "FORA_DO_PRAZO"
-    motivoAtraso?: string | null; // (quando FORA_DO_PRAZO)
+    tipoBasePrazo: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
+    dataRecebimento?: string | null;
+    dataConclusaoServico?: string | null;
+    dataPrevistaEntregaContrato?: string | null;
+    dataEntregaReal?: string | null;
 
-    condicaoQuantidadeOrdem: string; // "TOTAL" | "PARCIAL"
-    comentariosQuantidadeOrdem?: string | null; // (quando PARCIAL)
+    condicaoPrazo: TrpCondicaoPrazo;
+    motivoAtraso?: string | null;
 
+    condicaoQuantidadeOrdem: TrpCondicaoQuantidade;
+    comentariosQuantidadeOrdem?: string | null;
+
+    observacoesRecebimento?: string | null;
+
+    // ⚠️ LEGADO (compatibilidade): manter por enquanto
     objetoFornecido?: string | null;
-
-    // ✅ NOVOS CAMPOS (manual do fiscal) — cálculo do valor total
     unidade_medida?: string | null;
     quantidade_recebida?: number | null;
     valor_unitario?: number | null;
     valor_total_calculado?: number | null;
-
-    observacoesRecebimento?: string | null;
-
-    // Nota: Assinaturas (fiscalContratoNome, dataAssinatura, areaDemandanteNome)
-    // serão preenchidas automaticamente pelo sistema a partir dos documentos
   };
   files: {
     fichaContratualizacao: File | null;
@@ -174,13 +196,16 @@ export interface GenerateTrpParams {
   };
 }
 
-
-
 /**
  * Gera um novo TRP e retorna apenas runId, status e createdAt
  * O resultado completo deve ser buscado via fetchTrpRun(runId)
  */
 export async function generateTrp(params: GenerateTrpParams): Promise<TrpGenerateResponse> {
+  // ✅ validação mínima do novo fluxo
+  if (!params.dadosRecebimento?.itens_objeto || params.dadosRecebimento.itens_objeto.length === 0) {
+    throw new Error('Informe pelo menos 1 item em "itens_objeto" para gerar o TRP.');
+  }
+
   const formData = new FormData();
   formData.append('dadosRecebimento', JSON.stringify(params.dadosRecebimento));
 
@@ -201,7 +226,7 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpGenerat
   );
 
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
-  
+
   if (isDev) {
     console.debug('[TRP API] Generate response:', {
       keys: Object.keys(response.data),
@@ -211,7 +236,7 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpGenerat
   }
 
   const wrapper = response.data;
-  
+
   if (wrapper.success !== true) {
     const errorMessage = wrapper.message || 'Falha ao gerar TRP no servidor.';
     if (isDev) {
@@ -247,7 +272,7 @@ export async function generateTrp(params: GenerateTrpParams): Promise<TrpGenerat
  */
 export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
-  
+
   if (isDev) {
     console.debug('[TRP API] Fetching run:', runId);
   }
@@ -263,7 +288,7 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   }
 
   const wrapper = response.data;
-  
+
   if (wrapper.success !== true) {
     const errorMessage = wrapper.message || `Falha ao buscar TRP ${runId}`;
     if (isDev) {
@@ -299,12 +324,12 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
 /**
  * Lista os últimos TRPs gerados
  * Fonte da verdade: backend (Supabase)
- * 
+ *
  * ✅ Backend retorna: { success: true, data: { items: [...], nextCursor: "..." } }
  */
 export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]> {
   const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
-  
+
   if (isDev) {
     console.debug('[TRP API] Listing runs with limit:', limit);
   }
@@ -323,7 +348,7 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
   }
 
   const wrapper = response.data;
-  
+
   if (wrapper.success !== true) {
     const errorMessage = wrapper.message || 'Falha ao listar TRPs';
     if (isDev) {
@@ -338,7 +363,7 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
   if (wrapper.data && typeof wrapper.data === 'object' && 'items' in wrapper.data) {
     return (wrapper.data as { items: TrpRunListItem[] }).items || [];
   }
-  
+
   // Fallback para compatibilidade (se backend retornar array diretamente)
   if (Array.isArray(wrapper.data)) {
     return wrapper.data;
@@ -398,7 +423,7 @@ export async function fetchTrpRuns(params: FetchTrpRunsParams = {}): Promise<Fet
       nextCursor: dataObj.nextCursor || wrapper.nextCursor,
     };
   }
-  
+
   // Fallback para compatibilidade (se backend retornar array diretamente)
   if (Array.isArray(wrapper.data)) {
     return {
@@ -438,7 +463,11 @@ export async function fetchTrpRunsSummary(): Promise<TrpRunsSummary> {
   return wrapper.data || { total: 0, completed: 0, failed: 0 };
 }
 
-// Funções antigas (mantidas para compatibilidade, mas não usadas no novo fluxo)
+// ===================================================
+// ⚠️ Funções antigas (mantidas para compatibilidade, mas não usadas no novo fluxo)
+// (Você pode remover depois que confirmar que não há imports em lugar nenhum.)
+// ===================================================
+
 export interface UploadFileResponse {
   fileId: string;
 }
@@ -463,13 +492,13 @@ export interface TrpRunResponse {
 export async function uploadFile(file: File): Promise<UploadFileResponse> {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await api.post<UploadFileResponse>('/files/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
-  
+
   return response.data;
 }
 
@@ -490,7 +519,7 @@ function extractFilenameFromDisposition(header?: string | null): string | null {
   if (!filenameMatch) return null;
 
   let filename = filenameMatch[1];
-  
+
   // Remover aspas
   if (filename.startsWith('"') && filename.endsWith('"')) {
     filename = filename.slice(1, -1);
@@ -518,11 +547,11 @@ function extractFilenameFromDisposition(header?: string | null): string | null {
 
 /**
  * Faz download de um TRP em PDF ou DOCX
- * 
+ *
  * ✅ ENDPOINT SEMPRE: GET /api/trp/runs/${runId}/download?format=pdf|docx
  * ✅ runId DEVE vir do parâmetro da URL (TrpResultPage) ou do item da lista (TrpHistoryPage)
  * ✅ NUNCA usar estado global, "último run" ou qualquer outra fonte
- * 
+ *
  * @param runId ID do run do TRP (obrigatório, deve ser validado antes de chamar esta função)
  * @param format Formato do arquivo: 'pdf' ou 'docx'
  * @throws Error com mensagem apropriada para cada tipo de erro
@@ -567,7 +596,7 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
       // Tentar converter blob para texto e parsear como JSON
       const text = await new Response(res.data).text();
       let msg = `Falha no download (${res.status})`;
-      
+
       try {
         const json = JSON.parse(text);
         msg = json.message || json.error || msg;
@@ -584,7 +613,7 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
 
       // Criar erro com status para tratamento específico
       const error = Object.assign(new Error(msg), { status: res.status });
-      
+
       // Mapear status codes para mensagens específicas conforme requisitos
       switch (res.status) {
         case 401:
@@ -613,7 +642,7 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
   // Sucesso: extrair filename e fazer download
   const disposition = res.headers['content-disposition'] || res.headers['Content-Disposition'];
   let filename = extractFilenameFromDisposition(disposition);
-  
+
   // ✅ Fallback: usar runId se não encontrar no header
   // O backend deve enviar o filename correto no Content-Disposition
   if (!filename) {
@@ -627,7 +656,11 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
   // Criar blob com o tipo correto do header ou fallback
   const contentType = res.headers['content-type'] || res.headers['Content-Type'];
   const blob = new Blob([res.data], {
-    type: contentType || (format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+    type:
+      contentType ||
+      (format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   });
 
   // Criar link temporário e fazer download
@@ -644,4 +677,3 @@ export async function downloadTrpRun(runId: string, format: 'pdf' | 'docx'): Pro
     console.debug('[TRP Download] Download concluído:', filename);
   }
 }
-
