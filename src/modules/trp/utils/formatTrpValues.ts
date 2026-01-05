@@ -56,6 +56,9 @@ function formatBRL(value: number): string {
  * - "44.080,00"
  * - "44080.00"
  * - "120000"
+ * - "R$ 120,00"
+ * - "R$120,00"
+ * - "120,00"
  */
 function parsePtBrNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -63,20 +66,28 @@ function parsePtBrNumber(value: unknown): number | null {
   // já é number
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
 
-  const s = String(value).trim();
+  let s = String(value).trim();
   if (!s) return null;
   if (isHidden(s)) return null;
 
-  const cleaned = s.replace(/\s+/g, '');
+  // ✅ remove símbolos e textos comuns (R$, espaços, etc)
+  // mantém apenas dígitos, ponto, vírgula e sinal negativo
+  // ex: "R$ 1.234,56" -> "1.234,56"
+  s = s.replace(/\u00A0/g, ' ');
+  s = s.replace(/[Rr]\$\s?/g, '');
+  s = s.replace(/[^0-9,.\-]/g, '');
 
-  // se tem vírgula, assume pt-BR
+  const cleaned = s.replace(/\s+/g, '');
+  if (!cleaned) return null;
+
+  // se tem vírgula, assume pt-BR (milhar com ponto, decimal com vírgula)
   if (cleaned.includes(',')) {
     const normalized = cleaned.replace(/\./g, '').replace(/,/g, '.');
     const num = Number(normalized);
     return Number.isFinite(num) ? num : null;
   }
 
-  // senão, tenta número direto
+  // senão, tenta número direto (ex: "1200.50" ou "1200")
   const num = Number(cleaned);
   return Number.isFinite(num) ? num : null;
 }
@@ -148,9 +159,9 @@ export function formatTipoContratacao(value: string | null | undefined): string 
 }
 
 /**
- * ✅ Formata quantidade/unidade/valores do bloco "Objeto fornecido/prestado"
+ * ✅ Formata quantidade/unidade/valores
  * - quantidade_recebida -> número pt-BR
- * - valor_unitario / valor_total_calculado / valor_efetivo_numero / valor_efetivo -> BRL
+ * - valor_unitario / valor_total_calculado / valor_total_geral / valor_efetivo_numero / valor_efetivo -> BRL
  *
  * Retorna:
  * - string formatada (ex: "R$ 10,00", "1.234,5")
@@ -170,10 +181,11 @@ function formatQuantidadesEValores(fieldName: string, raw: unknown): string | nu
     return formatNumberPtBr(n);
   }
 
-  // moeda
+  // ✅ moeda (inclui valor_total_geral agora)
   if (
     key === 'valor_unitario' ||
     key === 'valor_total_calculado' ||
+    key === 'valor_total_geral' ||
     key === 'valor_efetivo' ||
     key === 'valor_efetivo_numero'
   ) {
@@ -197,7 +209,7 @@ export function normalizeTrpValue(value: string | null | undefined, fieldName?: 
   if (!raw) return '';
   if (isHidden(raw)) return '';
 
-  // ✅ formata campos numéricos específicos
+  // ✅ formata campos numéricos específicos (inclui valor_total_geral)
   if (fieldName) {
     const formatted = formatQuantidadesEValores(fieldName, raw);
     if (formatted !== null) return formatted;

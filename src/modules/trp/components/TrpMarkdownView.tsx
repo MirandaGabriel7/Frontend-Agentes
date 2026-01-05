@@ -1,53 +1,43 @@
-import React from 'react';
-import { Box, Typography, Paper, alpha, useTheme } from '@mui/material';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import { normalizeTrpValue } from '../utils/formatTrpValues';
+import React from "react";
+import { Box, Typography, Paper, alpha, useTheme } from "@mui/material";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import { normalizeTrpValue } from "../utils/formatTrpValues";
 
 interface TrpMarkdownViewProps {
   content: string;
   showTitle?: boolean;
 }
 
-/**
- * ✅ Regras:
- * - Continua sanitizando o markdown (remove NAO_DECLARADO + humaniza enums)
- * - CORTA LINHAS de tabelas quando a coluna "Informação" estiver vazia/não significativa
- * - Nunca deixa enum técnico “vazar”
- */
 const HIDDEN_STRINGS = new Set([
-  'NAO_DECLARADO',
-  'NÃO_DECLARADO',
-  'NAO INFORMADO',
-  'NÃO INFORMADO',
-  'NAO_INFORMADO',
-  'NÃO_INFORMADO',
-  'Não informado',
-  'Nao informado',
+  "NAO_DECLARADO",
+  "NÃO_DECLARADO",
+  "NAO INFORMADO",
+  "NÃO INFORMADO",
+  "NAO_INFORMADO",
+  "NÃO_INFORMADO",
+  "Não informado",
+  "Nao informado",
 ]);
 
 function extractText(node: any): string {
-  if (node === null || node === undefined) return '';
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(extractText).join(' ');
-  if (React.isValidElement(node)) return extractText((node as any).props?.children);
-  return '';
+  if (node === null || node === undefined) return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join(" ");
+  if (React.isValidElement(node))
+    return extractText((node as any).props?.children);
+  return "";
 }
 
 function isMeaningfulText(s: string): boolean {
-  const t = (s ?? '').trim();
+  const t = (s ?? "").trim();
   if (!t) return false;
   if (HIDDEN_STRINGS.has(t)) return false;
   if (HIDDEN_STRINGS.has(t.toUpperCase())) return false;
   return true;
 }
 
-/**
- * Considera como “valor”:
- * - tabelas 2 colunas: coluna 2
- * - tabelas >2 colunas: todas exceto a primeira
- */
 function rowHasValue(cellsNormalizedText: string[]): boolean {
   if (!cellsNormalizedText.length) return false;
 
@@ -59,39 +49,73 @@ function rowHasValue(cellsNormalizedText: string[]): boolean {
   return candidates.some((txt) => isMeaningfulText(txt));
 }
 
+function fixBrokenTotalRowTables(md: string): string {
+  if (!md || typeof md !== "string") return "";
+
+  const lines = md.split("\n");
+  const out: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i];
+    const next = lines[i + 1];
+
+    const curIsBlank = cur.trim() === "";
+    const nextIsTotalRow =
+      typeof next === "string" && /^\|\s*\*?\*?\s*Total\s+Geral/i.test(next.trim());
+
+    if (curIsBlank && nextIsTotalRow) continue;
+
+    if (/^\|\s*\*?\*?\s*Total\s+Geral/i.test(cur.trim())) {
+      const raw = cur.trim();
+      const parts = raw
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((p) => p.trim());
+
+      if (parts.length >= 2) {
+        const label = parts[0] || "Total Geral";
+        const last = parts[parts.length - 1] || "";
+        const normalized = [label, "", "", "", last];
+        out.push(`| ${normalized.join(" | ")} |`);
+        continue;
+      }
+    }
+
+    out.push(cur);
+  }
+
+  return out.join("\n");
+}
+
 export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
   content,
   showTitle = true,
 }) => {
   const theme = useTheme();
 
-  // ✅ Sanitização do markdown (corta placeholders técnicos e humaniza enums)
   const sanitizedContent = React.useMemo(() => {
-    return (content || '')
-      // Remover "não declarado" do documento
-      .replace(/\bNAO_DECLARADO\b/gi, '')
-      .replace(/\bNÃO_DECLARADO\b/gi, '')
-      .replace(/\bNAO_INFORMADO\b/gi, '')
-      .replace(/\bNÃO_INFORMADO\b/gi, '')
-
-      // Humanizar enums técnicos (mesmo se vierem no markdown)
-      .replace(/\bDATA_RECEBIMENTO\b/gi, 'Data de Recebimento')
-      .replace(/\bSERVICO\b/gi, 'Conclusão do Serviço')
-      .replace(/\bFORA_DO_PRAZO\b/gi, 'Fora do prazo')
-      .replace(/\bNO_PRAZO\b/gi, 'No prazo')
-      .replace(/\bTOTAL\b/gi, 'Total')
-      .replace(/\bPARCIAL\b/gi, 'Parcial')
-
-      // Limpeza de espaços “quebrados” (evita linhas vazias em excesso)
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
+    const base = (content || "")
+      .replace(/\bNAO_DECLARADO\b/gi, "")
+      .replace(/\bNÃO_DECLARADO\b/gi, "")
+      .replace(/\bNAO_INFORMADO\b/gi, "")
+      .replace(/\bNÃO_INFORMADO\b/gi, "")
+      .replace(/\bDATA_RECEBIMENTO\b/gi, "Data de Recebimento")
+      .replace(/\bSERVICO\b/gi, "Conclusão do Serviço")
+      .replace(/\bFORA_DO_PRAZO\b/gi, "Fora do prazo")
+      .replace(/\bNO_PRAZO\b/gi, "No prazo")
+      .replace(/\bTOTAL\b/gi, "Total")
+      .replace(/\bPARCIAL\b/gi, "Parcial")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
+
+    return fixBrokenTotalRowTables(base);
   }, [content]);
 
-  // Se o conteúdo estiver vazio ou undefined, exibir fallback
   if (!sanitizedContent || !sanitizedContent.trim()) {
     return (
-      <Box sx={{ height: '100%', overflow: 'auto' }}>
+      <Box sx={{ height: "100%", overflow: "auto" }}>
         {showTitle && (
           <Typography
             variant="h6"
@@ -107,10 +131,13 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
             borderRadius: 3,
             border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
             bgcolor: theme.palette.background.paper,
-            textAlign: 'center',
+            textAlign: "center",
           }}
         >
-          <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+          <Typography
+            variant="body1"
+            sx={{ color: theme.palette.text.secondary }}
+          >
             Documento não disponível
           </Typography>
         </Paper>
@@ -119,7 +146,7 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
   }
 
   return (
-    <Box sx={{ height: '100%', overflow: 'auto' }}>
+    <Box sx={{ height: "100%", overflow: "auto" }}>
       {showTitle && (
         <Typography
           variant="h6"
@@ -136,98 +163,101 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
           borderRadius: 3,
           border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
           bgcolor: theme.palette.background.paper,
-          boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 4px 12px ${alpha(
-            '#000',
+          boxShadow: `0 1px 3px ${alpha("#000", 0.04)}, 0 4px 12px ${alpha(
+            "#000",
             0.02
           )}`,
         }}
       >
         <Box
           sx={{
-            '& p': {
+            "& p": {
               marginBottom: 2,
               lineHeight: 1.8,
               color: theme.palette.text.primary,
             },
-            '& h1': {
+            "& h1": {
               marginTop: 0,
               marginBottom: 3,
               fontWeight: 700,
               color: theme.palette.text.primary,
-              fontSize: '1.75rem',
+              fontSize: "1.75rem",
               paddingBottom: 2,
-              borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              borderBottom: `2px solid ${alpha(
+                theme.palette.primary.main,
+                0.2
+              )}`,
             },
-            '& h2': {
+            "& h2": {
               marginTop: 0,
               marginBottom: 2.5,
               fontWeight: 600,
               color: theme.palette.text.primary,
-              fontSize: '1.5rem',
+              fontSize: "1.5rem",
               paddingBottom: 1.5,
               borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
             },
-            '& h3, & h4, & h5, & h6': {
+            "& h3, & h4, & h5, & h6": {
               marginTop: 2,
               marginBottom: 1.5,
               fontWeight: 600,
               color: theme.palette.text.primary,
             },
-            '& ul, & ol': {
+            "& ul, & ol": {
               marginBottom: 2,
               paddingLeft: 3,
             },
-            '& li': {
+            "& li": {
               marginBottom: 0.5,
               lineHeight: 1.8,
             },
-            '& table': {
-              width: '100%',
-              borderCollapse: 'collapse',
+            "& table": {
+              width: "100%",
+              borderCollapse: "collapse",
               marginTop: 2,
               marginBottom: 2,
               borderRadius: 2,
-              overflow: 'hidden',
+              overflow: "hidden",
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-              boxShadow: `0 1px 3px ${alpha('#000', 0.08)}`,
-              '& th, & td': {
+              boxShadow: `0 1px 3px ${alpha("#000", 0.08)}`,
+              "& th, & td": {
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                 padding: 1.5,
-                textAlign: 'left',
-                fontSize: '0.9375rem',
-                verticalAlign: 'top',
+                textAlign: "left",
+                fontSize: "0.9375rem",
+                verticalAlign: "top",
               },
-              '& th': {
+              "& th": {
                 backgroundColor: alpha(theme.palette.grey[500], 0.08),
                 fontWeight: 600,
                 color: theme.palette.text.primary,
-                fontSize: '0.875rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em',
+                fontSize: "0.875rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.02em",
               },
-              '& td': {
+              "& td": {
                 color: theme.palette.text.primary,
               },
-              '& tr:nth-of-type(even) td': {
+              "& tr:nth-of-type(even) td": {
                 backgroundColor: alpha(theme.palette.primary.main, 0.02),
               },
-              '& tr:hover td': {
+              "& tr:hover td": {
                 backgroundColor: alpha(theme.palette.primary.main, 0.04),
               },
             },
-            '& code': {
+            "& code": {
               backgroundColor: alpha(theme.palette.text.primary, 0.06),
-              padding: '2px 6px',
+              padding: "2px 6px",
               borderRadius: 1,
-              fontSize: '0.875em',
+              fontSize: "0.875em",
             },
-            '& pre': {
+            "& pre": {
               backgroundColor: alpha(theme.palette.text.primary, 0.04),
               padding: 2,
               borderRadius: 2,
-              overflow: 'auto',
-              '& code': {
-                backgroundColor: 'transparent',
+              overflow: "auto",
+              "& code": {
+                backgroundColor: "transparent",
                 padding: 0,
               },
             },
@@ -237,33 +267,73 @@ export const TrpMarkdownView: React.FC<TrpMarkdownViewProps> = ({
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
             components={{
-              /**
-               * ✅ CORTA LINHAS (tr) quando a coluna de valor estiver vazia
-               * - Mantém header
-               * - Remove linhas com valor vazio / NAO_DECLARADO / Não informado
-               */
               tr: ({ node, children, ...props }) => {
                 const parentTag = (node as any)?.parent?.tagName;
-                const isHeaderRow = parentTag === 'thead';
-
+                const isHeaderRow = parentTag === "thead";
                 if (isHeaderRow) return <tr {...props}>{children}</tr>;
 
                 const cells = React.Children.toArray(children);
-
-                // Se for algo estranho (sem cells), não mexe
                 if (!cells.length) return <tr {...props}>{children}</tr>;
 
                 const cellsText = cells.map((cell: any) => extractText(cell));
+                const cellsTextNormalized = cellsText.map((txt) =>
+                  txt ? normalizeTrpValue(txt, undefined) : ""
+                );
 
-                // Normaliza textos (humaniza enums) antes de decidir se exibe
-                const cellsTextNormalized = cellsText.map((txt) => {
-                  if (!txt) return '';
-                  return normalizeTrpValue(txt, undefined);
-                });
+                const firstCell = (cellsTextNormalized[0] || "")
+                  .trim()
+                  .toLowerCase();
+                const isTotalRow = firstCell.includes("total geral");
+
+                // ✅ TOTAL GERAL: puxa o texto para a direita (bem perto do valor)
+                if (isTotalRow) {
+                  const lastValue = (
+                    cellsTextNormalized[cellsTextNormalized.length - 1] || ""
+                  ).trim();
+
+                  const borderTop = `1px solid ${alpha(
+                    theme.palette.divider,
+                    0.2
+                  )}`;
+                  const rowBg = alpha(theme.palette.grey[500], 0.04);
+
+                  return (
+                    <tr {...props}>
+                      {/* ColSpan 4 + alinhamento à direita => “Total Geral” vai pra perto do valor */}
+                      <td
+                        colSpan={4}
+                        style={{
+                          fontWeight: 800,
+                          textAlign: "right",
+                          paddingRight: "10px",
+                          borderLeft: "none",
+                          borderRight: "none",
+                          borderTop,
+                          padding: "10px 12px",
+                          background: rowBg,
+                        }}
+                      >
+                        Total Geral
+                      </td>
+                      <td
+                        style={{
+                          fontWeight: 800,
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                          borderLeft: "none",
+                          borderRight: "none",
+                          borderTop,
+                          padding: "10px 12px",
+                          background: rowBg,
+                        }}
+                      >
+                        {lastValue}
+                      </td>
+                    </tr>
+                  );
+                }
 
                 const keep = rowHasValue(cellsTextNormalized);
-
-                // ✅ Se não tem valor real, some a linha inteira
                 if (!keep) return null;
 
                 return <tr {...props}>{children}</tr>;

@@ -6,6 +6,9 @@ export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
 export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "SERVICO";
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
+// ✅ Campos retornados pelo backend (campos_trp_normalizados)
+// Mantemos flexível porque o schema pode evoluir sem quebrar UI.
+export type TrpCamposNormalizados = Record<string, unknown>;
 
 // Livre por enquanto (não travar o fiscal)
 export type TrpUnidadeMedida = string;

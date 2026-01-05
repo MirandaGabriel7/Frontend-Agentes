@@ -1,6 +1,5 @@
 /**
  * Organização de campos por seções para renderização dinâmica
- * Define quais campos pertencem a cada seção do documento
  *
  * ✅ BLINDADO:
  * - Nunca retorna valor técnico cru (ex: FORA_DO_PRAZO, DATA_RECEBIMENTO, NAO_DECLARADO)
@@ -8,11 +7,13 @@
  * - alwaysShowFields mantém estrutura mínima, mas value vem "" (vazio) para UI decidir placeholder
  * - OUTROS também é normalizado + filtrado
  *
- * ✅ ATUALIZAÇÃO (Objeto + Quantidades/Valores juntos):
- * - "OBJETO FORNECIDO/PRESTADO" inclui: objeto_fornecido + unidade_medida + quantidade_recebida + valor_unitario + valor_total_calculado
- * - Remove seção separada de quantitativos/valores
- * - Remove "REGIME DE FORNECIMENTO" e remove area_demandante_nome
- * - Ignora prazos_calculados para não vazar JSON em OUTROS
+ * ✅ ATUALIZAÇÃO (ITENS):
+ * - Seção "ITENS DO RECEBIMENTO" inclui:
+ *   - itens_objeto (renderiza tabela no TrpStructuredDataPanel)
+ * - valor_total_geral NÃO deve aparecer como campo separado (fica só no rodapé da tabela)
+ *   -> por isso entra em ignoredFields e não entra em trpFieldSections
+ *
+ * ✅ Ignora prazos_calculados para não vazar JSON em OUTROS
  */
 
 import { getTrpFieldLabel } from './trpLabels';
@@ -40,14 +41,12 @@ export const trpFieldSections: FieldSection[] = [
     ],
   },
 
+  // ✅ Itens oficiais do recebimento (tabela)
   {
-    title: 'OBJETO FORNECIDO/PRESTADO',
+    title: 'ITENS DO RECEBIMENTO',
     fieldNames: [
-      'objeto_fornecido',
-      'unidade_medida',
-      'quantidade_recebida',
-      'valor_unitario',
-      'valor_total_calculado',
+      'itens_objeto',
+      // ⚠️ NÃO colocar valor_total_geral aqui para não duplicar na UI
     ],
   },
 
@@ -67,49 +66,69 @@ export const trpFieldSections: FieldSection[] = [
     title: 'CONDIÇÕES DE RECEBIMENTO',
     fieldNames: [
       'tipo_base_prazo',
+      'tipoBasePrazo', // compat camel
       'data_recebimento',
+      'dataRecebimento',
       'data_entrega',
+      'dataEntrega',
       'data_conclusao_servico',
+      'dataConclusaoServico',
       'data_prevista_entrega_contrato',
+      'dataPrevistaEntregaContrato',
       'data_entrega_real',
+      'dataEntregaReal',
 
       'condicao_prazo',
+      'condicaoPrazo',
 
       'condicao_quantidade',
+      'condicaoQuantidade',
       'condicao_quantidade_ordem',
+      'condicaoQuantidadeOrdem',
       'condicao_quantidade_nf',
+      'condicaoQuantidadeNf',
 
       'motivo_atraso',
+      'motivoAtraso',
       'comentarios_quantidade_ordem',
+      'comentariosQuantidadeOrdem',
       'comentarios_quantidade_nf',
+      'comentariosQuantidadeNf',
     ],
   },
 
   {
     title: 'OBSERVAÇÕES',
-    fieldNames: ['observacoes', 'observacoes_recebimento'],
+    fieldNames: ['observacoes', 'observacoes_recebimento', 'observacoesRecebimento'],
   },
 
   {
     title: 'ASSINATURAS',
-    fieldNames: ['fiscal_contrato_nome', 'data_assinatura'],
+    fieldNames: ['fiscal_contrato_nome', 'fiscalContratoNome', 'data_assinatura', 'dataAssinatura'],
   },
 ];
 
 export const ignoredFields = new Set([
-  'runId',
-  'createdAt',
-  'updatedAt',
-  'status',
-  'id',
+  "runId",
+  "createdAt",
+  "updatedAt",
+  "status",
+  "id",
 
   // ✅ evita vazar JSON em OUTROS
-  'prazos_calculados',
-  'prazos',
-  'prazos_calculados_raw',
+  "prazos_calculados",
+  "prazos",
+  "prazos_calculados_raw",
+  "prazos_calculados_normalizados",
+
+  // ✅ NOVO: campo derivado/duplicado que não deve aparecer em OUTROS
+  "valor_total_itens",
+  "valorTotalItens",
 ]);
 
+
 export const alwaysShowFields = new Set([
+  // identificação mínima
   'numero_contrato',
   'processo_licitatorio',
   'contratada',
@@ -118,12 +137,10 @@ export const alwaysShowFields = new Set([
   'data_entrega',
   'condicao_prazo',
 
-  // ✅ manter estrutura mínima do bloco Objeto/Valores
-  'objeto_fornecido',
-  'unidade_medida',
-  'quantidade_recebida',
-  'valor_unitario',
-  'valor_total_calculado',
+  // ✅ manter estrutura mínima dos itens (tabela)
+  'itens_objeto',
+
+  // ⚠️ NÃO manter valor_total_geral aqui, pois ele não será campo solto
 ]);
 
 const HIDDEN_STRINGS = new Set([
@@ -139,7 +156,6 @@ const HIDDEN_STRINGS = new Set([
   'NÃO INFORMADO ',
   'Não informado',
   'Nao informado',
-  'NÃO INFORMADO',
   'NAO DECLARADO',
   'NÃO DECLARADO',
 ]);
@@ -157,39 +173,41 @@ function isHiddenString(s: string): boolean {
  * Se não for exibível, retorna "" (vazio).
  *
  * ✅ IMPORTANTE:
- * - number/boolean também passam pelo normalizeTrpValue para permitir formatação (moeda/quantidade)
+ * - itens_objeto NÃO é convertido em string aqui (vai como raw para o painel renderizar tabela)
+ * - valor_total_geral NÃO sai (é ignorado)
+ * - prazos_calculados nunca sai
  */
 function toUiString(fieldName: string, value: unknown): string {
   if (value === null || value === undefined) return '';
 
-  // evita vazamento de estruturas
-  if (fieldName === 'prazos_calculados' || fieldName === 'prazos') return '';
+  // nunca vazar prazos
+  if (fieldName.startsWith('prazos')) return '';
 
-  // strings
+  // ✅ total geral não é campo solto (evita duplicação)
+  if (fieldName === 'valor_total_geral' || fieldName === 'valorTotalGeral') return '';
+
+  // ✅ itens_objeto será tratado no componente (tabela)
+  if (fieldName === 'itens_objeto') return '__STRUCTURED__';
+
   if (typeof value === 'string') {
     if (isHiddenString(value)) return '';
 
     const normalized = normalizeTrpValue(value, fieldName);
     if (!normalized || isHiddenString(normalized)) return '';
-
     return normalized;
   }
 
-  // number / boolean  ✅ agora normaliza também
   if (typeof value === 'number' || typeof value === 'boolean') {
     const normalized = normalizeTrpValue(String(value), fieldName);
     if (!normalized || isHiddenString(normalized)) return '';
     return normalized;
   }
 
-  // objeto/array
+  // objeto/array: não renderizar como JSON em OUTROS
   try {
     const s = JSON.stringify(value);
     if (!s || s === '{}' || s === '[]' || s === 'null') return '';
-
-    const normalized = normalizeTrpValue(s, fieldName);
-    if (!normalized || isHiddenString(normalized)) return '';
-    return normalized;
+    return '__STRUCTURED__';
   } catch {
     const s = String(value);
     if (!s || isHiddenString(s)) return '';
@@ -201,20 +219,21 @@ export function organizeFieldsBySections(
   campos: Record<string, unknown>
 ): Array<{
   section: FieldSection;
-  fields: Array<{ fieldName: string; label: string; value: string }>;
+  fields: Array<{ fieldName: string; label: string; value: unknown }>;
 }> {
   const allFieldNames = new Set(Object.keys(campos));
   const usedFields = new Set<string>();
 
   const result: Array<{
     section: FieldSection;
-    fields: Array<{ fieldName: string; label: string; value: string }>;
+    fields: Array<{ fieldName: string; label: string; value: unknown }>;
   }> = [];
 
   for (const section of trpFieldSections) {
-    const fields: Array<{ fieldName: string; label: string; value: string }> = [];
+    const fields: Array<{ fieldName: string; label: string; value: unknown }> = [];
 
     for (const fieldName of section.fieldNames) {
+      // se não existe no payload
       if (!allFieldNames.has(fieldName)) {
         if (alwaysShowFields.has(fieldName)) {
           fields.push({
@@ -228,21 +247,51 @@ export function organizeFieldsBySections(
       }
 
       const rawValue = campos[fieldName];
+
+      // ✅ itens_objeto deve ir como raw (para render tabela)
+      if (fieldName === 'itens_objeto') {
+        if (Array.isArray(rawValue) || alwaysShowFields.has(fieldName)) {
+          fields.push({
+            fieldName,
+            label: getTrpFieldLabel(fieldName),
+            value: rawValue,
+          });
+          usedFields.add(fieldName);
+        }
+        continue;
+      }
+
+      // ✅ total geral não é campo solto
+      if (fieldName === 'valor_total_geral' || fieldName === 'valorTotalGeral') {
+        usedFields.add(fieldName);
+        continue;
+      }
+
       const uiValue = toUiString(fieldName, rawValue);
+
+      // ✅ se é conteúdo estruturado (obj/array), mantém como rawValue (mas não joga json)
+      const valueToStore = uiValue === '__STRUCTURED__' ? rawValue : uiValue;
 
       if (alwaysShowFields.has(fieldName) || uiValue !== '') {
         fields.push({
           fieldName,
           label: getTrpFieldLabel(fieldName),
-          value: uiValue,
+          value: valueToStore,
         });
         usedFields.add(fieldName);
       }
     }
 
     if (fields.length > 0) {
-      const hasAnyValue = fields.some((f) => f.value !== '');
+      const hasAnyValue = fields.some((f) => {
+        if (f.fieldName === 'itens_objeto')
+          return Array.isArray(f.value) && (f.value as any[]).length > 0;
+        if (typeof f.value === 'string') return f.value !== '';
+        return f.value !== null && f.value !== undefined;
+      });
+
       const hasAlwaysShow = fields.some((f) => alwaysShowFields.has(f.fieldName));
+
       if (hasAnyValue || hasAlwaysShow) {
         result.push({ section, fields });
       }
@@ -250,7 +299,7 @@ export function organizeFieldsBySections(
   }
 
   // OUTROS
-  const otherFields: Array<{ fieldName: string; label: string; value: string }> = [];
+  const otherFields: Array<{ fieldName: string; label: string; value: unknown }> = [];
 
   for (const [fieldName, rawValue] of Object.entries(campos)) {
     if (ignoredFields.has(fieldName)) continue;
@@ -259,6 +308,9 @@ export function organizeFieldsBySections(
 
     const uiValue = toUiString(fieldName, rawValue);
     if (uiValue === '') continue;
+
+    // evita jogar json cru
+    if (uiValue === '__STRUCTURED__') continue;
 
     otherFields.push({
       fieldName,
