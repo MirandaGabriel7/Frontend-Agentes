@@ -160,6 +160,7 @@ export interface TrpAgentOutput {
   meta: TrpMeta;
 }
 
+
 /**
  * Run "do front" (se você usa em algum lugar). O backend tem outro shape (TrpRunData).
  */
