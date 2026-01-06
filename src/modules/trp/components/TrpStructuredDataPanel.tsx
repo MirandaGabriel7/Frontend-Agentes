@@ -243,7 +243,11 @@ function renderItensObjetoTable(itens: ItemObjetoLike[], totalGeral?: unknown) {
                   </Typography>
                   <Typography
                     component="span"
-                    sx={{ fontWeight: 900, whiteSpace: "nowrap", lineHeight: 1.2 }}
+                    sx={{
+                      fontWeight: 900,
+                      whiteSpace: "nowrap",
+                      lineHeight: 1.2,
+                    }}
                   >
                     {totalToShow}
                   </Typography>
@@ -297,7 +301,23 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
 
   // ✅ pega total geral (mesmo se existir no payload, não exibimos como campo solto no FieldSections)
   const totalGeral =
-    (camposAsRecord as any).valor_total_geral ?? (camposAsRecord as any).valorTotalGeral;
+    (camposAsRecord as any).valor_total_geral ??
+    (camposAsRecord as any).valorTotalGeral;
+
+  // ✅ NÃO repetir valor fora de "ITENS DO RECEBIMENTO"
+  // (mantém o valor apenas dentro da tabela de itens_objeto)
+  const VALUE_KEYS_TO_HIDE_OUTSIDE_ITEMS = new Set([
+    "valor_total_geral",
+    "valorTotalGeral",
+    "valor_efetivo",
+    "valor_efetivo_numero",
+    "valor_efetivo_formatado",
+    "valor_total",
+    "valor_total_calculado",
+    "valor_unitario",
+    "valor_unitario_num",
+    "valor_unitario_raw",
+  ]);
 
   const sections = sectionsWithFields
     .filter(({ section }) => section.title !== "ASSINATURAS")
@@ -305,6 +325,14 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
       const normalizedFields = fields
         .map((field) => {
           const raw = field.value;
+
+          // ✅ esconder valores repetidos fora da tabela de itens
+          if (
+            field.fieldName !== "itens_objeto" &&
+            VALUE_KEYS_TO_HIDE_OUTSIDE_ITEMS.has(field.fieldName)
+          ) {
+            return null;
+          }
 
           if (field.fieldName === "observacoes") {
             const display =
@@ -332,7 +360,8 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
 
           const node = toDisplayNode(field.fieldName, raw);
 
-          if (typeof node === "string" && isHiddenOrEmptyString(node)) return null;
+          if (typeof node === "string" && isHiddenOrEmptyString(node))
+            return null;
           if (typeof node === "string" && !node.trim()) return null;
 
           return {
