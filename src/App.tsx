@@ -14,6 +14,11 @@ import { AgentsPage } from "./pages/AgentsPage";
 import { DfdAgentPage } from "./pages/DfdAgentPage";
 import AgenteDfdResultado from "./pages/AgenteDfdResultado";
 
+// ✅ PÁGINAS DE CONTA
+import SettingsPage from "./pages/SettingsPage";
+import ProfilePage from "./pages/ProfilePage";
+
+// TRP
 import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
@@ -26,10 +31,14 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Rota pública */}
+              {/* ===================== */}
+              {/* ROTA PÚBLICA */}
+              {/* ===================== */}
               <Route path="/login" element={<LoginPage />} />
 
-              {/* Home */}
+              {/* ===================== */}
+              {/* HOME */}
+              {/* ===================== */}
               <Route
                 path="/"
                 element={
@@ -41,7 +50,9 @@ function App() {
                 }
               />
 
-              {/* Agents */}
+              {/* ===================== */}
+              {/* DASHBOARD / AGENTS */}
+              {/* ===================== */}
               <Route
                 path="/agents"
                 element={
@@ -53,7 +64,37 @@ function App() {
                 }
               />
 
-              {/* TRP (fluxo novo) */}
+              {/* ===================== */}
+              {/* CONFIGURAÇÕES */}
+              {/* ===================== */}
+              <Route
+                path="/agents/settings"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <SettingsPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* ===================== */}
+              {/* MEU PERFIL */}
+              {/* ===================== */}
+              <Route
+                path="/agents/profile"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <ProfilePage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* ===================== */}
+              {/* TRP */}
+              {/* ===================== */}
               <Route
                 path="/agents/trp"
                 element={
@@ -87,7 +128,7 @@ function App() {
                 }
               />
 
-              {/* Redirects (rotas antigas) */}
+              {/* Redirects (rotas antigas TRP) */}
               <Route
                 path="/agents/trp/novo"
                 element={<Navigate to="/agents/trp" replace />}
@@ -101,7 +142,9 @@ function App() {
                 element={<Navigate to="/agents/trp/historico" replace />}
               />
 
+              {/* ===================== */}
               {/* DFD */}
+              {/* ===================== */}
               <Route
                 path="/agents/dfd"
                 element={
@@ -124,7 +167,9 @@ function App() {
                 }
               />
 
-              {/* Fallback */}
+              {/* ===================== */}
+              {/* FALLBACK */}
+              {/* ===================== */}
               <Route path="*" element={<Navigate to="/agents" replace />} />
             </Routes>
           </BrowserRouter>

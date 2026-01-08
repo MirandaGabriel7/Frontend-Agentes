@@ -1,5 +1,11 @@
 // src/modules/trp/pages/TrpHistoryPage.tsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -20,6 +26,10 @@ import {
   Skeleton,
   Card,
   CardContent,
+  Snackbar,
+  IconButton,
+  Tooltip,
+  Pagination,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import {
@@ -32,6 +42,7 @@ import {
   PictureAsPdf as PdfIcon,
   Description as WordIcon,
   Close as CloseIcon,
+  Clear as ClearIcon,
 } from "@mui/icons-material";
 import {
   fetchTrpRuns,
@@ -41,7 +52,6 @@ import {
   downloadTrpRun,
 } from "../../../services/api";
 import { useAuth } from "../../../contexts/AuthContext";
-import { Snackbar, IconButton, Tooltip } from "@mui/material";
 import { isUuid } from "../../../utils/uuid";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
@@ -57,6 +67,8 @@ const STATUS_OPTIONS = [
   { value: "PENDING", label: "Pendentes" },
   { value: "RUNNING", label: "Em processamento" },
 ] as const;
+
+const PER_PAGE_OPTIONS = [5, 10, 15, 20] as const;
 
 const getStatusChip = (status: TrpRunListItem["status"]) => {
   switch (status) {
@@ -96,7 +108,7 @@ const formatDate = (dateString: string) => {
 };
 
 /**
- * ✅ NOVO: nome amigável do TRP no histórico (prioriza fileName vindo do backend).
+ * ✅ Nome amigável do TRP no histórico (prioriza fileName vindo do backend).
  * Fallback seguro: "TRP_<8 primeiros do runId>.pdf"
  */
 const getDisplayFileName = (run: TrpRunListItem) => {
@@ -106,12 +118,19 @@ const getDisplayFileName = (run: TrpRunListItem) => {
   return name || fallback;
 };
 
+// ✅ normalize robusto para busca (remove acentos + lowercase + trim)
+const normalize = (v: unknown) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+
 export const TrpHistoryPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
-  // ✅ FIX DO ERRO: aceitar "warning" também
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -125,37 +144,64 @@ export const TrpHistoryPage: React.FC = () => {
     [runId: string]: "pdf" | "docx" | null;
   }>({});
 
+  // ✅ baseRuns = lista “bruta” vinda do backend (sem depender da busca)
+  const [baseRuns, setBaseRuns] = useState<TrpRunListItem[]>([]);
+
+  // ✅ runs = lista renderizada (após filtro + paginação)
   const [runs, setRuns] = useState<TrpRunListItem[]>([]);
+
   const [summary, setSummary] = useState<{
     total: number;
     completed: number;
     failed: number;
-    lastExecution?: string;
   } | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+
   const [statusFilter, setStatusFilter] =
     useState<FetchTrpRunsParams["status"]>("ALL");
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
-  const [hasMore, setHasMore] = useState(false);
+
+  const [perPage, setPerPage] = useState<(typeof PER_PAGE_OPTIONS)[number]>(10);
+  const [page, setPage] = useState(1); // 1-based
+  const [totalCount, setTotalCount] = useState(0);
 
   const didFetchSummary = useRef(false);
   const lastFetchAt = useRef<number | null>(null);
 
-  // Debounce do campo de busca
+  // ✅ Debounce: busca “padrão OpenAI/Enter AI” (mantém o que achou e não refaz fetch)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 400);
-
+    }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Carregar resumo
+  // ✅ Resumo com fallback (não depende da busca)
+  const derivedSummary = useMemo(() => {
+    const arr = Array.isArray(baseRuns) ? baseRuns : [];
+    const total = arr.length;
+    const completed = arr.filter((r) => r?.status === "COMPLETED").length;
+    const failed = arr.filter((r) => r?.status === "FAILED").length;
+
+    if (!summary) return { total, completed, failed };
+
+    const sTotal = typeof summary.total === "number" ? summary.total : 0;
+    const sCompleted =
+      typeof summary.completed === "number" ? summary.completed : 0;
+    const sFailed = typeof summary.failed === "number" ? summary.failed : 0;
+
+    // se summary veio “vazio” e temos dados carregados, usa fallback
+    if ((sTotal === 0 && total > 0) || (sCompleted === 0 && completed > 0)) {
+      return { total, completed, failed };
+    }
+    return { total: sTotal, completed: sCompleted, failed: sFailed };
+  }, [baseRuns, summary]);
+
+  // Carregar resumo (sem lastExecution)
   const loadSummary = useCallback(async () => {
     if (didFetchSummary.current) return;
     didFetchSummary.current = true;
@@ -167,7 +213,6 @@ export const TrpHistoryPage: React.FC = () => {
           total: typeof data.total === "number" ? data.total : 0,
           completed: typeof data.completed === "number" ? data.completed : 0,
           failed: typeof data.failed === "number" ? data.failed : 0,
-          lastExecution: data.lastExecution || undefined,
         });
       } else {
         setSummary({ total: 0, completed: 0, failed: 0 });
@@ -178,93 +223,129 @@ export const TrpHistoryPage: React.FC = () => {
     }
   }, []);
 
-  // Carregar runs
-  const loadRuns = useCallback(
-    async (append = false) => {
-      const now = Date.now();
+  // ✅ Carrega dados do backend SEM depender do campo de busca
+  // (isso garante que a busca “mantenha” e “filtre” sempre de forma estável)
+  const loadRuns = useCallback(async () => {
+    const now = Date.now();
 
-      // Cache de 10 segundos apenas para primeira carga
-      if (
-        !append &&
-        lastFetchAt.current !== null &&
-        now - lastFetchAt.current < 10000
-      ) {
-        setLoading(false);
-        return;
-      }
+    // Cache 10s para evitar bater no backend sem necessidade
+    if (lastFetchAt.current !== null && now - lastFetchAt.current < 10000) {
+      setLoading(false);
+      return;
+    }
 
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const params: FetchTrpRunsParams = {
-          limit: 20,
-          cursor: append ? nextCursor : undefined,
-          status: statusFilter,
-          q: debouncedQuery || undefined,
-        };
+    try {
+      const params: FetchTrpRunsParams = {
+        limit: 250, // lote maior p/ filtrar bem (nome/contrato/nf/valor)
+        cursor: undefined,
+        status: statusFilter,
+        // ✅ IMPORTANTÍSSIMO: NÃO mandar "q" aqui.
+        // A busca é 100% local para não “voltar” e nem “perder” resultados.
+      };
 
-        const result = await fetchTrpRuns(params);
+      const result = await fetchTrpRuns(params);
+      const items = Array.isArray(result.items) ? result.items : [];
 
-        const items = Array.isArray(result.items) ? result.items : [];
+      setBaseRuns(items);
+      lastFetchAt.current = Date.now();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erro ao carregar histórico de TRPs";
+      setError(errorMessage);
+      setBaseRuns([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
-        if (append) {
-          setRuns((prev) => {
-            const prevArray = Array.isArray(prev) ? prev : [];
-            return [...prevArray, ...items];
-          });
-        } else {
-          setRuns(items);
-          lastFetchAt.current = Date.now();
-        }
-
-        setNextCursor(result.nextCursor);
-        setHasMore(!!result.nextCursor);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Erro ao carregar histórico de TRPs";
-        setError(errorMessage);
-        if (!append) {
-          setRuns([]);
-        }
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [debouncedQuery, statusFilter, nextCursor]
-  );
-
-  // Carregar dados iniciais
+  // Inicial
   useEffect(() => {
     loadSummary();
-    loadRuns(false);
+    loadRuns();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Recarregar quando filtros mudarem
+  // Recarrega quando Status muda (busca NÃO recarrega)
   useEffect(() => {
-    setNextCursor(undefined);
-    setRuns([]);
-    loadRuns(false);
-  }, [debouncedQuery, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    setPage(1);
+    lastFetchAt.current = null;
+    loadRuns();
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      loadRuns(true);
-    }
-  };
+  // ✅ Sempre que mudar a busca, volta pra página 1 (mas NÃO recarrega o backend)
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
 
   const handleRetry = () => {
     setError(null);
+    didFetchSummary.current = false;
     loadSummary();
-    loadRuns(false);
+    lastFetchAt.current = null;
+    loadRuns();
   };
+
+  /**
+   * ✅ Busca local REAL, com os campos pedidos:
+   * - Nome (fileName / fallback)
+   * - Número do contrato
+   * - NF
+   * - Valor (formatado e numérico)
+   * - (bônus) runId
+   *
+   * E mantém o resultado (não refaz fetch, não “some”).
+   */
+  const filteredRuns = useMemo(() => {
+    const arr = Array.isArray(baseRuns) ? baseRuns : [];
+    const q = normalize(debouncedQuery);
+    if (!q) return arr;
+
+    return arr.filter((run) => {
+      const displayName = getDisplayFileName(run);
+
+      const valorFormatado =
+        (run as any)?.valor_efetivo_formatado ?? run.valor_efetivo_formatado;
+      const valorNumero =
+        (run as any)?.valor_efetivo_numero ??
+        (run as any)?.valor_efetivo_numero;
+
+      const hay = normalize(
+        [
+          displayName,
+          (run as any)?.fileName,
+          run.numero_contrato,
+          run.numero_nf,
+          valorFormatado,
+          valorNumero,
+          run.runId,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+
+      return hay.includes(q);
+    });
+  }, [baseRuns, debouncedQuery]);
+
+  // ✅ Atualiza totalCount com base no filtro atual
+  useEffect(() => {
+    setTotalCount(filteredRuns.length);
+  }, [filteredRuns.length]);
+
+  // ✅ Fatiamento paginado
+  const pagedRuns = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filteredRuns.slice(start, start + perPage);
+  }, [filteredRuns, page, perPage]);
+
+  // ✅ runs renderizados = pagedRuns (mantém estrutura do seu código)
+  useEffect(() => {
+    setRuns(pagedRuns);
+  }, [pagedRuns]);
 
   const handleDownload = async (runId: string, format: "pdf" | "docx") => {
     if (!runId) {
@@ -285,7 +366,7 @@ export const TrpHistoryPage: React.FC = () => {
       return;
     }
 
-    const runsArray = Array.isArray(runs) ? runs : [];
+    const runsArray = Array.isArray(baseRuns) ? baseRuns : [];
 
     const run = runsArray.find((r) => r && r.runId === runId);
     if (!run) {
@@ -308,7 +389,7 @@ export const TrpHistoryPage: React.FC = () => {
     }
 
     try {
-      setDownloading({ ...downloading, [runId]: format });
+      setDownloading((prev) => ({ ...prev, [runId]: format }));
 
       await downloadTrpRun(runId, format);
       setSnackbar({
@@ -356,23 +437,31 @@ export const TrpHistoryPage: React.FC = () => {
         setSnackbar({ open: true, message: errorMessage, severity: "error" });
       }
     } finally {
-      setDownloading({ ...downloading, [runId]: null });
+      setDownloading((prev) => ({ ...prev, [runId]: null }));
     }
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+      <Box sx={{ mb: 4, textAlign: "center" }}>
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            mb: 1,
+            justifyContent: "center",
+          }}
+        >
           <HistoryIcon
             sx={{ fontSize: 32, color: theme.palette.primary.main }}
           />
-          <Box>
+          <Box sx={{ textAlign: "left" }}>
             <Typography
               variant="h4"
               sx={{ fontWeight: 700, color: theme.palette.text.primary }}
@@ -386,108 +475,80 @@ export const TrpHistoryPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Resumo */}
-      {summary && (
-        <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Card
-              sx={{
-                background: `linear-gradient(135deg, ${alpha(
-                  theme.palette.primary.main,
-                  0.1
-                )} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="h4"
-                  sx={{ fontWeight: 700, color: theme.palette.primary.main }}
-                >
-                  {summary.total}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Card
-              sx={{
-                background: `linear-gradient(135deg, ${alpha(
-                  theme.palette.success.main,
-                  0.1
-                )} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
-                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="h4"
-                  sx={{ fontWeight: 700, color: theme.palette.success.main }}
-                >
-                  {summary.completed}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Concluídos
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Card
-              sx={{
-                background: `linear-gradient(135deg, ${alpha(
-                  theme.palette.error.main,
-                  0.1
-                )} 0%, ${alpha(theme.palette.error.main, 0.05)} 100%)`,
-                border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="h4"
-                  sx={{ fontWeight: 700, color: theme.palette.error.main }}
-                >
-                  {summary.failed}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Falhas
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 6, sm: 3 }}>
-            <Card
-              sx={{
-                background: `linear-gradient(135deg, ${alpha(
-                  theme.palette.info.main,
-                  0.1
-                )} 0%, ${alpha(theme.palette.info.main, 0.05)} 100%)`,
-                border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 600, color: theme.palette.info.main }}
-                >
-                  {summary.lastExecution
-                    ? formatDate(summary.lastExecution)
-                    : "-"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Última execução
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
+      {/* Resumo (sem "Última execução") */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 6, sm: 4 }}>
+          <Card
+            sx={{
+              background: `linear-gradient(135deg, ${alpha(
+                theme.palette.primary.main,
+                0.1
+              )} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+            }}
+          >
+            <CardContent>
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, color: theme.palette.primary.main }}
+              >
+                {derivedSummary.total}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Total
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
-      )}
+
+        <Grid size={{ xs: 6, sm: 4 }}>
+          <Card
+            sx={{
+              background: `linear-gradient(135deg, ${alpha(
+                theme.palette.success.main,
+                0.1
+              )} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
+              border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+            }}
+          >
+            <CardContent>
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, color: theme.palette.success.main }}
+              >
+                {derivedSummary.completed}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Concluídos
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 6, sm: 4 }}>
+          <Card
+            sx={{
+              background: `linear-gradient(135deg, ${alpha(
+                theme.palette.error.main,
+                0.1
+              )} 0%, ${alpha(theme.palette.error.main, 0.05)} 100%)`,
+              border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+            }}
+          >
+            <CardContent>
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 700, color: theme.palette.error.main }}
+              >
+                {derivedSummary.failed}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Falhas
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Filtros */}
       <Paper
@@ -501,19 +562,32 @@ export const TrpHistoryPage: React.FC = () => {
       >
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
           <TextField
-            placeholder="Buscar por número de contrato ou NF..."
+            placeholder="Buscar por nome, contrato, NF ou valor..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             size="small"
-            sx={{ flex: 1, minWidth: 200 }}
+            sx={{ flex: 1, minWidth: 280 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
                   <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    aria-label="Limpar busca"
+                    onClick={() => setSearchQuery("")}
+                    edge="end"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
             }}
           />
+
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>Status</InputLabel>
             <Select
@@ -526,6 +600,27 @@ export const TrpHistoryPage: React.FC = () => {
               {STATUS_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Por página</InputLabel>
+            <Select
+              value={perPage}
+              label="Por página"
+              onChange={(e) => {
+                const next = Number(
+                  e.target.value
+                ) as (typeof PER_PAGE_OPTIONS)[number];
+                setPerPage(next);
+                setPage(1);
+              }}
+            >
+              {PER_PAGE_OPTIONS.map((n) => (
+                <MenuItem key={n} value={n}>
+                  {n}
                 </MenuItem>
               ))}
             </Select>
@@ -557,7 +652,7 @@ export const TrpHistoryPage: React.FC = () => {
           overflow: "hidden",
         }}
       >
-        {loading && runs.length === 0 ? (
+        {loading && baseRuns.length === 0 ? (
           <Box sx={{ p: 3 }}>
             {[...Array(5)].map((_, i) => (
               <Box key={i} sx={{ mb: 2 }}>
@@ -569,7 +664,7 @@ export const TrpHistoryPage: React.FC = () => {
               </Box>
             ))}
           </Box>
-        ) : runs.length === 0 ? (
+        ) : filteredRuns.length === 0 ? (
           <Box sx={{ p: 6, textAlign: "center" }}>
             <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
               Nenhum TRP encontrado
@@ -583,318 +678,320 @@ export const TrpHistoryPage: React.FC = () => {
         ) : (
           <>
             <Box sx={{ p: 0 }}>
-              {Array.isArray(runs) && runs.length > 0
-                ? runs.map((run) => {
-                    const displayFileName = getDisplayFileName(run);
+              {runs.map((run) => {
+                const displayFileName = getDisplayFileName(run);
 
-                    return (
-                      <Box
-                        key={run.runId}
-                        sx={{
-                          p: 3,
-                          borderBottom: `1px solid ${alpha(
-                            theme.palette.divider,
-                            0.08
-                          )}`,
-                          "&:last-child": {
-                            borderBottom: "none",
-                          },
-                          "&:hover": {
-                            backgroundColor: alpha(
-                              theme.palette.primary.main,
-                              0.02
-                            ),
-                          },
-                        }}
-                      >
+                return (
+                  <Box
+                    key={run.runId}
+                    sx={{
+                      p: 3,
+                      borderBottom: `1px solid ${alpha(
+                        theme.palette.divider,
+                        0.08
+                      )}`,
+                      "&:last-child": { borderBottom: "none" },
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.02
+                        ),
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                        gap: 2,
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 200 }}>
                         <Box
                           sx={{
                             display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            flexWrap: "wrap",
                             gap: 2,
+                            alignItems: "center",
+                            mb: 1,
+                            flexWrap: "wrap",
                           }}
                         >
-                          <Box sx={{ flex: 1, minWidth: 200 }}>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 2,
-                                alignItems: "center",
-                                mb: 1,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {getStatusChip(run.status)}
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {formatDate(run.createdAt)}
-                              </Typography>
-                            </Box>
+                          {getStatusChip(run.status)}
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDate(run.createdAt)}
+                          </Typography>
+                        </Box>
 
-                            {/* ✅ NOVO: Nome amigável escolhido (fileName) */}
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 700,
+                            color: theme.palette.text.primary,
+                            mb: 0.75,
+                            lineHeight: 1.2,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {displayFileName}
+                        </Typography>
+
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 3,
+                            flexWrap: "wrap",
+                            mt: 1,
+                          }}
+                        >
+                          <Box>
                             <Typography
-                              variant="subtitle1"
-                              sx={{
-                                fontWeight: 700,
-                                color: theme.palette.text.primary,
-                                mb: 0.75,
-                                lineHeight: 1.2,
-                                wordBreak: "break-word",
-                              }}
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
                             >
-                              {displayFileName}
+                              Contrato
                             </Typography>
-
-                            <Box
-                              sx={{
-                                display: "flex",
-                                gap: 3,
-                                flexWrap: "wrap",
-                                mt: 1,
-                              }}
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 500 }}
                             >
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  display="block"
-                                >
-                                  Contrato
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500 }}
-                                >
-                                  {run.numero_contrato || "Sem número"}
-                                </Typography>
-                              </Box>
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  display="block"
-                                >
-                                  NF
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500 }}
-                                >
-                                  {run.numero_nf || "Sem NF"}
-                                </Typography>
-                              </Box>
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  display="block"
-                                >
-                                  Valor
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500 }}
-                                >
-                                  {run.valor_efetivo_formatado || "-"}
-                                </Typography>
-                              </Box>
-                            </Box>
+                              {run.numero_contrato || "Sem número"}
+                            </Typography>
                           </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              gap: 1,
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {run.status === "COMPLETED" ? (
-                              <>
-                                <Tooltip
-                                  title={
-                                    downloading[run.runId] === "pdf"
-                                      ? "Exportando documento oficial do TRP..."
-                                      : "Exportar documento oficial do TRP em PDF"
-                                  }
-                                >
-                                  <span>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      startIcon={
-                                        downloading[run.runId] === "pdf" ? (
-                                          <CircularProgress size={16} />
-                                        ) : (
-                                          <PdfIcon />
-                                        )
-                                      }
-                                      onClick={() =>
-                                        handleDownload(run.runId, "pdf")
-                                      }
-                                      disabled={!!downloading[run.runId]}
-                                      sx={{
-                                        textTransform: "none",
-                                        minWidth: "auto",
-                                        color: theme.palette.error.main,
-                                        borderColor: alpha(
-                                          theme.palette.error.main,
-                                          0.5
-                                        ),
-                                        "&:hover": {
-                                          borderColor: theme.palette.error.main,
-                                          bgcolor: alpha(
-                                            theme.palette.error.main,
-                                            0.08
-                                          ),
-                                        },
-                                        "&:disabled": {
-                                          borderColor: alpha(
-                                            theme.palette.error.main,
-                                            0.3
-                                          ),
-                                          color: alpha(
-                                            theme.palette.error.main,
-                                            0.5
-                                          ),
-                                        },
-                                      }}
-                                    >
-                                      {downloading[run.runId] === "pdf"
-                                        ? "Exportando..."
-                                        : "PDF"}
-                                    </Button>
-                                  </span>
-                                </Tooltip>
-
-                                <Tooltip
-                                  title={
-                                    downloading[run.runId] === "docx"
-                                      ? "Exportando documento oficial do TRP..."
-                                      : "Exportar documento oficial do TRP em DOCX"
-                                  }
-                                >
-                                  <span>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      startIcon={
-                                        downloading[run.runId] === "docx" ? (
-                                          <CircularProgress size={16} />
-                                        ) : (
-                                          <WordIcon />
-                                        )
-                                      }
-                                      onClick={() =>
-                                        handleDownload(run.runId, "docx")
-                                      }
-                                      disabled={!!downloading[run.runId]}
-                                      sx={{
-                                        textTransform: "none",
-                                        minWidth: "auto",
-                                        color: theme.palette.info.main,
-                                        borderColor: alpha(
-                                          theme.palette.info.main,
-                                          0.5
-                                        ),
-                                        "&:hover": {
-                                          borderColor: theme.palette.info.main,
-                                          bgcolor: alpha(
-                                            theme.palette.info.main,
-                                            0.08
-                                          ),
-                                        },
-                                        "&:disabled": {
-                                          borderColor: alpha(
-                                            theme.palette.info.main,
-                                            0.3
-                                          ),
-                                          color: alpha(
-                                            theme.palette.info.main,
-                                            0.5
-                                          ),
-                                        },
-                                      }}
-                                    >
-                                      {downloading[run.runId] === "docx"
-                                        ? "Exportando..."
-                                        : "DOCX"}
-                                    </Button>
-                                  </span>
-                                </Tooltip>
-                              </>
-                            ) : (
-                              <Tooltip title="Documento ainda não concluído">
-                                <span>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    disabled
-                                    sx={{
-                                      textTransform: "none",
-                                      minWidth: "auto",
-                                      color: theme.palette.text.disabled,
-                                      borderColor: alpha(
-                                        theme.palette.divider,
-                                        0.2
-                                      ),
-                                      cursor: "not-allowed",
-                                    }}
-                                  >
-                                    Exportar
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                            )}
-
-                            <Button
-                              variant="contained"
-                              size="small"
-                              onClick={() =>
-                                navigate(`/agents/trp/resultado/${run.runId}`)
-                              }
-                              sx={{ textTransform: "none" }}
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
                             >
-                              Abrir
-                            </Button>
+                              NF
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 500 }}
+                            >
+                              {run.numero_nf || "Sem NF"}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                            >
+                              Valor
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 500 }}
+                            >
+                              {run.valor_efetivo_formatado || "-"}
+                            </Typography>
                           </Box>
                         </Box>
                       </Box>
-                    );
-                  })
-                : null}
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 1,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {run.status === "COMPLETED" ? (
+                          <>
+                            <Tooltip
+                              title={
+                                downloading[run.runId] === "pdf"
+                                  ? "Exportando documento oficial do TRP..."
+                                  : "Exportar documento oficial do TRP em PDF"
+                              }
+                            >
+                              <span>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    downloading[run.runId] === "pdf" ? (
+                                      <CircularProgress size={16} />
+                                    ) : (
+                                      <PdfIcon />
+                                    )
+                                  }
+                                  onClick={() =>
+                                    handleDownload(run.runId, "pdf")
+                                  }
+                                  disabled={!!downloading[run.runId]}
+                                  sx={{
+                                    textTransform: "none",
+                                    minWidth: "auto",
+                                    color: theme.palette.error.main,
+                                    borderColor: alpha(
+                                      theme.palette.error.main,
+                                      0.5
+                                    ),
+                                    "&:hover": {
+                                      borderColor: theme.palette.error.main,
+                                      bgcolor: alpha(
+                                        theme.palette.error.main,
+                                        0.08
+                                      ),
+                                    },
+                                    "&:disabled": {
+                                      borderColor: alpha(
+                                        theme.palette.error.main,
+                                        0.3
+                                      ),
+                                      color: alpha(
+                                        theme.palette.error.main,
+                                        0.5
+                                      ),
+                                    },
+                                  }}
+                                >
+                                  {downloading[run.runId] === "pdf"
+                                    ? "Exportando..."
+                                    : "PDF"}
+                                </Button>
+                              </span>
+                            </Tooltip>
+
+                            <Tooltip
+                              title={
+                                downloading[run.runId] === "docx"
+                                  ? "Exportando documento oficial do TRP..."
+                                  : "Exportar documento oficial do TRP em DOCX"
+                              }
+                            >
+                              <span>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    downloading[run.runId] === "docx" ? (
+                                      <CircularProgress size={16} />
+                                    ) : (
+                                      <WordIcon />
+                                    )
+                                  }
+                                  onClick={() =>
+                                    handleDownload(run.runId, "docx")
+                                  }
+                                  disabled={!!downloading[run.runId]}
+                                  sx={{
+                                    textTransform: "none",
+                                    minWidth: "auto",
+                                    color: theme.palette.info.main,
+                                    borderColor: alpha(
+                                      theme.palette.info.main,
+                                      0.5
+                                    ),
+                                    "&:hover": {
+                                      borderColor: theme.palette.info.main,
+                                      bgcolor: alpha(
+                                        theme.palette.info.main,
+                                        0.08
+                                      ),
+                                    },
+                                    "&:disabled": {
+                                      borderColor: alpha(
+                                        theme.palette.info.main,
+                                        0.3
+                                      ),
+                                      color: alpha(
+                                        theme.palette.info.main,
+                                        0.5
+                                      ),
+                                    },
+                                  }}
+                                >
+                                  {downloading[run.runId] === "docx"
+                                    ? "Exportando..."
+                                    : "DOCX"}
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          </>
+                        ) : (
+                          <Tooltip title="Documento ainda não concluído">
+                            <span>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                disabled
+                                sx={{
+                                  textTransform: "none",
+                                  minWidth: "auto",
+                                  color: theme.palette.text.disabled,
+                                  borderColor: alpha(
+                                    theme.palette.divider,
+                                    0.2
+                                  ),
+                                  cursor: "not-allowed",
+                                }}
+                              >
+                                Exportar
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        )}
+
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() =>
+                            navigate(`/agents/trp/resultado/${run.runId}`)
+                          }
+                          sx={{ textTransform: "none" }}
+                        >
+                          Abrir
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
             </Box>
 
-            {/* Load More */}
-            {hasMore && (
-              <Box
-                sx={{
-                  p: 3,
-                  textAlign: "center",
-                  borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-                }}
-              >
-                <Button
-                  variant="outlined"
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  startIcon={
-                    loadingMore ? <CircularProgress size={16} /> : null
-                  }
-                >
-                  {loadingMore ? "Carregando..." : "Carregar mais"}
-                </Button>
-              </Box>
-            )}
+            {/* Paginação */}
+            <Box
+              sx={{
+                p: 2.5,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 2,
+                flexWrap: "wrap",
+                borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Exibindo{" "}
+                <b>
+                  {Math.min((page - 1) * perPage + 1, totalCount)}-
+                  {Math.min(page * perPage, totalCount)}
+                </b>{" "}
+                de <b>{totalCount}</b>
+              </Typography>
+
+              <Pagination
+                count={Math.max(1, Math.ceil(totalCount / perPage))}
+                page={page}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+                shape="rounded"
+                siblingCount={1}
+                boundaryCount={1}
+              />
+            </Box>
           </>
         )}
       </Paper>
 
-      {/* Snackbar para feedback */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
