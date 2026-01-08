@@ -1,6 +1,6 @@
 // src/lib/types/trp.ts
 
-export type TrpStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+export type TrpStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "RUNNING";
 
 export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Paper,
   Box,
@@ -18,7 +18,7 @@ import {
   FormControl,
   InputLabel,
   Pagination,
-} from '@mui/material';
+} from "@mui/material";
 import {
   CheckCircle,
   Sync,
@@ -28,14 +28,14 @@ import {
   Download,
   PictureAsPdf as PdfIcon,
   Description as WordIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 export interface TrpHistoryItem {
   id: string;
   fileName: string;
   contractNumber?: string;
   invoiceNumber?: string;
-  status: 'completed' | 'processing' | 'failed';
+  status: "completed" | "processing" | "failed";
   createdAt: string;
   totalValue?: number;
 }
@@ -55,7 +55,7 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
   onDownload,
   onDownloadPdf,
   onDownloadDocx,
-  emptyMessage = 'Nenhum TRP gerado ainda.',
+  emptyMessage = "Nenhum TRP gerado ainda.",
 }) => {
   const theme = useTheme();
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -80,25 +80,25 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
     setCurrentPage(1);
   }, [items.length]);
 
-  const getStatusConfig = (status: TrpHistoryItem['status']) => {
+  const getStatusConfig = (status: TrpHistoryItem["status"]) => {
     switch (status) {
-      case 'completed':
+      case "completed":
         return {
           icon: <CheckCircle />,
           color: theme.palette.success.main,
-          label: 'Concluído',
+          label: "Concluído",
         };
-      case 'processing':
+      case "processing":
         return {
           icon: <Sync />,
           color: theme.palette.warning.main,
-          label: 'Processando',
+          label: "Processando",
         };
-      case 'failed':
+      case "failed":
         return {
           icon: <ErrorIcon />,
           color: theme.palette.error.main,
-          label: 'Falhou',
+          label: "Falhou",
         };
     }
   };
@@ -111,18 +111,20 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Agora';
+    if (diffMins < 1) return "Agora";
     if (diffMins < 60) return `${diffMins} min atrás`;
-    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hora' : 'horas'} atrás`;
-    if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'dia' : 'dias'} atrás`;
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    if (diffHours < 24)
+      return `${diffHours} ${diffHours === 1 ? "hora" : "horas"} atrás`;
+    if (diffDays < 7)
+      return `${diffDays} ${diffDays === 1 ? "dia" : "dias"} atrás`;
+    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   };
 
   const formatCurrency = (value?: number) => {
-    if (!value) return '-';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    if (!value) return "-";
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
@@ -135,17 +137,42 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
           borderRadius: 4,
           border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
           background: theme.palette.background.paper,
-          boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 8px 24px ${alpha('#000', 0.04)}`,
-          textAlign: 'center',
+          boxShadow: `0 1px 3px ${alpha("#000", 0.04)}, 0 8px 24px ${alpha(
+            "#000",
+            0.04
+          )}`,
+          textAlign: "center",
         }}
       >
-        <Description sx={{ fontSize: 48, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+        <Description
+          sx={{ fontSize: 48, color: "text.secondary", mb: 2, opacity: 0.5 }}
+        />
         <Typography variant="body1" color="text.secondary">
           {emptyMessage}
         </Typography>
       </Paper>
     );
   }
+
+  const sanitizeDisplayName = (v: unknown) => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s.length ? s : "";
+  };
+
+  const ensurePdfExtForDisplay = (name: string) => {
+    if (!name) return name;
+    // só para exibição: se não tiver extensão, não obriga .pdf (nome pode ser "TRP - Planco AI")
+    return name;
+  };
+
+  const getDisplayFileName = (item: TrpHistoryItem) => {
+    const chosen = sanitizeDisplayName((item as any)?.fileName);
+
+    // fallback bom e curto (igual seu print)
+    const fallback = `TRP_${String(item.id || "").slice(0, 8)}.pdf`;
+
+    return ensurePdfExtForDisplay(chosen || fallback);
+  };
 
   return (
     <Paper
@@ -154,8 +181,11 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
         borderRadius: 4,
         border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
         background: theme.palette.background.paper,
-        boxShadow: `0 1px 3px ${alpha('#000', 0.04)}, 0 8px 24px ${alpha('#000', 0.04)}`,
-        overflow: 'hidden',
+        boxShadow: `0 1px 3px ${alpha("#000", 0.04)}, 0 8px 24px ${alpha(
+          "#000",
+          0.04
+        )}`,
+        overflow: "hidden",
       }}
     >
       <Box
@@ -165,20 +195,29 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
         }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: 2,
+          }}
+        >
           <Box>
             <Typography
               variant="h6"
               sx={{
                 fontWeight: 700,
                 color: theme.palette.text.primary,
-                letterSpacing: '-0.01em',
+                letterSpacing: "-0.01em",
               }}
             >
               Histórico de TRPs
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {items.length} {items.length === 1 ? 'TRP gerado' : 'TRPs gerados'}
+              {items.length}{" "}
+              {items.length === 1 ? "TRP gerado" : "TRPs gerados"}
             </Typography>
           </Box>
           <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -190,7 +229,7 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
               onChange={(e) => setItemsPerPage(Number(e.target.value))}
               sx={{
                 borderRadius: 2,
-                '& .MuiOutlinedInput-notchedOutline': {
+                "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: alpha(theme.palette.divider, 0.3),
                 },
               }}
@@ -212,9 +251,9 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                 sx={{
                   px: { xs: 3, sm: 4 },
                   py: 3,
-                  position: 'relative',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': {
+                  position: "relative",
+                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  "&:hover": {
                     bgcolor: alpha(theme.palette.primary.main, 0.03),
                   },
                 }}
@@ -234,17 +273,27 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                 </ListItemAvatar>
                 <ListItemText
                   primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5, flexWrap: 'wrap' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.5,
+                        mb: 0.5,
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <Typography
                         variant="subtitle1"
                         sx={{
                           fontWeight: 600,
                           color: theme.palette.text.primary,
-                          fontSize: '0.9375rem',
+                          fontSize: "0.9375rem",
+                          wordBreak: "break-word",
                         }}
                       >
-                        {item.fileName}
+                        {getDisplayFileName(item)}
                       </Typography>
+
                       <Chip
                         label={statusConfig.label}
                         size="small"
@@ -252,14 +301,14 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                           bgcolor: alpha(statusConfig.color, 0.1),
                           border: `1px solid ${alpha(statusConfig.color, 0.3)}`,
                           color: statusConfig.color,
-                          fontSize: '0.75rem',
+                          fontSize: "0.75rem",
                           fontWeight: 600,
                           height: 24,
                         }}
                       />
                     </Box>
                   }
-                  secondaryTypographyProps={{ component: 'div' }}
+                  secondaryTypographyProps={{ component: "div" }}
                   secondary={
                     <Box>
                       <Typography
@@ -268,61 +317,77 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                         sx={{
                           color: theme.palette.text.secondary,
                           mb: 1,
-                          fontSize: '0.8125rem',
+                          fontSize: "0.8125rem",
                           lineHeight: 1.5,
                         }}
                       >
-                        {item.status === 'completed' && (
+                        {item.status === "completed" && (
                           <>
                             {item.contractNumber && (
                               <>
                                 Contrato: <strong>{item.contractNumber}</strong>
-                                {item.invoiceNumber && ' • '}
+                                {item.invoiceNumber && " • "}
                               </>
                             )}
                             {item.invoiceNumber && (
                               <>
                                 NF: <strong>{item.invoiceNumber}</strong>
-                                {item.totalValue && ' • '}
+                                {item.totalValue && " • "}
                               </>
                             )}
                             {item.totalValue && (
                               <>
-                                Valor: <strong>{formatCurrency(item.totalValue)}</strong>
+                                Valor:{" "}
+                                <strong>
+                                  {formatCurrency(item.totalValue)}
+                                </strong>
                               </>
                             )}
                           </>
                         )}
-                        {item.status === 'processing' && 'TRP em processamento...'}
-                        {item.status === 'failed' && 'Falha ao gerar o TRP'}
+                        {item.status === "processing" &&
+                          "TRP em processamento..."}
+                        {item.status === "failed" && "Falha ao gerar o TRP"}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          flexWrap: "wrap",
+                        }}
+                      >
                         <Typography
                           variant="caption"
                           component="div"
                           sx={{
                             color: theme.palette.text.secondary,
-                            fontSize: '0.75rem',
+                            fontSize: "0.75rem",
                             opacity: 0.7,
                           }}
                         >
                           {formatDate(item.createdAt)}
                         </Typography>
-                        {item.status === 'completed' && (
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {item.status === "completed" && (
+                          <Box
+                            sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}
+                          >
                             {onView && (
                               <Button
                                 size="small"
                                 startIcon={<Visibility sx={{ fontSize: 16 }} />}
                                 onClick={() => onView(item.id)}
                                 sx={{
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  minWidth: 'auto',
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  minWidth: "auto",
                                   px: 1.5,
                                   color: theme.palette.primary.main,
-                                  '&:hover': {
-                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                  "&:hover": {
+                                    bgcolor: alpha(
+                                      theme.palette.primary.main,
+                                      0.08
+                                    ),
                                   },
                                 }}
                               >
@@ -335,13 +400,16 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                                 startIcon={<PdfIcon sx={{ fontSize: 16 }} />}
                                 onClick={() => onDownloadPdf(item.id)}
                                 sx={{
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  minWidth: 'auto',
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  minWidth: "auto",
                                   px: 1.5,
                                   color: theme.palette.error.main,
-                                  '&:hover': {
-                                    bgcolor: alpha(theme.palette.error.main, 0.08),
+                                  "&:hover": {
+                                    bgcolor: alpha(
+                                      theme.palette.error.main,
+                                      0.08
+                                    ),
                                   },
                                 }}
                               >
@@ -354,13 +422,16 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                                 startIcon={<WordIcon sx={{ fontSize: 16 }} />}
                                 onClick={() => onDownloadDocx(item.id)}
                                 sx={{
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  minWidth: 'auto',
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  minWidth: "auto",
                                   px: 1.5,
                                   color: theme.palette.info.main,
-                                  '&:hover': {
-                                    bgcolor: alpha(theme.palette.info.main, 0.08),
+                                  "&:hover": {
+                                    bgcolor: alpha(
+                                      theme.palette.info.main,
+                                      0.08
+                                    ),
                                   },
                                 }}
                               >
@@ -373,13 +444,16 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                                 startIcon={<Download sx={{ fontSize: 16 }} />}
                                 onClick={() => onDownload(item.id)}
                                 sx={{
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  minWidth: 'auto',
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  minWidth: "auto",
                                   px: 1.5,
                                   color: theme.palette.text.secondary,
-                                  '&:hover': {
-                                    bgcolor: alpha(theme.palette.action.hover, 0.05),
+                                  "&:hover": {
+                                    bgcolor: alpha(
+                                      theme.palette.action.hover,
+                                      0.05
+                                    ),
                                   },
                                 }}
                               >
@@ -393,7 +467,9 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
                   }
                 />
               </ListItem>
-              {index < paginatedItems.length - 1 && <Divider sx={{ mx: { xs: 3, sm: 4 } }} />}
+              {index < paginatedItems.length - 1 && (
+                <Divider sx={{ mx: { xs: 3, sm: 4 } }} />
+              )}
             </React.Fragment>
           );
         })}
@@ -406,9 +482,9 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
             px: { xs: 3, sm: 4 },
             py: 3,
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
           <Pagination
@@ -420,9 +496,9 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
             showFirstButton
             showLastButton
             sx={{
-              '& .MuiPaginationItem-root': {
+              "& .MuiPaginationItem-root": {
                 borderRadius: 2,
-                '&.Mui-selected': {
+                "&.Mui-selected": {
                   fontWeight: 600,
                 },
               },
@@ -433,4 +509,3 @@ export const TrpHistoryCard: React.FC<TrpHistoryCardProps> = ({
     </Paper>
   );
 };
-

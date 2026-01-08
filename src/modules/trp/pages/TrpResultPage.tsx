@@ -70,6 +70,22 @@ export const TrpResultPage: React.FC = () => {
   });
   const contentRef = useRef<HTMLDivElement>(null);
 
+function pickTrpFileName(run: TrpRunData | null, fallbackId?: string | null): string {
+  const raw =
+    run?.fileName ??
+    (typeof run?.contexto_recebimento_raw?.fileName === "string"
+      ? run.contexto_recebimento_raw.fileName
+      : null);
+
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (s) return s;
+
+  // fallback final: nome amigável SEM extensão
+  return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
+}
+
+
+
   const loadData = async () => {
     if (!runId) {
       setError("ID do TRP não fornecido na URL");
@@ -334,24 +350,17 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
-  const termoNome =
-    // ✅ NOVO (quando você expuser fileName no backend)
-    (runData as any)?.fileName ||
-    // ✅ fallback enquanto não expõe: pega do contexto salvo
-    (runData as any)?.contexto_recebimento_raw?.fileName ||
-    // ✅ último fallback
-    viewModel.runId ||
-    "TRP_Gerado.pdf";
+const termoNome = pickTrpFileName(runData, viewModel.runId || null);
 
+const data: TrpAgentOutput = {
+  documento_markdown: viewModel.documento_markdown,
+  campos: viewModel.campos,
+  meta: {
+    fileName: termoNome,
+    hash_tdr: viewModel.runId || "",
+  },
+};
 
-  const data: TrpAgentOutput = {
-    documento_markdown: viewModel.documento_markdown,
-    campos: viewModel.campos,
-    meta: {
-      fileName: termoNome,
-      hash_tdr: viewModel.runId || "",
-    },
-  };
 
 
   // ✅ REGRA: objeto_fornecido NUNCA aparece fora do documento.
