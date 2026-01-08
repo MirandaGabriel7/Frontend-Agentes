@@ -334,14 +334,25 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
+  const termoNome =
+    // ✅ NOVO (quando você expuser fileName no backend)
+    (runData as any)?.fileName ||
+    // ✅ fallback enquanto não expõe: pega do contexto salvo
+    (runData as any)?.contexto_recebimento_raw?.fileName ||
+    // ✅ último fallback
+    viewModel.runId ||
+    "TRP_Gerado.pdf";
+
+
   const data: TrpAgentOutput = {
     documento_markdown: viewModel.documento_markdown,
     campos: viewModel.campos,
     meta: {
-      fileName: viewModel.runId || "TRP_Gerado.pdf",
+      fileName: termoNome,
       hash_tdr: viewModel.runId || "",
     },
   };
+
 
   // ✅ REGRA: objeto_fornecido NUNCA aparece fora do documento.
   // ✅ Ele deve existir apenas dentro do markdown gerado pelo PRIME.
@@ -407,7 +418,7 @@ export const TrpResultPage: React.FC = () => {
                   fontWeight: 600,
                 }}
               >
-                Arquivo:
+                Nome do TRP:
               </Typography>
 
               <Typography

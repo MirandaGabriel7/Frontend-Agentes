@@ -8,6 +8,10 @@ import {
   Button,
   Snackbar,
   IconButton,
+  Paper,
+  TextField,
+  Divider,
+  alpha,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -44,6 +48,25 @@ function parseMoneyBR(raw?: string): number | null {
 
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+// ✅ FOCO: nome simples (fileName) sanitizado
+function sanitizeFileName(input?: unknown): string | null {
+  if (input === null || input === undefined) return null;
+
+  let s = String(input).trim();
+  if (!s) return null;
+
+  // remove quebras e normaliza espaços
+  s = s.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+
+  // remove caracteres problemáticos
+  s = s.replace(/[<>:"/\\|?*\x00-\x1F]/g, " ").replace(/\s{2,}/g, " ").trim();
+
+  // limite simples
+  if (s.length > 120) s = s.slice(0, 120).trim();
+
+  return s || null;
 }
 
 export const TrpPage: React.FC = () => {
@@ -103,8 +126,9 @@ export const TrpPage: React.FC = () => {
     data_assinatura: undefined,
     area_demandante_nome: undefined,
 
-    arquivoTdrNome: "",
-  });
+    // ✅ FOCO: vamos usar isso como "Nome" do fiscal (fileName)
+    fileName: "",
+  } as any);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -126,6 +150,12 @@ export const TrpPage: React.FC = () => {
       !ordemFornecimentoFile
     ) {
       return "É necessário enviar pelo menos um arquivo (Ficha de Contratualização, Nota Fiscal ou Ordem de Fornecimento).";
+    }
+
+    // ✅ FOCO: Nome simples obrigatório (fileName)
+    const safeName = sanitizeFileName((form as any).fileName);
+    if (!safeName) {
+      return 'O campo "Nome" é obrigatório.';
     }
 
     if (!form.tipo_contratacao)
@@ -253,12 +283,18 @@ export const TrpPage: React.FC = () => {
           .toFixed(2)
       );
 
+      // ✅ FOCO: nome do fiscal (fileName) vindo do form
+      const fileName = sanitizeFileName((form as any).fileName);
+
       // ✅ payload tipado (sem any)
       const dadosRecebimento: GenerateTrpParams["dadosRecebimento"] = {
         tipoContratacao: form.tipo_contratacao!,
         tipoBasePrazo: form.tipo_base_prazo!,
         condicaoPrazo: form.condicao_prazo!,
         condicaoQuantidadeOrdem: form.condicao_quantidade_ordem!,
+
+        // ✅ FOCO
+        fileName: fileName || null,
 
         competenciaMesAno: form.competencia_mes_ano || null,
         dataRecebimento: form.data_recebimento || null,
@@ -324,8 +360,9 @@ export const TrpPage: React.FC = () => {
       data_assinatura: undefined,
       area_demandante_nome: undefined,
 
-      arquivoTdrNome: "",
-    });
+      // ✅ FOCO
+      fileName: "",
+    } as any);
 
     setErrorMessage(null);
   };
@@ -505,7 +542,102 @@ export const TrpPage: React.FC = () => {
         </Alert>
       )}
 
+      {/* ✅ ORDEM NOVA:
+          0) Nome do termo (balão simples)
+          1) Upload (igual hoje)
+          2) Formulário completo (igual hoje)
+      */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 4.5, mb: 4 }}>
+        {/* 0) Nome do termo */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 4,
+            border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+            background: theme.palette.background.paper,
+          }}
+        >
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                color: theme.palette.text.primary,
+                fontSize: "0.95rem",
+              }}
+            >
+              Nome do Termo de Recebimento
+            </Typography>
+
+            <Typography
+              variant="body2"
+              sx={{
+                color: alpha(theme.palette.text.secondary, 0.8),
+                fontSize: "0.825rem",
+                lineHeight: 1.5,
+                maxWidth: 780,
+              }}
+            >
+              Esse nome será usado para identificar o arquivo gerado (ex: “TRP –
+              Planco AI”).
+            </Typography>
+
+            <TextField
+              value={(form as any).fileName || ""}
+              onChange={(e) => {
+                const cleaned = (e.target.value || "")
+                  .replace(/\r?\n/g, " ")
+                  .slice(0, 120);
+                setForm((prev: any) => ({ ...prev, fileName: cleaned }));
+              }}
+              fullWidth
+              variant="outlined"
+              placeholder="Ex: TRP – Planco AI"
+              disabled={isLoading}
+              InputLabelProps={{ shrink: false }}
+              label=""
+              inputProps={{ maxLength: 120 }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "background.paper",
+                  "& fieldset": {
+                    borderColor: alpha(theme.palette.text.primary, 0.25),
+                    borderWidth: "1px",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: "1px",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: theme.palette.primary.main,
+                    borderWidth: "2px",
+                    boxShadow: (t: any) =>
+                      `0 0 0 2px ${alpha(t.palette.primary.main, 0.12)}`,
+                  },
+                },
+                "& .MuiInputBase-input": {
+                  paddingLeft: "16px",
+                  paddingRight: "16px",
+                  paddingTop: "14px",
+                  paddingBottom: "14px",
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                },
+                "& .MuiInputBase-input::placeholder": {
+                  color: alpha(theme.palette.text.secondary, 0.65),
+                  opacity: 1,
+                  fontSize: "0.9375rem",
+                },
+              }}
+            />
+
+            <Divider sx={{ mt: 2, opacity: 0.5 }} />
+          </Box>
+        </Paper>
+
+        {/* 1) Upload (igual hoje) */}
         <TrpUploadCard
           fichaContratualizacaoFile={fichaContratualizacaoFile}
           notaFiscalFile={notaFiscalFile}
@@ -516,6 +648,7 @@ export const TrpPage: React.FC = () => {
           disabled={isLoading}
         />
 
+        {/* 2) Formulário completo (igual hoje) */}
         <TrpFormCard
           value={form}
           onChange={(next) => setForm(() => next)}

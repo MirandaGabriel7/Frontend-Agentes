@@ -6,6 +6,7 @@ export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
 export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "SERVICO";
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
+
 // ✅ Campos retornados pelo backend (campos_trp_normalizados)
 // Mantemos flexível porque o schema pode evoluir sem quebrar UI.
 export type TrpCamposNormalizados = Record<string, unknown>;
@@ -20,6 +21,7 @@ export type TrpUnidadeMedida = string;
  * O fiscal digita valor_unitario como string (ex: "12,50").
  * O total do item pode ser calculado no front.
  */
+
 export interface TrpItemObjeto {
   descricao: string;
   unidade_medida: TrpUnidadeMedida;
@@ -89,8 +91,8 @@ export interface TrpInputForm {
   data_assinatura?: string;
   area_demandante_nome?: string;
 
-  // auxiliar upload
-  arquivoTdrNome?: string;
+   // ✅ NOVO: nome curto para o fiscal identificar (vira fileName no backend/N8N)
+  fileName?: string;
 }
 
 /**
@@ -105,6 +107,9 @@ export interface DadosRecebimentoPayload {
 
   // ✅ total geral dos itens
   valor_total_geral?: number | null;
+
+  // ✅ NOVO: vai para o backend e vira o fileName enviado ao N8N
+  fileName?: string | null;
 
   // serviços
   competenciaMesAno?: string | null; // MM/AAAA
@@ -159,7 +164,6 @@ export interface TrpAgentOutput {
   campos: Record<string, any>;
   meta: TrpMeta;
 }
-
 
 /**
  * Run "do front" (se você usa em algum lugar). O backend tem outro shape (TrpRunData).
