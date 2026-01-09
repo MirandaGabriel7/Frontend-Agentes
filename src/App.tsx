@@ -1,10 +1,10 @@
+// src/App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
-import { theme } from "./theme";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MainLayout } from "./layout/MainLayout";
@@ -14,31 +14,27 @@ import { AgentsPage } from "./pages/AgentsPage";
 import { DfdAgentPage } from "./pages/DfdAgentPage";
 import AgenteDfdResultado from "./pages/AgenteDfdResultado";
 
-// ✅ PÁGINAS DE CONTA
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 
-// TRP
 import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
 
-function App() {
+import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
+
+function AppShell() {
+  const { muiTheme } = useUiSettings();
+
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* ===================== */}
-              {/* ROTA PÚBLICA */}
-              {/* ===================== */}
               <Route path="/login" element={<LoginPage />} />
 
-              {/* ===================== */}
-              {/* HOME */}
-              {/* ===================== */}
               <Route
                 path="/"
                 element={
@@ -50,9 +46,6 @@ function App() {
                 }
               />
 
-              {/* ===================== */}
-              {/* DASHBOARD / AGENTS */}
-              {/* ===================== */}
               <Route
                 path="/agents"
                 element={
@@ -64,9 +57,6 @@ function App() {
                 }
               />
 
-              {/* ===================== */}
-              {/* CONFIGURAÇÕES */}
-              {/* ===================== */}
               <Route
                 path="/agents/settings"
                 element={
@@ -78,9 +68,6 @@ function App() {
                 }
               />
 
-              {/* ===================== */}
-              {/* MEU PERFIL */}
-              {/* ===================== */}
               <Route
                 path="/agents/profile"
                 element={
@@ -92,9 +79,6 @@ function App() {
                 }
               />
 
-              {/* ===================== */}
-              {/* TRP */}
-              {/* ===================== */}
               <Route
                 path="/agents/trp"
                 element={
@@ -128,23 +112,10 @@ function App() {
                 }
               />
 
-              {/* Redirects (rotas antigas TRP) */}
-              <Route
-                path="/agents/trp/novo"
-                element={<Navigate to="/agents/trp" replace />}
-              />
-              <Route
-                path="/agents/trp/lista"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
-              <Route
-                path="/agents/trp/:id"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
+              <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
+              <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
+              <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
 
-              {/* ===================== */}
-              {/* DFD */}
-              {/* ===================== */}
               <Route
                 path="/agents/dfd"
                 element={
@@ -167,9 +138,6 @@ function App() {
                 }
               />
 
-              {/* ===================== */}
-              {/* FALLBACK */}
-              {/* ===================== */}
               <Route path="*" element={<Navigate to="/agents" replace />} />
             </Routes>
           </BrowserRouter>
@@ -179,4 +147,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <UiSettingsProvider>
+      <AppShell />
+    </UiSettingsProvider>
+  );
+}
