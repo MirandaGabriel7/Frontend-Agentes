@@ -77,20 +77,17 @@ function isMeaningfulValue(v: unknown): boolean {
 function normalizeUiValue(fieldName: string, value: unknown): unknown {
   if (value === undefined || value === null) return value;
 
+  // strings sim: normaliza (moeda, enum, etc)
   if (typeof value === "string") {
     const s = value.trim();
     if (!s) return "";
     return normalizeTrpValue(s, fieldName);
   }
 
-  // ✅ Para UI, normaliza também, mas cuidado: isso vira string.
-  // Para campos numéricos usados em soma, a gente preserva number no compute.
-  if (typeof value === "number" || typeof value === "boolean") {
-    return normalizeTrpValue(String(value), fieldName);
-  }
-
+  // ✅ números/boolean: mantém tipo (não normaliza aqui)
   return value;
 }
+
 
 /**
  * Extrai informações de assinatura do markdown
@@ -367,20 +364,15 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     }
   }
 
-  // 5) Agora sim: normaliza para UI tudo que ficou (exceto arrays/objetos)
-  for (const [key, value] of Object.entries(allFields)) {
-    if (STRUCTURAL_KEYS.has(key)) continue;
+// 5) Limpeza final (sem destruir tipos)
+for (const [key, value] of Object.entries(allFields)) {
+  if (STRUCTURAL_KEYS.has(key)) continue;
 
-    // não normaliza itens_objeto como string (mantém array)
-    if (key === "itens_objeto") continue;
-
-    const normalized = normalizeUiValue(key, value);
-    if (isMeaningfulValue(normalized)) {
-      allFields[key] = normalized;
-    } else {
-      delete (allFields as AnyObj)[key];
-    }
+  if (!isMeaningfulValue(value)) {
+    delete (allFields as AnyObj)[key];
   }
+}
+
 
   // 6) Assinaturas: prioridade markdown (só entra se houver valor)
   if (isMeaningfulValue(signaturesFromMarkdown.fiscal_contrato_nome)) {
@@ -435,15 +427,19 @@ export function getTrpDisplayFields(viewModel: TrpViewModel): Array<{
     shouldDisplay: boolean;
   }> = [];
 
-const toDisplayString = (value: unknown): string => {
+const toDisplayString = (fieldName: string, value: unknown): string => {
   if (!isMeaningfulValue(value)) return "";
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return normalizeTrpValue(value, fieldName);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return normalizeTrpValue(String(value), fieldName);
+  }
   return String(value);
 };
 
 
+
 const addField = (fieldName: string, label: string, value: unknown) => {
-  const displayValue = toDisplayString(value);
+  const displayValue = toDisplayString(fieldName, value);
   fields.push({
     fieldName,
     label,
@@ -451,6 +447,7 @@ const addField = (fieldName: string, label: string, value: unknown) => {
     shouldDisplay: isMeaningfulValue(displayValue),
   });
 };
+
 
 
   // Identificação (snake/camel)
