@@ -23,7 +23,6 @@ import {
   KeyboardArrowUp as ArrowUpIcon,
   Description as WordIcon,
   Close as CloseIcon,
-  Edit as EditIcon,
 } from "@mui/icons-material";
 import { TrpAgentOutput } from "../../../lib/types/trp";
 import { fetchTrpRun, downloadTrpRun, TrpRunData } from "../../../services/api";
@@ -71,22 +70,21 @@ export const TrpResultPage: React.FC = () => {
   });
   const contentRef = useRef<HTMLDivElement>(null);
 
-  function pickTrpFileName(
-    run: TrpRunData | null,
-    fallbackId?: string | null
-  ): string {
-    const raw =
-      run?.fileName ??
-      (typeof run?.contexto_recebimento_raw?.fileName === "string"
-        ? run.contexto_recebimento_raw.fileName
-        : null);
+function pickTrpFileName(run: TrpRunData | null, fallbackId?: string | null): string {
+  const raw =
+    run?.fileName ??
+    (typeof run?.contexto_recebimento_raw?.fileName === "string"
+      ? run.contexto_recebimento_raw.fileName
+      : null);
 
-    const s = typeof raw === "string" ? raw.trim() : "";
-    if (s) return s;
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (s) return s;
 
-    // fallback final: nome amigável SEM extensão
-    return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
-  }
+  // fallback final: nome amigável SEM extensão
+  return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
+}
+
+
 
   const loadData = async () => {
     if (!runId) {
@@ -352,16 +350,18 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
-  const termoNome = pickTrpFileName(runData, viewModel.runId || null);
+const termoNome = pickTrpFileName(runData, viewModel.runId || null);
 
-  const data: TrpAgentOutput = {
-    documento_markdown: viewModel.documento_markdown,
-    campos: viewModel.campos,
-    meta: {
-      fileName: termoNome,
-      hash_tdr: viewModel.runId || "",
-    },
-  };
+const data: TrpAgentOutput = {
+  documento_markdown: viewModel.documento_markdown,
+  campos: viewModel.campos,
+  meta: {
+    fileName: termoNome,
+    hash_tdr: viewModel.runId || "",
+  },
+};
+
+
 
   // ✅ REGRA: objeto_fornecido NUNCA aparece fora do documento.
   // ✅ Ele deve existir apenas dentro do markdown gerado pelo PRIME.
@@ -603,51 +603,6 @@ export const TrpResultPage: React.FC = () => {
                 mb: 2.5,
               }}
             >
-              <Tooltip
-                title={
-                  !runId || !isUuid(runId)
-                    ? "ID do TRP inválido"
-                    : runData?.status !== "COMPLETED"
-                    ? "Aguarde processamento"
-                    : "Editar dados (criar nova versão)"
-                }
-              >
-                <span>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    startIcon={<EditIcon sx={{ fontSize: 22 }} />}
-                    onClick={() => navigate(`/agents/trp/editar/${runId}`)}
-                    disabled={
-                      !runId ||
-                      !isUuid(runId) ||
-                      downloadingPdf ||
-                      downloadingDocx ||
-                      runData?.status !== "COMPLETED"
-                    }
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 700,
-                      px: 2.5,
-                      py: 1.25,
-                      borderRadius: 999,
-                      borderWidth: 2,
-                      borderColor: alpha(theme.palette.primary.main, 0.35),
-                      "&:hover": {
-                        bgcolor: alpha(theme.palette.primary.main, 0.06),
-                        borderColor: theme.palette.primary.main,
-                      },
-                      "&:disabled": {
-                        borderColor: alpha(theme.palette.divider, 0.12),
-                        color: alpha(theme.palette.text.primary, 0.45),
-                      },
-                    }}
-                  >
-                    Editar dados
-                  </Button>
-                </span>
-              </Tooltip>
-
               <Tooltip
                 title={
                   !runId || !isUuid(runId)

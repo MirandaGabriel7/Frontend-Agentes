@@ -20,12 +20,8 @@ import ProfilePage from "./pages/ProfilePage";
 import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
-import { TrpEditPage } from "./modules/trp/pages/TrpEditPage";
 
-import {
-  UiSettingsProvider,
-  useUiSettings,
-} from "./contexts/UiSettingsContext";
+import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
 
 function AppShell() {
   const { muiTheme } = useUiSettings();
@@ -106,17 +102,6 @@ function AppShell() {
               />
 
               <Route
-                path="/agents/trp/editar/:id"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrpEditPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
                 path="/agents/trp/historico"
                 element={
                   <ProtectedRoute>
@@ -127,18 +112,9 @@ function AppShell() {
                 }
               />
 
-              <Route
-                path="/agents/trp/novo"
-                element={<Navigate to="/agents/trp" replace />}
-              />
-              <Route
-                path="/agents/trp/lista"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
-              <Route
-                path="/agents/trp/:id"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
+              <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
+              <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
+              <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
 
               <Route
                 path="/agents/dfd"
