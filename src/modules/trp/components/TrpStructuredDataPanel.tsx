@@ -22,7 +22,7 @@ import { normalizeTrpValue } from "../utils/formatTrpValues";
 import { organizeFieldsBySections } from "../utils/trpFieldSections";
 
 interface TrpStructuredDataPanelProps {
-  campos: TrpCamposNormalizados;
+  campos: TrpCamposNormalizados & Record<string, unknown>;
 }
 
 interface DataFieldProps {
@@ -91,6 +91,102 @@ function isPlainObject(v: unknown) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+/**
+ * ✅ Detecta enum no formato TIPO_ENUM (ALL_CAPS com underscores)
+ */
+function isEnumLikeString(v: unknown): v is string {
+  if (typeof v !== "string") return false;
+  const s = v.trim();
+  if (!s) return false;
+  return /^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(s);
+}
+
+/**
+ * ✅ Humaniza enum com fallback seguro (sem inventar)
+ */
+function humanizeEnumPtBr(value: string): string {
+  const lowerWords = new Set([
+    "de",
+    "do",
+    "da",
+    "dos",
+    "das",
+    "e",
+    "em",
+    "no",
+    "na",
+  ]);
+
+  const parts = value
+    .trim()
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.toLowerCase());
+
+  if (!parts.length) return value;
+
+  return parts
+    .map((w, idx) => {
+      if (idx > 0 && lowerWords.has(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
+
+/**
+ * ✅ Mapa de enums por campo (controlado)
+ */
+const ENUM_LABELS_BY_FIELD: Record<string, Record<string, string>> = {
+  condicao_prazo: {
+    NO_PRAZO: "No prazo",
+    FORA_DO_PRAZO: "Fora do prazo",
+    NAO_PRAZO: "Não se aplica",
+    NAO_APLICA: "Não se aplica",
+  },
+  condicao_quantidade_ordem: {
+    TOTAL: "Total",
+    PARCIAL: "Parcial",
+    NAO_APLICA: "Não se aplica",
+  },
+  tipo_base_prazo: {
+    DATA_RECEBIMENTO: "Data de recebimento",
+    DATA_ENTREGA: "Data de entrega",
+    DATA_CONCLUSAO_SERVICO: "Data de conclusão do serviço",
+    NF: "Nota Fiscal",
+  },
+  tipo_contrato: {
+    BENS: "Bens",
+    SERVICOS: "Serviços",
+    SERVIÇOS: "Serviços",
+    OBRAS: "Obras",
+  },
+};
+
+function formatValueForDisplay(fieldName: string, raw: unknown): string {
+  if (raw === null || raw === undefined) return "";
+
+  if (isEnumLikeString(raw)) {
+    const mapped = ENUM_LABELS_BY_FIELD[fieldName]?.[raw.trim()];
+    return mapped ?? humanizeEnumPtBr(raw.trim());
+  }
+
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return "";
+    const norm = normalizeTrpValue(s, fieldName);
+    return norm?.trim?.() ? norm : s;
+  }
+
+  if (typeof raw === "number") {
+    const norm = normalizeTrpValue(String(raw), fieldName);
+    return norm?.trim?.() ? norm : String(raw);
+  }
+
+  if (typeof raw === "boolean") return raw ? "Sim" : "Não";
+
+  return String(raw);
+}
+
 type ItemObjetoLike = {
   descricao?: unknown;
   unidade_medida?: unknown;
@@ -124,11 +220,21 @@ function parsePtbrMoneyLike(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function renderItensObjetoTable(itens: ItemObjetoLike[], totalGeral?: unknown) {
+/**
+ * ✅ Componente (evita hook fora do React e remove duplicação de título)
+ * - Não renderiza "Itens Objeto" aqui (já vem do label do DataField)
+ * - Borda mais “quadrada”
+ * - Um respiro entre label e tabela
+ */
+const ItensObjetoTable: React.FC<{
+  itens: ItemObjetoLike[];
+  totalGeral?: unknown;
+}> = ({ itens, totalGeral }) => {
+  const theme = useTheme();
+
   const safe = (Array.isArray(itens) ? itens : []).filter(Boolean);
   if (!safe.length) return null;
 
-  // total geral: se não veio, tenta somar
   let computedTotal: number | null = null;
   const tgNum = parsePtbrMoneyLike(totalGeral);
 
@@ -152,120 +258,190 @@ function renderItensObjetoTable(itens: ItemObjetoLike[], totalGeral?: unknown) {
       : null;
 
   return (
-    <TableContainer
-      component={Paper}
-      elevation={0}
-      sx={(theme) => ({
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.divider, 0.14)}`,
-        overflow: "hidden",
-      })}
-    >
-      <Table size="small">
-        <TableHead>
-          <TableRow
-            sx={(theme) => ({
-              bgcolor: alpha(theme.palette.grey[500], 0.08),
-            })}
-          >
-            <TableCell sx={{ fontWeight: 800 }}>Descrição</TableCell>
-            <TableCell sx={{ fontWeight: 800, width: 90 }}>UM</TableCell>
-            <TableCell sx={{ fontWeight: 800, width: 130 }} align="right">
-              Quantidade
-            </TableCell>
-            <TableCell sx={{ fontWeight: 800, width: 170 }} align="right">
-              Valor Unitário
-            </TableCell>
-            <TableCell sx={{ fontWeight: 800, width: 170 }} align="right">
-              Valor Total
-            </TableCell>
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {safe.map((it, idx) => (
-            <TableRow key={idx} hover>
-              <TableCell sx={{ verticalAlign: "top" }}>
-                {String(it.descricao ?? "")}
+    <Box sx={{ width: "100%", mt: 0.75 }}>
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        sx={{
+          // ✅ mais quadrado (menos pill)
+          borderRadius: 1, // 4px (bem mais “quadrado”)
+          border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+          overflow: "hidden",
+          bgcolor: theme.palette.background.paper,
+        }}
+      >
+        <Table size="small" sx={{ tableLayout: "fixed" }}>
+          <TableHead>
+            <TableRow
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.04),
+                "& th": {
+                  fontWeight: 800,
+                  color: theme.palette.text.primary,
+                  fontSize: "0.78rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  py: 1.1,
+                  px: 1.5,
+                },
+              }}
+            >
+              <TableCell sx={{ width: "46%", pl: 2 }}>Descrição</TableCell>
+              <TableCell sx={{ width: 90, textAlign: "center" }}>UM</TableCell>
+              <TableCell sx={{ width: 120 }} align="right">
+                Quant.
               </TableCell>
-              <TableCell sx={{ verticalAlign: "top" }}>
-                {String(it.unidade_medida ?? "")}
+              <TableCell sx={{ width: 160 }} align="right">
+                Valor Unit.
               </TableCell>
-              <TableCell align="right" sx={{ verticalAlign: "top" }}>
-                {normalizeTrpValue(
-                  String(it.quantidade_recebida ?? ""),
-                  "quantidade_recebida"
-                )}
-              </TableCell>
-              <TableCell align="right" sx={{ verticalAlign: "top" }}>
-                {normalizeTrpValue(
-                  String(getItemUnitValue(it) ?? ""),
-                  "valor_unitario"
-                )}
-              </TableCell>
-              <TableCell align="right" sx={{ verticalAlign: "top" }}>
-                {normalizeTrpValue(
-                  String(it.valor_total_calculado ?? ""),
-                  "valor_total_calculado"
-                )}
+              <TableCell sx={{ width: 160, pr: 2 }} align="right">
+                Valor Total
               </TableCell>
             </TableRow>
-          ))}
+          </TableHead>
 
-          {totalToShow && (
-            <TableRow
-              sx={(theme) => ({
-                bgcolor: alpha(theme.palette.grey[500], 0.04),
-              })}
-            >
-              {/* ✅ FICA BEM COLADO: label + valor no lado direito */}
-              <TableCell
-                colSpan={5}
-                sx={{
-                  fontWeight: 900,
-                  borderTop: `1px solid ${alpha("#000", 0.08)}`,
-                  paddingY: 1.25,
-                }}
-              >
-                <Box
+          <TableBody
+            sx={{
+              "& td": {
+                py: 1.15,
+                px: 1.5,
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                fontSize: "0.92rem",
+              },
+              "& tr:last-of-type td": { borderBottom: "none" },
+              "& tr:nth-of-type(even) td": {
+                bgcolor: alpha(theme.palette.grey[500], 0.03),
+              },
+              "& tr:hover td": {
+                bgcolor: alpha(theme.palette.primary.main, 0.04),
+              },
+            }}
+          >
+            {safe.map((it, idx) => (
+              <TableRow key={idx}>
+                <TableCell
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    gap: 1, // ✅ controla o quão "colado" fica
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
+                    lineHeight: 1.5,
+                    pl: 2,
                   }}
                 >
-                  <Typography
-                    component="span"
-                    sx={{ fontWeight: 900, lineHeight: 1.2 }}
-                  >
-                    Total Geral
-                  </Typography>
-                  <Typography
-                    component="span"
-                    sx={{
-                      fontWeight: 900,
-                      whiteSpace: "nowrap",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {totalToShow}
-                  </Typography>
-                </Box>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
+                  {String(it.descricao ?? "")}
+                </TableCell>
 
-function toDisplayNode(fieldName: string, raw: unknown): React.ReactNode {
+                <TableCell
+                  sx={{
+                    textAlign: "center",
+                    fontWeight: 500,
+                    color: theme.palette.text.primary,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {String(it.unidade_medida ?? "")}
+                </TableCell>
+
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {normalizeTrpValue(
+                    String(it.quantidade_recebida ?? ""),
+                    "quantidade_recebida"
+                  )}
+                </TableCell>
+
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {normalizeTrpValue(
+                    String(getItemUnitValue(it) ?? ""),
+                    "valor_unitario"
+                  )}
+                </TableCell>
+
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    fontWeight: 500, // normal, consistente com os outros
+                  }}
+                >
+                  {normalizeTrpValue(
+                    String(it.valor_total_calculado ?? ""),
+                    "valor_total_calculado"
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+
+        {typeof totalToShow === "string" && totalToShow.trim() !== "" && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 1.25,
+              px: 2,
+              py: 1,
+              borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              bgcolor: alpha(theme.palette.primary.main, 0.02),
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 800,
+                color: theme.palette.text.primary,
+                fontSize: "0.9rem",
+              }}
+            >
+              Total Geral
+            </Typography>
+
+            <Typography
+              sx={{
+                fontWeight: 900,
+                color: theme.palette.text.primary,
+                fontSize: "0.9rem",
+                whiteSpace: "nowrap",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {totalToShow}
+            </Typography>
+          </Box>
+        )}
+      </TableContainer>
+    </Box>
+  );
+};
+
+function toDisplayNode(
+  fieldName: string,
+  raw: unknown,
+  totalGeral?: unknown
+): React.ReactNode {
   if (raw === null || raw === undefined) return "";
 
   if (fieldName === "itens_objeto" && Array.isArray(raw)) {
-    return renderItensObjetoTable(raw as ItemObjetoLike[], undefined);
+    return (
+      <ItensObjetoTable
+        itens={raw as ItemObjetoLike[]}
+        totalGeral={totalGeral}
+      />
+    );
   }
 
   if (Array.isArray(raw) || isPlainObject(raw)) {
@@ -276,19 +452,8 @@ function toDisplayNode(fieldName: string, raw: unknown): React.ReactNode {
     );
   }
 
-  if (typeof raw === "string") {
-    const normalized = normalizeTrpValue(raw, fieldName);
-    return normalized?.trim?.() ? normalized : "";
-  }
-
-  if (typeof raw === "number") {
-    const normalized = normalizeTrpValue(String(raw), fieldName);
-    return normalized?.trim?.() ? normalized : String(raw);
-  }
-
-  if (typeof raw === "boolean") return raw ? "Sim" : "Não";
-
-  return String(raw);
+  const s = formatValueForDisplay(fieldName, raw);
+  return s?.trim?.() ? s : "";
 }
 
 export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
@@ -299,13 +464,26 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
   const camposAsRecord = (campos ?? {}) as Record<string, unknown>;
   const sectionsWithFields = organizeFieldsBySections(camposAsRecord);
 
-  // ✅ pega total geral (mesmo se existir no payload, não exibimos como campo solto no FieldSections)
   const totalGeral =
     (camposAsRecord as any).valor_total_geral ??
     (camposAsRecord as any).valorTotalGeral;
 
-  // ✅ NÃO repetir valor fora de "ITENS DO RECEBIMENTO"
-  // (mantém o valor apenas dentro da tabela de itens_objeto)
+  const ALWAYS_HIDE_FIELDS = new Set<string>([
+    "tipo_contrato_label",
+    "tipo_base_prazo_label",
+    "condicao_prazo_label",
+    "condicao_quantidade_ordem_label",
+
+    "trechos_suporte",
+    "origem_prazos",
+    "schema_version",
+    "n8n_webhook_url",
+    "request_id",
+    "status",
+    "error_message",
+    "source",
+  ]);
+
   const VALUE_KEYS_TO_HIDE_OUTSIDE_ITEMS = new Set([
     "valor_total_geral",
     "valorTotalGeral",
@@ -319,14 +497,32 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
     "valor_unitario_raw",
   ]);
 
+  function shouldHideField(fieldName: string): boolean {
+    if (!fieldName) return true;
+
+    if (ALWAYS_HIDE_FIELDS.has(fieldName)) return true;
+
+    if (/_label$/i.test(fieldName)) return true;
+    if (/_raw$/i.test(fieldName)) return true;
+    if (/_num$/i.test(fieldName)) return true;
+
+    if (/\blabel\b/i.test(fieldName)) return true;
+
+    return false;
+  }
+
   const sections = sectionsWithFields
-    .filter(({ section }) => section.title !== "ASSINATURAS")
+    .filter(
+      ({ section }) =>
+        section.title !== "ASSINATURAS" && section.title !== "OUTROS"
+    )
     .map(({ section, fields }) => {
       const normalizedFields = fields
         .map((field) => {
           const raw = field.value;
 
-          // ✅ esconder valores repetidos fora da tabela de itens
+          if (shouldHideField(field.fieldName)) return null;
+
           if (
             field.fieldName !== "itens_objeto" &&
             VALUE_KEYS_TO_HIDE_OUTSIDE_ITEMS.has(field.fieldName)
@@ -335,30 +531,14 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
           }
 
           if (field.fieldName === "observacoes") {
-            const display =
-              typeof raw === "string"
-                ? normalizeTrpValue(raw, field.fieldName)
-                : "";
+            const display = formatValueForDisplay(field.fieldName, raw);
             if (isHiddenOrEmptyString(display)) return null;
           }
 
-          if (typeof raw === "string" && isHiddenOrEmptyString(raw)) return null;
+          if (typeof raw === "string" && isHiddenOrEmptyString(raw))
+            return null;
 
-          if (field.fieldName === "itens_objeto" && Array.isArray(raw)) {
-            const node = renderItensObjetoTable(
-              raw as ItemObjetoLike[],
-              totalGeral
-            );
-            if (!node) return null;
-
-            return {
-              fieldName: field.fieldName,
-              label: field.label,
-              value: node,
-            };
-          }
-
-          const node = toDisplayNode(field.fieldName, raw);
+          const node = toDisplayNode(field.fieldName, raw, totalGeral);
 
           if (typeof node === "string" && isHiddenOrEmptyString(node))
             return null;

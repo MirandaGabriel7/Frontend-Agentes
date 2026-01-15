@@ -47,6 +47,51 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
   );
 };
 
+function normalizeIdentificacaoObjetoMarkdown(markdown: string): string {
+  if (!markdown || typeof markdown !== "string") return markdown;
+
+  // 1) tenta isolar a seção "1. Identificação do Contrato"
+  // funciona para ## ou ### e para "1." com ou sem espaço extra
+  const sectionRegex =
+    /(\n#{2,3}\s*1\.\s*Identificação do Contrato\s*\n)([\s\S]*?)(\n#{2,3}\s*2\.\s*Objeto fornecido\/prestado\s*\n|\n#{2,3}\s*2\.\s*Objeto\s*\n|$)/i;
+
+  const m = markdown.match(sectionRegex);
+  if (!m) {
+    // fallback: aplica só em linhas da tabela que começam com "| Objeto |"
+    return markdown.replace(
+      /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim,
+      (_all, p1, cell, p3) => {
+        const cleaned = String(cell)
+          .replace(/<br\s*\/?>/gi, " ")
+          .replace(/\s*\n\s*/g, " ")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+        return `${p1}${cleaned}${p3}`;
+      }
+    );
+  }
+
+  const before = m[1];
+  const body = m[2];
+  const after = m[3];
+
+  // 2) dentro da seção 1, corrige SOMENTE a linha/célula "Objeto"
+  const bodyFixed = body.replace(
+    /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim,
+    (_all, p1, cell, p3) => {
+      const cleaned = String(cell)
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/\s*\n\s*/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      return `${p1}${cleaned}${p3}`;
+    }
+  );
+
+  return markdown.replace(sectionRegex, `${before}${bodyFixed}${after}`);
+}
+
+
 export const TrpResultPage: React.FC = () => {
   const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -70,21 +115,16 @@ export const TrpResultPage: React.FC = () => {
   });
   const contentRef = useRef<HTMLDivElement>(null);
 
-function pickTrpFileName(run: TrpRunData | null, fallbackId?: string | null): string {
-  const raw =
-    run?.fileName ??
-    (typeof run?.contexto_recebimento_raw?.fileName === "string"
-      ? run.contexto_recebimento_raw.fileName
-      : null);
+  function pickTrpFileName(
+    run: TrpRunData | null,
+    fallbackId?: string | null
+  ): string {
+    const s = typeof run?.fileName === "string" ? run.fileName.trim() : "";
+    if (s) return s;
 
-  const s = typeof raw === "string" ? raw.trim() : "";
-  if (s) return s;
-
-  // fallback final: nome amigável SEM extensão
-  return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
-}
-
-
+    // fallback final: nome amigável SEM extensão
+    return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
+  }
 
   const loadData = async () => {
     if (!runId) {
@@ -350,17 +390,20 @@ function pickTrpFileName(run: TrpRunData | null, fallbackId?: string | null): st
     );
   }
 
-const termoNome = pickTrpFileName(runData, viewModel.runId || null);
+  const termoNome = pickTrpFileName(runData, viewModel.runId || null);
+
+const markdownUi = normalizeIdentificacaoObjetoMarkdown(
+  viewModel.documento_markdown
+);
 
 const data: TrpAgentOutput = {
-  documento_markdown: viewModel.documento_markdown,
+  documento_markdown: markdownUi,
   campos: viewModel.campos,
   meta: {
     fileName: termoNome,
     hash_tdr: viewModel.runId || "",
   },
 };
-
 
 
   // ✅ REGRA: objeto_fornecido NUNCA aparece fora do documento.
@@ -591,8 +634,14 @@ const data: TrpAgentOutput = {
 
         {/* Tab 1: Visualização do Documento */}
         <TabPanel value={activeTab} index={0}>
-          <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
-            {/* ✅ ALTERAÇÃO: botões ficam acima do documento, dentro do card */}
+          <Box
+            sx={{
+              px: { xs: 3, sm: 4, md: 5 },
+              pt: { xs: 2, sm: 2.5, md: 0 }, // 👈 topo menor (sobe o conteúdo)
+              pb: { xs: 3, sm: 4, md: 5 },
+            }}
+          >
+            {/* ✅ Botões acima do documento */}
             <Box
               sx={{
                 display: "flex",
@@ -600,7 +649,7 @@ const data: TrpAgentOutput = {
                 alignItems: "center",
                 gap: 1.5,
                 flexWrap: "wrap",
-                mb: 2.5,
+                mb: 1.25, // 👈 antes era 2.5 (menos espaço)
               }}
             >
               <Tooltip
@@ -709,8 +758,6 @@ const data: TrpAgentOutput = {
                 </span>
               </Tooltip>
             </Box>
-
-            {/* ✅ FIM ALTERAÇÃO */}
 
             <TrpMarkdownView
               content={data.documento_markdown}

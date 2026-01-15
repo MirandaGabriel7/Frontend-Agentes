@@ -4,16 +4,12 @@
  * ViewModel para TRP
  * Combina dados de múltiplas fontes para criar uma única fonte de verdade para a UI
  *
- * Fontes:
- * - documento_markdown_final: texto do documento final (n8n)
- * - documento_markdown_prime: texto do PRIME (fallback)
- * - documento_markdown: fallback legado
- * - campos_trp_normalizados: campos estruturados normalizados
- * - contexto_recebimento_raw: dados brutos do contexto de recebimento (quando disponível)
+ * ✅ AJUSTE (mínimo e correto):
+ * - Fonte de verdade para campos da UI = campos_trp_normalizados (backend)
+ * - contexto_recebimento_raw NÃO sobrescreve campos exibidos (evita inconsistência)
  */
 
 import { TrpCamposNormalizados } from "../../../lib/types/trp";
-import { normalizeTrpValue } from "./formatTrpValues";
 
 // ✅ Use o tipo oficial do backend
 import type { TrpRunData as ApiTrpRunData } from "../../../services/api";
@@ -70,23 +66,26 @@ function isMeaningfulValue(v: unknown): boolean {
 
 /**
  * Normaliza um valor cru para algo seguro de exibir na UI.
- * - strings passam por normalizeTrpValue (enums, moeda, etc.)
- * - numbers/booleans: mantém o valor original em paralelo quando necessário (para cálculos),
- *   mas para exibição também normalizamos.
+ *
+ * ✅ Mantém enums crus (ALL_CAPS_COM_UNDERSCORE) como string (UI humaniza depois)
+ * ✅ Mantém strings “normais” como estão (sem humanização aqui)
+ * ✅ Mantém number/boolean como estão (evita virar string e quebrar soma)
  */
-function normalizeUiValue(fieldName: string, value: unknown): unknown {
+function normalizeUiValue(_fieldName: string, value: unknown): unknown {
   if (value === undefined || value === null) return value;
+
+  const isEnumLike =
+    typeof value === "string" && /^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(value.trim());
 
   if (typeof value === "string") {
     const s = value.trim();
     if (!s) return "";
-    return normalizeTrpValue(s, fieldName);
+    if (isEnumLike) return s;
+    return s;
   }
 
-  // ✅ Para UI, normaliza também, mas cuidado: isso vira string.
-  // Para campos numéricos usados em soma, a gente preserva number no compute.
   if (typeof value === "number" || typeof value === "boolean") {
-    return normalizeTrpValue(String(value), fieldName);
+    return value;
   }
 
   return value;
@@ -112,7 +111,9 @@ function extractSignaturesFromMarkdown(markdown: string): {
   );
   if (fiscalMatch?.[1]) result.fiscal_contrato_nome = fiscalMatch[1].trim();
 
-  const dataMatch = markdown.match(/(?:Data de Assinatura|Data)[:\s]*([^\n]+)/i);
+  const dataMatch = markdown.match(
+    /(?:Data de Assinatura|Data)[:\s]*([^\n]+)/i
+  );
   if (dataMatch?.[1]) result.data_assinatura = dataMatch[1].trim();
 
   return result;
@@ -166,9 +167,7 @@ function formatBRL(value: number): string {
 
 /**
  * Tenta extrair itens_objeto e normalizar o total somado.
- * Observação importante:
- * - allFields pode conter itens_objeto vindo como array bruto.
- * - não confiar em strings normalizadas para soma; sempre tentar pegar number.
+ * - não confiar em strings para soma; sempre tentar pegar number.
  */
 function computeItensAndTotal(allFields: AnyObj): {
   itens_objeto?: Array<Record<string, unknown>>;
@@ -189,7 +188,6 @@ function computeItensAndTotal(allFields: AnyObj): {
 
     const q = (it as any).quantidade_recebida;
 
-    // ✅ suporte aos dois formatos (payload novo e legado)
     const vuNum = (it as any).valor_unitario_num;
     const vuLegacy = (it as any).valor_unitario;
 
@@ -213,7 +211,11 @@ function computeItensAndTotal(allFields: AnyObj): {
       continue;
     }
 
-    if (typeof q === "number" && Number.isFinite(q) && typeof vuLegacy === "string") {
+    if (
+      typeof q === "number" &&
+      Number.isFinite(q) &&
+      typeof vuLegacy === "string"
+    ) {
       const cleaned = vuLegacy.replace(/[^\d.,]/g, "");
       const parsed = cleaned.includes(",")
         ? Number(cleaned.replace(/\./g, "").replace(",", "."))
@@ -222,9 +224,12 @@ function computeItensAndTotal(allFields: AnyObj): {
       if (Number.isFinite(parsed)) total += q * parsed;
     }
 
-    // payload novo: valor_unitario_raw (string digitável)
     const vuRaw = (it as any).valor_unitario_raw;
-    if (typeof q === "number" && Number.isFinite(q) && typeof vuRaw === "string") {
+    if (
+      typeof q === "number" &&
+      Number.isFinite(q) &&
+      typeof vuRaw === "string"
+    ) {
       const cleaned = vuRaw.replace(/[^\d.,]/g, "");
       const parsed = cleaned.includes(",")
         ? Number(cleaned.replace(/\./g, "").replace(",", "."))
@@ -245,7 +250,9 @@ function computeItensAndTotal(allFields: AnyObj): {
  * Formata itens_objeto para exibição em um campo único (texto).
  * Evita mudar UI agora.
  */
-function formatItensObjetoForDisplay(itens: Array<Record<string, unknown>>): string {
+function formatItensObjetoForDisplay(
+  itens: Array<Record<string, unknown>>
+): string {
   const lines: string[] = [];
 
   itens.forEach((it, idx) => {
@@ -265,7 +272,8 @@ function formatItensObjetoForDisplay(itens: Array<Record<string, unknown>>): str
 
     const qStr = typeof q === "number" && Number.isFinite(q) ? String(q) : "";
     const unStr = un ? un : "";
-    if (qStr || unStr) parts.push(`${qStr}${unStr ? ` ${unStr}` : ""}`.trim());
+    if (qStr || unStr)
+      parts.push(`${qStr}${unStr ? ` ${unStr}` : ""}`.trim());
 
     if (typeof vuNum === "number" && Number.isFinite(vuNum)) {
       parts.push(`Unit: ${formatBRL(vuNum)}`);
@@ -294,7 +302,7 @@ function formatItensObjetoForDisplay(itens: Array<Record<string, unknown>>): str
 /**
  * Cria um viewModel único a partir dos dados do run
  * ✅ PRIORIDADE markdown: final > prime > legacy
- * ✅ dinamicamente mapeia campos e filtra não declarados
+ * ✅ campos da UI vêm SOMENTE de campos_trp_normalizados (evita sobrescrita)
  * ✅ suporta itens_objeto[] + total
  */
 export function createTrpViewModel(run: TrpRunData): TrpViewModel {
@@ -304,19 +312,18 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     run.documento_markdown ??
     "";
 
-  // ✅ prioridade correta
   const camposRaw = (run.campos_trp_normalizados ??
-    run.campos_trp ??
-    run.campos ??
+    (run as any).campos_trp ??
+    (run as any).campos ??
     {}) as Record<string, unknown>;
 
-  const contextoRaw = (run.contexto_recebimento_raw || {}) as Record<string, unknown>;
-
-  const signaturesFromMarkdown = extractSignaturesFromMarkdown(documento_markdown);
+  const signaturesFromMarkdown = extractSignaturesFromMarkdown(
+    documento_markdown
+  );
 
   const allFields: Record<string, unknown> = {};
 
-  // 1) camposRaw (entra normalizado)
+  // 1) camposRaw (UI source of truth)
   for (const [key, value] of Object.entries(camposRaw)) {
     if (STRUCTURAL_KEYS.has(key)) continue;
 
@@ -324,32 +331,21 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     if (isMeaningfulValue(normalized)) allFields[key] = normalized;
   }
 
-  // 2) contextoRaw (sobrescreve)
-  for (const [key, value] of Object.entries(contextoRaw)) {
-    if (STRUCTURAL_KEYS.has(key)) continue;
-
-    const normalized = normalizeUiValue(key, value);
-    if (isMeaningfulValue(normalized)) allFields[key] = normalized;
-  }
-
-  // 3) Blindagem: não deixa sumir se existir no payload
+  // 2) Blindagem: não deixa sumir se existir no payload (somente camposRaw)
   for (const key of ALWAYS_KEEP_FIELDS) {
     if (STRUCTURAL_KEYS.has(key)) continue;
 
     if (Object.prototype.hasOwnProperty.call(camposRaw, key)) {
       (allFields as AnyObj)[key] = (camposRaw as AnyObj)[key];
-    } else if (Object.prototype.hasOwnProperty.call(contextoRaw, key)) {
-      (allFields as AnyObj)[key] = (contextoRaw as AnyObj)[key];
     }
   }
 
-  // 4) Se existir itens_objeto, calcula total e injeta
+  // 3) Se existir itens_objeto, calcula total e injeta
   const computed = computeItensAndTotal(allFields as AnyObj);
 
   if (computed.itens_objeto && computed.itens_objeto.length > 0) {
     (allFields as AnyObj).itens_objeto = computed.itens_objeto;
 
-    // se backend trouxe valor_total_itens numérico, respeita; senão usa o calculado
     const rawTotal = (allFields as AnyObj).valor_total_itens;
     const total =
       typeof rawTotal === "number" && Number.isFinite(rawTotal)
@@ -358,7 +354,7 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
 
     (allFields as AnyObj).valor_total_itens = total;
 
-    // reforça valor_efetivo_* usando o total oficial (compat)
+    // compat
     if ((allFields as AnyObj).valor_efetivo_numero == null) {
       (allFields as AnyObj).valor_efetivo_numero = total;
     }
@@ -367,11 +363,9 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     }
   }
 
-  // 5) Agora sim: normaliza para UI tudo que ficou (exceto arrays/objetos)
+  // 4) Limpeza final: remove vazios / não declarados (sem transformar tipos)
   for (const [key, value] of Object.entries(allFields)) {
     if (STRUCTURAL_KEYS.has(key)) continue;
-
-    // não normaliza itens_objeto como string (mantém array)
     if (key === "itens_objeto") continue;
 
     const normalized = normalizeUiValue(key, value);
@@ -382,7 +376,7 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     }
   }
 
-  // 6) Assinaturas: prioridade markdown (só entra se houver valor)
+  // 5) Assinaturas: prioridade markdown (só entra se houver valor)
   if (isMeaningfulValue(signaturesFromMarkdown.fiscal_contrato_nome)) {
     (allFields as AnyObj).fiscal_contrato_nome = String(
       signaturesFromMarkdown.fiscal_contrato_nome
@@ -420,7 +414,9 @@ function pick(campos: AnyObj, keys: string[]): unknown {
  * ✅ não cria "Não informado"
  * ✅ só retorna campos declarados
  */
-export function getTrpDisplayFields(viewModel: TrpViewModel): Array<{
+export function getTrpDisplayFields(
+  viewModel: TrpViewModel
+): Array<{
   fieldName: string;
   label: string;
   value: string;
@@ -435,89 +431,227 @@ export function getTrpDisplayFields(viewModel: TrpViewModel): Array<{
     shouldDisplay: boolean;
   }> = [];
 
-const toDisplayString = (value: unknown): string => {
-  if (!isMeaningfulValue(value)) return "";
-  if (typeof value === "string") return value;
-  return String(value);
-};
+  const MONEY_FIELDS = new Set([
+    "valor_efetivo",
+    "valor_efetivo_numero",
+    "valor_total_itens",
+    "valor_total_geral",
+    "valor_unitario",
+    "valor_total_calculado",
+  ]);
 
+  const toDisplayString = (value: unknown, fieldName?: string): string => {
+    if (!isMeaningfulValue(value)) return "";
 
-const addField = (fieldName: string, label: string, value: unknown) => {
-  const displayValue = toDisplayString(value);
-  fields.push({
-    fieldName,
-    label,
-    value: displayValue,
-    shouldDisplay: isMeaningfulValue(displayValue),
-  });
-};
+    if (typeof value === "number") {
+      if (fieldName && MONEY_FIELDS.has(fieldName)) return formatBRL(value);
+      return String(value);
+    }
 
+    if (typeof value === "boolean") return value ? "Sim" : "Não";
+    if (typeof value === "string") return value;
+
+    return String(value);
+  };
+
+  const addField = (fieldName: string, label: string, value: unknown) => {
+    const displayValue = toDisplayString(value, fieldName);
+    fields.push({
+      fieldName,
+      label,
+      value: displayValue,
+      shouldDisplay: isMeaningfulValue(displayValue),
+    });
+  };
 
   // Identificação (snake/camel)
-  addField("numero_contrato", "Número do Contrato", pick(campos, ["numero_contrato", "numeroContrato"]));
-  addField("processo_licitatorio", "Processo Licitatório", pick(campos, ["processo_licitatorio", "processoLicitatorio"]));
+  addField(
+    "numero_contrato",
+    "Número do Contrato",
+    pick(campos, ["numero_contrato", "numeroContrato"])
+  );
+  addField(
+    "processo_licitatorio",
+    "Processo Licitatório",
+    pick(campos, ["processo_licitatorio", "processoLicitatorio"])
+  );
   addField("contratada", "Contratada", pick(campos, ["contratada"]));
   addField("cnpj", "CNPJ", pick(campos, ["cnpj"]));
   addField("vigencia", "Vigência", pick(campos, ["vigencia"]));
-  addField("tipo_contrato", "Tipo de Contrato", pick(campos, ["tipo_contrato", "tipoContrato"]));
-  addField("numero_ordem_compra", "Ordem de Compra", pick(campos, ["numero_ordem_compra", "numeroOrdemCompra"]));
-  addField("objeto_contrato", "Objeto do Contrato", pick(campos, ["objeto_contrato", "objetoContrato"]));
-  addField("competencia_mes_ano", "Competência (Mês/Ano)", pick(campos, ["competencia_mes_ano", "competenciaMesAno"]));
+  addField(
+    "tipo_contrato",
+    "Tipo de Contrato",
+    pick(campos, ["tipo_contrato", "tipoContrato"])
+  );
+  addField(
+    "numero_ordem_compra",
+    "Ordem de Compra",
+    pick(campos, ["numero_ordem_compra", "numeroOrdemCompra"])
+  );
+  addField(
+    "objeto_contrato",
+    "Objeto do Contrato",
+    pick(campos, ["objeto_contrato", "objetoContrato"])
+  );
+  addField(
+    "competencia_mes_ano",
+    "Competência (Mês/Ano)",
+    pick(campos, ["competencia_mes_ano", "competenciaMesAno"])
+  );
 
   // Itens (novo oficial)
   const itens = campos.itens_objeto;
   if (Array.isArray(itens) && itens.length > 0) {
-    addField("itens_objeto", "Itens fornecidos / serviços prestados", formatItensObjetoForDisplay(itens));
+    addField(
+      "itens_objeto",
+      "Itens fornecidos / serviços prestados",
+      formatItensObjetoForDisplay(itens)
+    );
     addField(
       "valor_total_itens",
       "Total dos itens",
-      campos.valor_total_itens ?? campos.valor_efetivo_formatado ?? campos.valor_efetivo_numero
+      campos.valor_total_itens ??
+        campos.valor_efetivo_formatado ??
+        campos.valor_efetivo_numero
     );
   } else {
     // Legado
-    addField("objeto_fornecido", "Fornecimento(s) ou Serviço(s) Prestado(s)", pick(campos, ["objeto_fornecido", "objetoFornecido"]));
-    addField("unidade_medida", "Unidade de Medida", pick(campos, ["unidade_medida", "unidadeMedida"]));
-    addField("quantidade_recebida", "Quantidade Recebida", pick(campos, ["quantidade_recebida", "quantidadeRecebida"]));
-    addField("valor_unitario", "Valor Unitário", pick(campos, ["valor_unitario", "valorUnitario"]));
-    addField("valor_total_calculado", "Valor Total", pick(campos, ["valor_total_calculado", "valorTotalCalculado"]));
+    addField(
+      "objeto_fornecido",
+      "Fornecimento(s) ou Serviço(s) Prestado(s)",
+      pick(campos, ["objeto_fornecido", "objetoFornecido"])
+    );
+    addField(
+      "unidade_medida",
+      "Unidade de Medida",
+      pick(campos, ["unidade_medida", "unidadeMedida"])
+    );
+    addField(
+      "quantidade_recebida",
+      "Quantidade Recebida",
+      pick(campos, ["quantidade_recebida", "quantidadeRecebida"])
+    );
+    addField(
+      "valor_unitario",
+      "Valor Unitário",
+      pick(campos, ["valor_unitario", "valorUnitario"])
+    );
+    addField(
+      "valor_total_calculado",
+      "Valor Total",
+      pick(campos, ["valor_total_calculado", "valorTotalCalculado"])
+    );
   }
 
   // Documento Fiscal
   addField("numero_nf", "Número da NF", pick(campos, ["numero_nf", "numeroNf"]));
-  addField("vencimento_nf", "Vencimento da NF", pick(campos, ["vencimento_nf", "vencimentoNf"]));
-  addField("numero_empenho", "Número do Empenho", pick(campos, ["numero_empenho", "numeroEmpenho"]));
+  addField(
+    "vencimento_nf",
+    "Vencimento da NF",
+    pick(campos, ["vencimento_nf", "vencimentoNf"])
+  );
+  addField(
+    "numero_empenho",
+    "Número do Empenho",
+    pick(campos, ["numero_empenho", "numeroEmpenho"])
+  );
 
   addField(
     "valor_efetivo",
     "Valor Efetivo",
-    campos.valor_efetivo_formatado ?? campos.valor_efetivo_numero ?? campos.valor_efetivo
+    campos.valor_efetivo_formatado ??
+      campos.valor_efetivo_numero ??
+      campos.valor_efetivo
   );
 
   // Condições de Recebimento
-  addField("tipo_base_prazo", "Base para contagem de prazo", pick(campos, ["tipo_base_prazo", "tipoBasePrazo"]));
-  addField("data_recebimento", "Data de Recebimento", pick(campos, ["data_recebimento", "dataRecebimento"]));
-  addField("data_entrega", "Data Base (Entrega)", pick(campos, ["data_entrega", "dataEntrega"]));
-  addField("data_conclusao_servico", "Data de Conclusão do Serviço", pick(campos, ["data_conclusao_servico", "dataConclusaoServico"]));
-  addField("data_prevista_entrega_contrato", "Data Prevista em Contrato", pick(campos, ["data_prevista_entrega_contrato", "dataPrevistaEntregaContrato"]));
-  addField("data_entrega_real", "Data de Entrega Real", pick(campos, ["data_entrega_real", "dataEntregaReal"]));
+  addField(
+    "tipo_base_prazo",
+    "Base para contagem de prazo",
+    pick(campos, ["tipo_base_prazo", "tipoBasePrazo"])
+  );
+  addField(
+    "data_recebimento",
+    "Data de Recebimento",
+    pick(campos, ["data_recebimento", "dataRecebimento"])
+  );
+  addField(
+    "data_entrega",
+    "Data Base (Entrega)",
+    pick(campos, ["data_entrega", "dataEntrega"])
+  );
+  addField(
+    "data_conclusao_servico",
+    "Data de Conclusão do Serviço",
+    pick(campos, ["data_conclusao_servico", "dataConclusaoServico"])
+  );
+  addField(
+    "data_prevista_entrega_contrato",
+    "Data Prevista em Contrato",
+    pick(campos, [
+      "data_prevista_entrega_contrato",
+      "dataPrevistaEntregaContrato",
+    ])
+  );
+  addField(
+    "data_entrega_real",
+    "Data de Entrega Real",
+    pick(campos, ["data_entrega_real", "dataEntregaReal"])
+  );
 
-  addField("condicao_prazo", "Condição do Prazo", pick(campos, ["condicao_prazo", "condicaoPrazo"]));
-  addField("condicao_quantidade_ordem", "Condição da Quantidade (Ordem)", pick(campos, ["condicao_quantidade_ordem", "condicaoQuantidadeOrdem"]));
+  addField(
+    "condicao_prazo",
+    "Condição do Prazo",
+    pick(campos, ["condicao_prazo", "condicaoPrazo"])
+  );
+  addField(
+    "condicao_quantidade_ordem",
+    "Condição da Quantidade (Ordem)",
+    pick(campos, ["condicao_quantidade_ordem", "condicaoQuantidadeOrdem"])
+  );
 
   // manter compat
-  addField("condicao_quantidade_nf", "Condição da Quantidade (NF)", pick(campos, ["condicao_quantidade_nf", "condicaoQuantidadeNf"]));
+  addField(
+    "condicao_quantidade_nf",
+    "Condição da Quantidade (NF)",
+    pick(campos, ["condicao_quantidade_nf", "condicaoQuantidadeNf"])
+  );
 
-  addField("motivo_atraso", "Motivo do Atraso", pick(campos, ["motivo_atraso", "motivoAtraso"]));
-  addField("comentarios_quantidade_ordem", "Comentários (Ordem)", pick(campos, ["comentarios_quantidade_ordem", "comentariosQuantidadeOrdem"]));
-  addField("comentarios_quantidade_nf", "Comentários (NF)", pick(campos, ["comentarios_quantidade_nf", "comentariosQuantidadeNf"]));
+  addField(
+    "motivo_atraso",
+    "Motivo do Atraso",
+    pick(campos, ["motivo_atraso", "motivoAtraso"])
+  );
+  addField(
+    "comentarios_quantidade_ordem",
+    "Comentários (Ordem)",
+    pick(campos, ["comentarios_quantidade_ordem", "comentariosQuantidadeOrdem"])
+  );
+  addField(
+    "comentarios_quantidade_nf",
+    "Comentários (NF)",
+    pick(campos, ["comentarios_quantidade_nf", "comentariosQuantidadeNf"])
+  );
 
   // Observações
   addField("observacoes", "Observações", pick(campos, ["observacoes"]));
-  addField("observacoes_recebimento", "Observações do Recebimento", pick(campos, ["observacoes_recebimento", "observacoesRecebimento"]));
+  addField(
+    "observacoes_recebimento",
+    "Observações do Recebimento",
+    pick(campos, ["observacoes_recebimento", "observacoesRecebimento"])
+  );
 
   // Assinaturas
-  addField("fiscal_contrato_nome", "Fiscal do Contrato", pick(campos, ["fiscal_contrato_nome", "fiscalContratoNome"]));
-  addField("data_assinatura", "Data", pick(campos, ["data_assinatura", "dataAssinatura"]));
+  addField(
+    "fiscal_contrato_nome",
+    "Fiscal do Contrato",
+    pick(campos, ["fiscal_contrato_nome", "fiscalContratoNome"])
+  );
+  addField(
+    "data_assinatura",
+    "Data",
+    pick(campos, ["data_assinatura", "dataAssinatura"])
+  );
 
   return fields.filter((f) => f.shouldDisplay);
 }
