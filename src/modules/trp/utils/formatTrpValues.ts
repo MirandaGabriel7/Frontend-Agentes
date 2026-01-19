@@ -218,17 +218,22 @@ function formatQuantidadesEValores(fieldName: string, raw: unknown): string | nu
     return formatNumberPtBr(n);
   }
 
-  if (
-    key === "valor_unitario" ||
-    key === "valor_total_calculado" ||
-    key === "valor_total_geral" ||
-    key === "valor_efetivo" ||
-    key === "valor_efetivo_numero"
-  ) {
-    const n = parsePtBrNumber(raw);
-    if (n === null) return "";
-    return formatBRL(n);
-  }
+if (
+  key === "valor_unitario" ||
+  key === "valorunitario" ||
+  key === "valor_total_calculado" ||
+  key === "valortotalcalculado" ||
+  key === "valor_total_geral" ||
+  key === "valortotalgeral" ||
+  key === "valor_efetivo" ||
+  key === "valorefetivo" ||
+  key === "valor_efetivo_numero" ||
+  key === "valorefetivonumero"
+) {
+  const n = parsePtBrNumber(raw);
+  if (n === null) return "";
+  return formatBRL(n);
+}
 
   return null;
 }

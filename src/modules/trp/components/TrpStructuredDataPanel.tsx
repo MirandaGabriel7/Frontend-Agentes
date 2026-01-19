@@ -197,6 +197,8 @@ type ItemObjetoLike = {
   valor_total_calculado?: unknown;
 };
 
+type LabelValueLike = { label?: unknown; value?: unknown };
+
 function getItemUnitValue(it: ItemObjetoLike) {
   return it.valor_unitario_num ?? it.valor_unitario ?? it.valor_unitario_raw;
 }
@@ -263,8 +265,7 @@ const ItensObjetoTable: React.FC<{
         component={Paper}
         elevation={0}
         sx={{
-          // ✅ mais quadrado (menos pill)
-          borderRadius: 1, // 4px (bem mais “quadrado”)
+          borderRadius: 1,
           border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
           overflow: "hidden",
           bgcolor: theme.palette.background.paper,
@@ -374,7 +375,7 @@ const ItensObjetoTable: React.FC<{
                   sx={{
                     fontVariantNumeric: "tabular-nums",
                     whiteSpace: "nowrap",
-                    fontWeight: 500, // normal, consistente com os outros
+                    fontWeight: 500,
                   }}
                 >
                   {normalizeTrpValue(
@@ -428,11 +429,61 @@ const ItensObjetoTable: React.FC<{
   );
 };
 
-function toDisplayNode(
-  fieldName: string,
-  raw: unknown,
-  totalGeral?: unknown
-): React.ReactNode {
+const LabelValueList: React.FC<{ rows: LabelValueLike[] }> = ({ rows }) => {
+  const theme = useTheme();
+  const safeRows = (Array.isArray(rows) ? rows : [])
+    .map((r) => ({
+      label: String(r?.label ?? "").trim(),
+      value: String(r?.value ?? "").trim(),
+    }))
+    .filter((r) => r.label && r.value);
+
+  if (!safeRows.length) return null;
+
+  return (
+    <Box sx={{ mt: 0.75 }}>
+      {safeRows.map((r, idx) => (
+        <Box
+          key={`${r.label}-${idx}`}
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 2,
+            py: 0.75,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+            "&:last-of-type": { borderBottom: "none" },
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.92rem",
+              color: theme.palette.text.secondary,
+              fontWeight: 600,
+              minWidth: 220,
+            }}
+          >
+            {r.label}
+          </Typography>
+
+          <Typography
+            sx={{
+              fontSize: "0.92rem",
+              color: theme.palette.text.primary,
+              fontWeight: 600,
+              textAlign: "right",
+              whiteSpace: "nowrap",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {r.value}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+function toDisplayNode(fieldName: string, raw: unknown, totalGeral?: unknown) {
   if (raw === null || raw === undefined) return "";
 
   if (fieldName === "itens_objeto" && Array.isArray(raw)) {
@@ -442,6 +493,11 @@ function toDisplayNode(
         totalGeral={totalGeral}
       />
     );
+  }
+
+  // ✅ NOVO: datas enxutas do regime
+  if (fieldName === "regime_execucao_datas_exibicao" && Array.isArray(raw)) {
+    return <LabelValueList rows={raw as LabelValueLike[]} />;
   }
 
   if (Array.isArray(raw) || isPlainObject(raw)) {
@@ -463,6 +519,10 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
 
   const camposAsRecord = (campos ?? {}) as Record<string, unknown>;
   const sectionsWithFields = organizeFieldsBySections(camposAsRecord);
+
+  const hasRegimeDatasExibicao =
+    Array.isArray((camposAsRecord as any).regime_execucao_datas_exibicao) &&
+    ((camposAsRecord as any).regime_execucao_datas_exibicao as any[]).length > 0;
 
   const totalGeral =
     (camposAsRecord as any).valor_total_geral ??
@@ -523,6 +583,22 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
 
           if (shouldHideField(field.fieldName)) return null;
 
+          // ✅ Se temos o campo enxuto, escondemos redundâncias no regime/execução
+          // ✅ MAS: NÃO esconder data_base_calculo (agora ela tem label dinâmico e é a linha principal!)
+          if (hasRegimeDatasExibicao) {
+            const redundantDates = new Set([
+              "data_entrega",
+              "data_entrega_real",
+              "data_recebimento",
+              "data_conclusao_servico",
+              "data_prevista_entrega_contrato",
+              "data_base_entrega",
+              // ✅ REMOVIDO: "data_base_calculo"
+            ]);
+
+            if (redundantDates.has(field.fieldName)) return null;
+          }
+
           if (
             field.fieldName !== "itens_objeto" &&
             VALUE_KEYS_TO_HIDE_OUTSIDE_ITEMS.has(field.fieldName)
@@ -535,8 +611,7 @@ export const TrpStructuredDataPanel: React.FC<TrpStructuredDataPanelProps> = ({
             if (isHiddenOrEmptyString(display)) return null;
           }
 
-          if (typeof raw === "string" && isHiddenOrEmptyString(raw))
-            return null;
+          if (typeof raw === "string" && isHiddenOrEmptyString(raw)) return null;
 
           const node = toDisplayNode(field.fieldName, raw, totalGeral);
 

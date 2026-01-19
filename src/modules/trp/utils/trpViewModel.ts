@@ -7,21 +7,21 @@
  * ✅ AJUSTE (mínimo e correto):
  * - Fonte de verdade para campos da UI = campos_trp_normalizados (backend)
  * - contexto_recebimento_raw NÃO sobrescreve campos exibidos (evita inconsistência)
+ *
+ * ✅ AJUSTE PRINCIPAL (datas não redundantes):
+ * - Se existir data_base_calculo OU regime_execucao_datas_exibicao (novo modelo),
+ *   então a UI NÃO deve exibir as datas técnicas antigas (data_recebimento, data_entrega etc.)
+ * - Se NÃO existir o novo modelo, mantém fallback para runs antigos.
  */
 
 import { TrpCamposNormalizados } from "../../../lib/types/trp";
-
-// ✅ Use o tipo oficial do backend
 import type { TrpRunData as ApiTrpRunData } from "../../../services/api";
 
 export type TrpRunData = ApiTrpRunData;
 
 export interface TrpViewModel {
   documento_markdown: string;
-
-  // ✅ já sai pronto pra UI
   campos: TrpCamposNormalizados & Record<string, unknown>;
-
   runId: string;
   createdAt?: string;
   status: string;
@@ -66,10 +66,6 @@ function isMeaningfulValue(v: unknown): boolean {
 
 /**
  * Normaliza um valor cru para algo seguro de exibir na UI.
- *
- * ✅ Mantém enums crus (ALL_CAPS_COM_UNDERSCORE) como string (UI humaniza depois)
- * ✅ Mantém strings “normais” como estão (sem humanização aqui)
- * ✅ Mantém number/boolean como estão (evita virar string e quebrar soma)
  */
 function normalizeUiValue(_fieldName: string, value: unknown): unknown {
   if (value === undefined || value === null) return value;
@@ -92,8 +88,7 @@ function normalizeUiValue(_fieldName: string, value: unknown): unknown {
 }
 
 /**
- * Extrai informações de assinatura do markdown
- * (mantido por compatibilidade)
+ * Extrai informações de assinatura do markdown (compat)
  */
 function extractSignaturesFromMarkdown(markdown: string): {
   fiscal_contrato_nome?: string | null;
@@ -107,12 +102,12 @@ function extractSignaturesFromMarkdown(markdown: string): {
   if (!markdown) return result;
 
   const fiscalMatch = markdown.match(
-    /(?:Fiscal do Contrato|Fiscal)[:\s]*([^\n]+)/i
+    /(?:Fiscal do Contrato|Fiscal)[:\s]*([^\n]+)/i,
   );
   if (fiscalMatch?.[1]) result.fiscal_contrato_nome = fiscalMatch[1].trim();
 
   const dataMatch = markdown.match(
-    /(?:Data de Assinatura|Data)[:\s]*([^\n]+)/i
+    /(?:Data de Assinatura|Data)[:\s]*([^\n]+)/i,
   );
   if (dataMatch?.[1]) result.data_assinatura = dataMatch[1].trim();
 
@@ -120,7 +115,7 @@ function extractSignaturesFromMarkdown(markdown: string): {
 }
 
 /**
- * ✅ chaves estruturais que não devem ir para UI como texto
+ * chaves estruturais que não devem ir para UI como texto
  */
 const STRUCTURAL_KEYS = new Set([
   "prazos_calculados",
@@ -129,10 +124,9 @@ const STRUCTURAL_KEYS = new Set([
 ]);
 
 /**
- * ✅ Campos que nunca podem sumir se existirem no payload
+ * Campos que nunca podem sumir se existirem no payload
  */
 const ALWAYS_KEEP_FIELDS = [
-  // novo oficial
   "itens_objeto",
   "valor_total_itens",
   "valor_total_geral",
@@ -166,8 +160,18 @@ function formatBRL(value: number): string {
 }
 
 /**
+ * Normaliza valor para comparação (dedupe)
+ */
+function normKey(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
  * Tenta extrair itens_objeto e normalizar o total somado.
- * - não confiar em strings para soma; sempre tentar pegar number.
  */
 function computeItensAndTotal(allFields: AnyObj): {
   itens_objeto?: Array<Record<string, unknown>>;
@@ -246,12 +250,8 @@ function computeItensAndTotal(allFields: AnyObj): {
   };
 }
 
-/**
- * Formata itens_objeto para exibição em um campo único (texto).
- * Evita mudar UI agora.
- */
 function formatItensObjetoForDisplay(
-  itens: Array<Record<string, unknown>>
+  itens: Array<Record<string, unknown>>,
 ): string {
   const lines: string[] = [];
 
@@ -272,8 +272,7 @@ function formatItensObjetoForDisplay(
 
     const qStr = typeof q === "number" && Number.isFinite(q) ? String(q) : "";
     const unStr = un ? un : "";
-    if (qStr || unStr)
-      parts.push(`${qStr}${unStr ? ` ${unStr}` : ""}`.trim());
+    if (qStr || unStr) parts.push(`${qStr}${unStr ? ` ${unStr}` : ""}`.trim());
 
     if (typeof vuNum === "number" && Number.isFinite(vuNum)) {
       parts.push(`Unit: ${formatBRL(vuNum)}`);
@@ -292,19 +291,12 @@ function formatItensObjetoForDisplay(
     const line = parts.length
       ? `${idx + 1}) ${parts.join(" — ")}`
       : `${idx + 1}) Item`;
-
     lines.push(line);
   });
 
   return lines.join("\n");
 }
 
-/**
- * Cria um viewModel único a partir dos dados do run
- * ✅ PRIORIDADE markdown: final > prime > legacy
- * ✅ campos da UI vêm SOMENTE de campos_trp_normalizados (evita sobrescrita)
- * ✅ suporta itens_objeto[] + total
- */
 export function createTrpViewModel(run: TrpRunData): TrpViewModel {
   const documento_markdown =
     run.documento_markdown_final ??
@@ -317,9 +309,8 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     (run as any).campos ??
     {}) as Record<string, unknown>;
 
-  const signaturesFromMarkdown = extractSignaturesFromMarkdown(
-    documento_markdown
-  );
+  const signaturesFromMarkdown =
+    extractSignaturesFromMarkdown(documento_markdown);
 
   const allFields: Record<string, unknown> = {};
 
@@ -340,7 +331,7 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     }
   }
 
-  // 3) Se existir itens_objeto, calcula total e injeta
+  // 3) Itens + total
   const computed = computeItensAndTotal(allFields as AnyObj);
 
   if (computed.itens_objeto && computed.itens_objeto.length > 0) {
@@ -350,7 +341,7 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     const total =
       typeof rawTotal === "number" && Number.isFinite(rawTotal)
         ? rawTotal
-        : computed.valor_total_itens ?? 0;
+        : (computed.valor_total_itens ?? 0);
 
     (allFields as AnyObj).valor_total_itens = total;
 
@@ -363,45 +354,37 @@ export function createTrpViewModel(run: TrpRunData): TrpViewModel {
     }
   }
 
-  // 4) Limpeza final: remove vazios / não declarados (sem transformar tipos)
+  // 4) limpeza final
   for (const [key, value] of Object.entries(allFields)) {
     if (STRUCTURAL_KEYS.has(key)) continue;
     if (key === "itens_objeto") continue;
 
     const normalized = normalizeUiValue(key, value);
-    if (isMeaningfulValue(normalized)) {
-      allFields[key] = normalized;
-    } else {
-      delete (allFields as AnyObj)[key];
-    }
+    if (isMeaningfulValue(normalized)) allFields[key] = normalized;
+    else delete (allFields as AnyObj)[key];
   }
 
-  // 5) Assinaturas: prioridade markdown (só entra se houver valor)
+  // 5) assinaturas
   if (isMeaningfulValue(signaturesFromMarkdown.fiscal_contrato_nome)) {
     (allFields as AnyObj).fiscal_contrato_nome = String(
-      signaturesFromMarkdown.fiscal_contrato_nome
+      signaturesFromMarkdown.fiscal_contrato_nome,
     );
   }
   if (isMeaningfulValue(signaturesFromMarkdown.data_assinatura)) {
     (allFields as AnyObj).data_assinatura = String(
-      signaturesFromMarkdown.data_assinatura
+      signaturesFromMarkdown.data_assinatura,
     );
   }
 
-  const campos = allFields as TrpViewModel["campos"];
-
   return {
     documento_markdown,
-    campos,
+    campos: allFields as TrpViewModel["campos"],
     runId: run.runId,
     createdAt: run.createdAt,
     status: run.status,
   };
 }
 
-/**
- * Helper: pega o primeiro campo existente dentre aliases (snake/camel)
- */
 function pick(campos: AnyObj, keys: string[]): unknown {
   for (const k of keys) {
     if (campos?.[k] !== undefined && campos?.[k] !== null) return campos[k];
@@ -410,13 +393,52 @@ function pick(campos: AnyObj, keys: string[]): unknown {
 }
 
 /**
- * Lista de campos para UI (cards/resumo/sidebar)
- * ✅ não cria "Não informado"
- * ✅ só retorna campos declarados
+ * ✅ Normaliza e DEDUPLICA a lista de datas consideradas no cálculo.
+ * - Remove entrada cuja value seja igual à data_base_calculo
+ * - Remove labels genéricos "Data-base do cálculo" / "Data base do cálculo"
+ * - Dedup por value
  */
-export function getTrpDisplayFields(
-  viewModel: TrpViewModel
-): Array<{
+function sanitizeDatasExibicao(
+  value: unknown,
+  baseValue: unknown,
+): Array<{ label: string; value: string }> {
+  if (!Array.isArray(value) || value.length === 0) return [];
+
+  const baseKey = normKey(baseValue);
+  const seenValue = new Set<string>();
+  const out: Array<{ label: string; value: string }> = [];
+
+  for (const it of value as any[]) {
+    if (!it || typeof it !== "object") continue;
+
+    const label = String((it as any).label ?? "").trim();
+    const val = String((it as any).value ?? "").trim();
+    if (!label || !val) continue;
+
+    const valKey = normKey(val);
+    if (baseKey && valKey === baseKey) continue;
+
+    const labelKey = normKey(label);
+    if (labelKey === normKey("Data-base do cálculo")) continue;
+    if (labelKey === normKey("Data base do cálculo")) continue;
+
+    if (seenValue.has(valKey)) continue;
+    seenValue.add(valKey);
+
+    out.push({ label, value: val });
+  }
+
+  return out;
+}
+
+function formatDatasExibicaoList(
+  list: Array<{ label: string; value: string }>,
+): string {
+  if (!Array.isArray(list) || list.length === 0) return "";
+  return list.map((it) => `${it.label}: ${it.value}`).join("\n");
+}
+
+export function getTrpDisplayFields(viewModel: TrpViewModel): Array<{
   fieldName: string;
   label: string;
   value: string;
@@ -464,16 +486,18 @@ export function getTrpDisplayFields(
     });
   };
 
-  // Identificação (snake/camel)
+  // =========================
+  // Identificação
+  // =========================
   addField(
     "numero_contrato",
     "Número do Contrato",
-    pick(campos, ["numero_contrato", "numeroContrato"])
+    pick(campos, ["numero_contrato", "numeroContrato"]),
   );
   addField(
     "processo_licitatorio",
     "Processo Licitatório",
-    pick(campos, ["processo_licitatorio", "processoLicitatorio"])
+    pick(campos, ["processo_licitatorio", "processoLicitatorio"]),
   );
   addField("contratada", "Contratada", pick(campos, ["contratada"]));
   addField("cnpj", "CNPJ", pick(campos, ["cnpj"]));
@@ -481,79 +505,86 @@ export function getTrpDisplayFields(
   addField(
     "tipo_contrato",
     "Tipo de Contrato",
-    pick(campos, ["tipo_contrato", "tipoContrato"])
+    pick(campos, ["tipo_contrato", "tipoContrato"]),
   );
   addField(
     "numero_ordem_compra",
     "Ordem de Compra",
-    pick(campos, ["numero_ordem_compra", "numeroOrdemCompra"])
+    pick(campos, ["numero_ordem_compra", "numeroOrdemCompra"]),
   );
   addField(
     "objeto_contrato",
     "Objeto do Contrato",
-    pick(campos, ["objeto_contrato", "objetoContrato"])
+    pick(campos, ["objeto_contrato", "objetoContrato"]),
   );
   addField(
     "competencia_mes_ano",
     "Competência (Mês/Ano)",
-    pick(campos, ["competencia_mes_ano", "competenciaMesAno"])
+    pick(campos, ["competencia_mes_ano", "competenciaMesAno"]),
   );
 
-  // Itens (novo oficial)
+  // =========================
+  // Itens / Totais
+  // =========================
   const itens = campos.itens_objeto;
   if (Array.isArray(itens) && itens.length > 0) {
     addField(
       "itens_objeto",
       "Itens fornecidos / serviços prestados",
-      formatItensObjetoForDisplay(itens)
+      formatItensObjetoForDisplay(itens),
     );
     addField(
       "valor_total_itens",
       "Total dos itens",
       campos.valor_total_itens ??
         campos.valor_efetivo_formatado ??
-        campos.valor_efetivo_numero
+        campos.valor_efetivo_numero,
     );
   } else {
-    // Legado
     addField(
       "objeto_fornecido",
       "Fornecimento(s) ou Serviço(s) Prestado(s)",
-      pick(campos, ["objeto_fornecido", "objetoFornecido"])
+      pick(campos, ["objeto_fornecido", "objetoFornecido"]),
     );
     addField(
       "unidade_medida",
       "Unidade de Medida",
-      pick(campos, ["unidade_medida", "unidadeMedida"])
+      pick(campos, ["unidade_medida", "unidadeMedida"]),
     );
     addField(
       "quantidade_recebida",
       "Quantidade Recebida",
-      pick(campos, ["quantidade_recebida", "quantidadeRecebida"])
+      pick(campos, ["quantidade_recebida", "quantidadeRecebida"]),
     );
     addField(
       "valor_unitario",
       "Valor Unitário",
-      pick(campos, ["valor_unitario", "valorUnitario"])
+      pick(campos, ["valor_unitario", "valorUnitario"]),
     );
     addField(
       "valor_total_calculado",
       "Valor Total",
-      pick(campos, ["valor_total_calculado", "valorTotalCalculado"])
+      pick(campos, ["valor_total_calculado", "valorTotalCalculado"]),
     );
   }
 
+  // =========================
   // Documento Fiscal
-  addField("numero_nf", "Número da NF", pick(campos, ["numero_nf", "numeroNf"]));
+  // =========================
+  addField(
+    "numero_nf",
+    "Número da NF",
+    pick(campos, ["numero_nf", "numeroNf"]),
+  );
   addField(
     "vencimento_nf",
     "Vencimento da NF",
-    pick(campos, ["vencimento_nf", "vencimentoNf"])
+    pick(campos, ["vencimento_nf", "vencimentoNf"]),
   );
   addField(
     "numero_empenho",
     "Número do Empenho",
-    pick(campos, ["numero_empenho", "numeroEmpenho"])
+    pick(campos, ["numero_empenho", "numeroEmpenho"]),
   );
 
   addField(
@@ -561,97 +592,156 @@ export function getTrpDisplayFields(
     "Valor Efetivo",
     campos.valor_efetivo_formatado ??
       campos.valor_efetivo_numero ??
-      campos.valor_efetivo
+      campos.valor_efetivo,
   );
 
-  // Condições de Recebimento
+  // =========================
+  // Regra de datas (NÃO redundante)
+  // =========================
+  const dataBaseCalculo = pick(campos, ["data_base_calculo"]);
+  const dataBaseCalculoLabel = pick(campos, ["data_base_calculo_label"]);
+  const datasExibRaw = pick(campos, ["regime_execucao_datas_exibicao"]);
+
+  const datasExibList = sanitizeDatasExibicao(datasExibRaw, dataBaseCalculo);
+  const datasExibFmt = formatDatasExibicaoList(datasExibList);
+
+  const hasResumoNovoDatas =
+    isMeaningfulValue(dataBaseCalculo) || isMeaningfulValue(datasExibFmt);
+
+  // Base de prazo (sempre)
   addField(
     "tipo_base_prazo",
     "Base para contagem de prazo",
-    pick(campos, ["tipo_base_prazo", "tipoBasePrazo"])
-  );
-  addField(
-    "data_recebimento",
-    "Data de Recebimento",
-    pick(campos, ["data_recebimento", "dataRecebimento"])
-  );
-  addField(
-    "data_entrega",
-    "Data Base (Entrega)",
-    pick(campos, ["data_entrega", "dataEntrega"])
-  );
-  addField(
-    "data_conclusao_servico",
-    "Data de Conclusão do Serviço",
-    pick(campos, ["data_conclusao_servico", "dataConclusaoServico"])
-  );
-  addField(
-    "data_prevista_entrega_contrato",
-    "Data Prevista em Contrato",
-    pick(campos, [
-      "data_prevista_entrega_contrato",
-      "dataPrevistaEntregaContrato",
-    ])
-  );
-  addField(
-    "data_entrega_real",
-    "Data de Entrega Real",
-    pick(campos, ["data_entrega_real", "dataEntregaReal"])
+    pick(campos, ["tipo_base_prazo", "tipoBasePrazo"]),
   );
 
+  if (hasResumoNovoDatas) {
+    const baseLabel = (
+      typeof dataBaseCalculoLabel === "string" && dataBaseCalculoLabel.trim()
+        ? dataBaseCalculoLabel.trim()
+        : "Data base do cálculo"
+    ).replace(/Data-base do c[aá]lculo/gi, "Data base do cálculo");
+
+    addField("data_base_calculo", baseLabel, dataBaseCalculo);
+    addField(
+      "regime_execucao_datas_exibicao",
+      "Datas consideradas no cálculo",
+      datasExibFmt,
+    );
+  } else {
+    // fallback runs antigos
+    addField(
+      "data_recebimento",
+      "Data de Recebimento",
+      pick(campos, ["data_recebimento", "dataRecebimento"]),
+    );
+    addField(
+      "data_entrega",
+      "Data Base (Entrega)",
+      pick(campos, ["data_entrega", "dataEntrega"]),
+    );
+    addField(
+      "data_conclusao_servico",
+      "Data de Conclusão do Serviço",
+      pick(campos, ["data_conclusao_servico", "dataConclusaoServico"]),
+    );
+    addField(
+      "data_prevista_entrega_contrato",
+      "Data Prevista em Contrato",
+      pick(campos, [
+        "data_prevista_entrega_contrato",
+        "dataPrevistaEntregaContrato",
+      ]),
+    );
+    addField(
+      "data_entrega_real",
+      "Data de Entrega Real",
+      pick(campos, ["data_entrega_real", "dataEntregaReal"]),
+    );
+  }
+
+  // =========================
+  // Demais condições
+  // =========================
   addField(
     "condicao_prazo",
     "Condição do Prazo",
-    pick(campos, ["condicao_prazo", "condicaoPrazo"])
+    pick(campos, ["condicao_prazo", "condicaoPrazo"]),
   );
   addField(
     "condicao_quantidade_ordem",
     "Condição da Quantidade (Ordem)",
-    pick(campos, ["condicao_quantidade_ordem", "condicaoQuantidadeOrdem"])
+    pick(campos, ["condicao_quantidade_ordem", "condicaoQuantidadeOrdem"]),
   );
 
-  // manter compat
   addField(
     "condicao_quantidade_nf",
     "Condição da Quantidade (NF)",
-    pick(campos, ["condicao_quantidade_nf", "condicaoQuantidadeNf"])
+    pick(campos, ["condicao_quantidade_nf", "condicaoQuantidadeNf"]),
   );
 
   addField(
     "motivo_atraso",
     "Motivo do Atraso",
-    pick(campos, ["motivo_atraso", "motivoAtraso"])
+    pick(campos, ["motivo_atraso", "motivoAtraso"]),
   );
   addField(
     "comentarios_quantidade_ordem",
     "Comentários (Ordem)",
-    pick(campos, ["comentarios_quantidade_ordem", "comentariosQuantidadeOrdem"])
+    pick(campos, [
+      "comentarios_quantidade_ordem",
+      "comentariosQuantidadeOrdem",
+    ]),
   );
   addField(
     "comentarios_quantidade_nf",
     "Comentários (NF)",
-    pick(campos, ["comentarios_quantidade_nf", "comentariosQuantidadeNf"])
+    pick(campos, ["comentarios_quantidade_nf", "comentariosQuantidadeNf"]),
   );
 
+  // =========================
   // Observações
+  // =========================
   addField("observacoes", "Observações", pick(campos, ["observacoes"]));
   addField(
     "observacoes_recebimento",
     "Observações do Recebimento",
-    pick(campos, ["observacoes_recebimento", "observacoesRecebimento"])
+    pick(campos, ["observacoes_recebimento", "observacoesRecebimento"]),
   );
 
+  // =========================
   // Assinaturas
+  // =========================
   addField(
     "fiscal_contrato_nome",
     "Fiscal do Contrato",
-    pick(campos, ["fiscal_contrato_nome", "fiscalContratoNome"])
+    pick(campos, ["fiscal_contrato_nome", "fiscalContratoNome"]),
   );
   addField(
     "data_assinatura",
     "Data",
-    pick(campos, ["data_assinatura", "dataAssinatura"])
+    pick(campos, ["data_assinatura", "dataAssinatura"]),
   );
 
-  return fields.filter((f) => f.shouldDisplay);
+  const filtered = fields.filter((f) => f.shouldDisplay);
+
+  // ✅ blindagem final anti-duplicação (label+value)
+  const norm = (s: string) =>
+    String(s ?? "")
+      .trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const seen = new Set<string>();
+  const deduped: typeof filtered = [];
+
+  for (const f of filtered) {
+    const key = `${norm(f.label)}||${norm(f.value)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(f);
+  }
+
+  return deduped;
 }

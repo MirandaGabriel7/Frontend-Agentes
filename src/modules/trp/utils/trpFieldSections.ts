@@ -12,8 +12,19 @@
  *   - itens_objeto (renderiza tabela no TrpStructuredDataPanel)
  *   - valor_total_geral (Total Geral)
  *
+ * ✅ Datas ENXUTAS:
+ * - Se existir data_base_calculo OU regime_execucao_datas_exibicao,
+ *   então NÃO exibir datas técnicas antigas (data_recebimento, data_entrega, etc.)
+ *
  * ✅ Ignora prazos_calculados para não vazar JSON em OUTROS
  * ✅ Evita DUPLICAR snake_case + camelCase (prioriza snake)
+ *
+ * ✅ FIX (duplicidade + label correto):
+ * - data_base_calculo ganha label dinâmico conforme tipo_base_prazo
+ * - regime_execucao_datas_exibicao é SANITIZADO:
+ *   - remove "Data-base do cálculo"/"Data base do cálculo"
+ *   - remove item com value igual à data_base_calculo
+ *   - padroniza "Data-base" -> "Data base"
  */
 
 import { getTrpFieldLabel } from "./trpLabels";
@@ -67,11 +78,7 @@ export const trpFieldSections: FieldSection[] = [
 
   {
     title: "ITENS DO RECEBIMENTO",
-    fieldNames: [
-      "itens_objeto",
-      "valor_total_geral",
-      "valorTotalGeral", // compat (camel) — só entra se snake não existir
-    ],
+    fieldNames: ["itens_objeto", "valor_total_geral", "valorTotalGeral"],
   },
 
   {
@@ -87,21 +94,20 @@ export const trpFieldSections: FieldSection[] = [
   },
 
   {
-    title: "CONDIÇÕES DE RECEBIMENTO",
+    title: "REGIME E EXECUÇÃO",
     fieldNames: [
       "tipo_base_prazo",
       "tipoBasePrazo",
-      "data_recebimento",
-      "dataRecebimento",
-      "data_entrega",
-      "dataEntrega",
-      "data_conclusao_servico",
-      "dataConclusaoServico",
-      "data_prevista_entrega_contrato",
-      "dataPrevistaEntregaContrato",
-      "data_entrega_real",
-      "dataEntregaReal",
 
+      // ✅ NOVOS (UI enxuta)
+      "data_base_calculo",
+      "regime_execucao_datas_exibicao",
+    ],
+  },
+
+  {
+    title: "CONDIÇÕES DE RECEBIMENTO",
+    fieldNames: [
       "condicao_prazo",
       "condicaoPrazo",
 
@@ -148,13 +154,11 @@ export const ignoredFields = new Set([
   "status",
   "id",
 
-  // ✅ evita vazar JSON em OUTROS
   "prazos_calculados",
   "prazos",
   "prazos_calculados_raw",
   "prazos_calculados_normalizados",
 
-  // ✅ remove o “OUTROS: Valor Total Itens”
   "valor_total_itens",
   "valorTotalItens",
   "valor_total_itens_numero",
@@ -167,10 +171,8 @@ export const alwaysShowFields = new Set([
   "contratada",
   "numero_nf",
   "valor_efetivo_formatado",
-  "data_entrega",
   "condicao_prazo",
 
-  // ✅ manter estrutura mínima dos itens
   "itens_objeto",
   "valor_total_geral",
 ]);
@@ -208,9 +210,7 @@ function isHiddenString(s: string): boolean {
  */
 function toUiString(fieldName: string, value: unknown): string {
   if (value === null || value === undefined) return "";
-
   if (fieldName.startsWith("prazos")) return "";
-
   if (fieldName === "itens_objeto") return "__STRUCTURED__";
 
   if (typeof value === "string") {
@@ -237,6 +237,102 @@ function toUiString(fieldName: string, value: unknown): string {
   }
 }
 
+/**
+ * ✅ Detecta se existe o novo modelo de datas enxutas
+ */
+function hasResumoNovoDatas(campos: Record<string, unknown>): boolean {
+  const base = toUiString("data_base_calculo", campos["data_base_calculo"]);
+  const lista = campos["regime_execucao_datas_exibicao"];
+
+  const listaStr = Array.isArray(lista)
+    ? "__HAS_LIST__"
+    : toUiString("regime_execucao_datas_exibicao", lista);
+
+  return base !== "" || listaStr !== "";
+}
+
+/**
+ * ✅ Datas técnicas que devem sumir quando existir o resumo novo
+ */
+const TECH_DATE_FIELDS = new Set([
+  "data_recebimento",
+  "dataRecebimento",
+  "data_entrega",
+  "dataEntrega",
+  "data_conclusao_servico",
+  "dataConclusaoServico",
+  "data_prevista_entrega_contrato",
+  "dataPrevistaEntregaContrato",
+  "data_entrega_real",
+  "dataEntregaReal",
+]);
+
+/**
+ * ✅ Label dinâmico para o campo data_base_calculo (primeira linha do bloco)
+ * - DATA_ENTREGA -> Data de entrega
+ * - DATA_CONCLUSAO_SERVICO -> Data da prestação do serviço
+ * - DATA_RECEBIMENTO -> Data de recebimento
+ * - fallback -> Data base do cálculo (sem hífen)
+ */
+function getDataBaseCalculoLabel(campos: Record<string, unknown>): string {
+  const raw = String(campos["tipo_base_prazo"] ?? "").trim().toUpperCase();
+
+  if (raw === "DATA_ENTREGA") return "Data de entrega";
+  if (raw === "DATA_CONCLUSAO_SERVICO" || raw === "SERVICO" || raw === "SERVIÇO")
+    return "Data da prestação do serviço";
+  if (raw === "DATA_RECEBIMENTO") return "Data de recebimento";
+
+  return "Data base do cálculo";
+}
+
+/**
+ * ✅ Sanitiza a lista regime_execucao_datas_exibicao para NÃO duplicar "data_base_calculo"
+ * - remove qualquer item com label "Data-base do cálculo" / "Data base do cálculo"
+ * - remove item com value igual à data_base_calculo
+ * - padroniza "Data-base" -> "Data base"
+ */
+function sanitizeRegimeExecucaoLista(
+  campos: Record<string, unknown>,
+  rawValue: unknown
+): unknown {
+  if (!Array.isArray(rawValue)) return rawValue;
+
+  const base = String(campos["data_base_calculo"] ?? "").trim();
+
+  const normalizeText = (s: string) =>
+    s
+      .replace(/\s+/g, " ")
+      .replace(/^\s+|\s+$/g, "")
+      .replace(/Data-base/gi, "Data base"); // padroniza
+
+  const isBaseLabel = (label: string) => {
+    const l = normalizeText(label).toLowerCase();
+    return l === "data base do cálculo" || l === "data base do calculo";
+  };
+
+  const seenValues = new Set<string>();
+  if (base) seenValues.add(normalizeText(base));
+
+  const cleaned: Array<{ label: string; value: string }> = [];
+
+  for (const it of rawValue as any[]) {
+    const label = normalizeText(String(it?.label ?? ""));
+    const value = normalizeText(String(it?.value ?? ""));
+    if (!label || !value) continue;
+
+    // remove "Data base do cálculo" da lista
+    if (isBaseLabel(label)) continue;
+
+    // remove repetição por value (inclui igual a data_base_calculo)
+    if (seenValues.has(value)) continue;
+
+    cleaned.push({ label, value });
+    seenValues.add(value);
+  }
+
+  return cleaned;
+}
+
 export function organizeFieldsBySections(
   campos: Record<string, unknown>
 ): Array<{
@@ -246,7 +342,8 @@ export function organizeFieldsBySections(
   const allFieldNames = new Set(Object.keys(campos));
   const usedFields = new Set<string>();
 
-  // ✅ campos camel a pular quando o snake existe
+  const shouldHideTechDates = hasResumoNovoDatas(campos);
+
   const skipCamel = new Set<string>();
   for (const [camel, snake] of Object.entries(COMPAT_CAMEL_TO_SNAKE)) {
     if (allFieldNames.has(snake) && allFieldNames.has(camel)) {
@@ -265,6 +362,8 @@ export function organizeFieldsBySections(
 
     for (const fieldName of section.fieldNames) {
       if (skipCamel.has(fieldName)) continue;
+
+      if (shouldHideTechDates && TECH_DATE_FIELDS.has(fieldName)) continue;
 
       if (!allFieldNames.has(fieldName)) {
         if (alwaysShowFields.has(fieldName)) {
@@ -287,6 +386,39 @@ export function organizeFieldsBySections(
             fieldName,
             label: getTrpFieldLabel(fieldName),
             value: rawValue,
+          });
+          usedFields.add(fieldName);
+        }
+        continue;
+      }
+
+      // ✅ regime_execucao_datas_exibicao: sanitiza para não duplicar data_base_calculo
+      if (fieldName === "regime_execucao_datas_exibicao") {
+        const sanitized = sanitizeRegimeExecucaoLista(campos, rawValue);
+        const uiValue = toUiString(fieldName, sanitized);
+        const valueToStore = uiValue === "__STRUCTURED__" ? sanitized : uiValue;
+
+        if (alwaysShowFields.has(fieldName) || uiValue !== "") {
+          fields.push({
+            fieldName,
+            label: getTrpFieldLabel(fieldName),
+            value: valueToStore,
+          });
+          usedFields.add(fieldName);
+        }
+        continue;
+      }
+
+      // ✅ data_base_calculo: label dinâmico e sem hífen
+      if (fieldName === "data_base_calculo") {
+        const uiValue = toUiString(fieldName, rawValue);
+        const label = getDataBaseCalculoLabel(campos); // <-- aqui troca o rótulo
+
+        if (alwaysShowFields.has(fieldName) || uiValue !== "") {
+          fields.push({
+            fieldName,
+            label,
+            value: uiValue,
           });
           usedFields.add(fieldName);
         }
@@ -329,6 +461,8 @@ export function organizeFieldsBySections(
     if (usedFields.has(fieldName)) continue;
     if (skipCamel.has(fieldName)) continue;
     if (fieldName.startsWith("prazos")) continue;
+
+    if (shouldHideTechDates && TECH_DATE_FIELDS.has(fieldName)) continue;
 
     const uiValue = toUiString(fieldName, rawValue);
     if (uiValue === "") continue;
