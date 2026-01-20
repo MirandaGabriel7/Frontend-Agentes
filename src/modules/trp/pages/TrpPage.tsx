@@ -100,6 +100,7 @@ export const TrpPage: React.FC = () => {
 
       tipo_base_prazo: undefined,
       data_recebimento: undefined,
+      data_inicio_servico: undefined,
       data_conclusao_servico: undefined,
 
       data_prevista_entrega_contrato: undefined,
@@ -147,7 +148,7 @@ export const TrpPage: React.FC = () => {
       return "É necessário enviar pelo menos um arquivo (Ficha de Contratualização, Nota Fiscal ou Ordem de Fornecimento).";
     }
 
-    const safeName = sanitizeFileName((form as any).fileName);
+    const safeName = sanitizeFileName(form.fileName);
     if (!safeName) return 'O campo "Nome" é obrigatório.';
 
     if (!form.tipo_contratacao) return 'O campo "Tipo de contrato" é obrigatório.';
@@ -164,13 +165,18 @@ export const TrpPage: React.FC = () => {
       return 'O campo "Base para contagem de Prazo" é obrigatório.';
     }
 
-    if (form.tipo_base_prazo === "DATA_RECEBIMENTO" && !form.data_recebimento) {
-      return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
-    }
+if (form.tipo_base_prazo === "DATA_RECEBIMENTO" && !form.data_recebimento) {
+  return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
+}
 
-    if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
-      return 'O campo "Data de Conclusão do Serviço" é obrigatório quando a base de prazo é SERVICO.';
-    }
+if (form.tipo_base_prazo === "INICIO_SERVICO" && !form.data_inicio_servico) {
+  return 'O campo "Data de Início do Serviço" é obrigatório quando a base de prazo é INICIO_SERVICO.';
+}
+
+if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
+  return 'O campo "Data de Conclusão do Serviço" é obrigatório quando a base de prazo é SERVICO.';
+}
+
 
     if (!form.condicao_prazo) {
       return 'O campo "Condição quanto ao prazo" é obrigatório.';
@@ -275,7 +281,7 @@ export const TrpPage: React.FC = () => {
           .toFixed(2)
       );
 
-      const fileName = sanitizeFileName((form as any).fileName);
+      const fileName = sanitizeFileName(form.fileName);
 
       const dadosRecebimento: GenerateTrpParams["dadosRecebimento"] = {
         tipoContratacao: form.tipo_contratacao!,
@@ -287,6 +293,7 @@ export const TrpPage: React.FC = () => {
 
         competenciaMesAno: form.competencia_mes_ano || null,
         dataRecebimento: form.data_recebimento || null,
+        dataInicioServico: form.data_inicio_servico || null,
         dataConclusaoServico: form.data_conclusao_servico || null,
         dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || null,
         dataEntregaReal: form.data_entrega_real || null,
@@ -344,6 +351,7 @@ export const TrpPage: React.FC = () => {
 
         tipo_base_prazo: undefined,
         data_recebimento: undefined,
+        data_inicio_servico: undefined,
         data_conclusao_servico: undefined,
 
         data_prevista_entrega_contrato: undefined,
@@ -474,7 +482,7 @@ export const TrpPage: React.FC = () => {
             </Typography>
 
             <TextField
-              value={(form as any).fileName || ""}
+              value={form.fileName || ""}
               onChange={(e) => {
                 const cleaned = (e.target.value || "").replace(/\r?\n/g, " ").slice(0, 120);
                 setForm((prev: any) => ({ ...prev, fileName: cleaned }));

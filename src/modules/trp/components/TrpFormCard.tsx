@@ -1,3 +1,5 @@
+// src/modules/trp/components/TrpFormCard.tsx
+
 import React from "react";
 import {
   Paper,
@@ -41,8 +43,11 @@ const formatSelectValue = (value: string): string => {
     BENS: "Bens",
     SERVIÇOS: "Serviços",
     OBRA: "Obra",
+
     DATA_RECEBIMENTO: "Data de Recebimento",
+    INICIO_SERVICO: "Início do Serviço",
     SERVICO: "Conclusão do Serviço",
+
     NO_PRAZO: "No Prazo",
     FORA_DO_PRAZO: "Fora do Prazo",
     TOTAL: "Total",
@@ -58,6 +63,7 @@ const FIELD_LABELS = {
   competencia_mes_ano: "Qual é o mês/ano de competência?",
   tipo_base_prazo: "Qual é a base do prazo?",
   data_recebimento: "Qual é a data de recebimento?",
+  data_inicio_servico: "Qual é a data de início do serviço?",
   data_conclusao_servico: "Qual é a data de conclusão do serviço?",
   condicao_prazo: "Foi entregue/prestado no prazo?",
   data_prevista_entrega_contrato: "Qual era a data prevista (contrato)?",
@@ -150,13 +156,21 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     onChange({ ...value, ...updates } as TrpInputForm);
   };
 
+  // ✅ Atualizado para suportar INICIO_SERVICO
   const handleTipoBasePrazoChange = (newValue: TrpTipoBasePrazo) => {
     const updates: Partial<TrpInputForm> = { tipo_base_prazo: newValue };
+
     if (newValue === "DATA_RECEBIMENTO") {
+      updates.data_inicio_servico = undefined;
+      updates.data_conclusao_servico = undefined;
+    } else if (newValue === "INICIO_SERVICO") {
+      updates.data_recebimento = undefined;
       updates.data_conclusao_servico = undefined;
     } else if (newValue === "SERVICO") {
       updates.data_recebimento = undefined;
+      updates.data_inicio_servico = undefined;
     }
+
     onChange({ ...value, ...updates } as TrpInputForm);
   };
 
@@ -184,6 +198,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
   const showCompetenciaField = value.tipo_contratacao === "SERVIÇOS";
   const showDataRecebimento = value.tipo_base_prazo === "DATA_RECEBIMENTO";
+  const showDataInicioServico = value.tipo_base_prazo === "INICIO_SERVICO";
   const showDataConclusaoServico = value.tipo_base_prazo === "SERVICO";
   const showAtrasoFields = value.condicao_prazo === "FORA_DO_PRAZO";
   const showPendenciasOrdem = value.condicao_quantidade_ordem === "PARCIAL";
@@ -426,9 +441,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               <Select
                 value={value.tipo_contratacao || ""}
                 onChange={(e) =>
-                  handleTipoContratacaoChange(
-                    e.target.value as TrpTipoContrato
-                  )
+                  handleTipoContratacaoChange(e.target.value as TrpTipoContrato)
                 }
                 disabled={disabled}
                 displayEmpty
@@ -855,9 +868,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               <Select
                 value={value.tipo_base_prazo || ""}
                 onChange={(e) =>
-                  handleTipoBasePrazoChange(
-                    e.target.value as TrpTipoBasePrazo
-                  )
+                  handleTipoBasePrazoChange(e.target.value as TrpTipoBasePrazo)
                 }
                 disabled={disabled}
                 displayEmpty
@@ -877,6 +888,13 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   Data de Recebimento — Prazo contado a partir da data de
                   recebimento dos itens
                 </MenuItem>
+
+                {/* ✅ NOVO (antes da conclusão) */}
+                <MenuItem value="INICIO_SERVICO">
+                  Início do Serviço — Prazo contado a partir do início do
+                  serviço
+                </MenuItem>
+
                 <MenuItem value="SERVICO">
                   Conclusão do Serviço — Prazo contado a partir da conclusão do
                   serviço
@@ -907,6 +925,50 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   value={parseDateFromDDMMYYYY(value.data_recebimento)}
                   onChange={(newValue: Dayjs | null) => {
                     updateField("data_recebimento")(
+                      formatDateToDDMMYYYY(newValue)
+                    );
+                  }}
+                  disabled={disabled}
+                  format="DD/MM/YYYY"
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      variant: "outlined",
+                      placeholder: "Selecione a data",
+                      required: true,
+                      InputLabelProps: { shrink: false },
+                      label: "",
+                      sx: inputSx,
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+            </Box>
+          )}
+
+          {/* ✅ NOVO DatePicker: início do serviço */}
+          {showDataInicioServico && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{
+                  mb: 1,
+                  fontSize: "0.9375rem",
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.5,
+                }}
+              >
+                {FIELD_LABELS.data_inicio_servico}
+              </Typography>
+              <LocalizationProvider
+                dateAdapter={AdapterDayjs}
+                adapterLocale="pt-br"
+              >
+                <DatePicker
+                  value={parseDateFromDDMMYYYY(value.data_inicio_servico)}
+                  onChange={(newValue: Dayjs | null) => {
+                    updateField("data_inicio_servico")(
                       formatDateToDDMMYYYY(newValue)
                     );
                   }}
@@ -1212,69 +1274,71 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 transition: "all 0.2s ease",
               }}
             >
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 1.5,
-                  mb: 2.5,
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.info.main, 0.06),
-                }}
-              >
-                <InfoOutlinedIcon
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <Box
                   sx={{
-                    color: theme.palette.info.main,
-                    fontSize: 20,
-                    mt: 0.25,
-                    flexShrink: 0,
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: theme.palette.text.primary,
-                    fontSize: "0.8125rem",
-                    lineHeight: 1.6,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1.5,
+                    mb: 2.5,
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.info.main, 0.06),
                   }}
                 >
-                  Descreva detalhadamente a divergência entre a quantidade
-                  prevista na Ordem de Fornecimento e a quantidade efetivamente
-                  recebida, incluindo informações sobre pendências ou remessas
-                  futuras, se aplicável.
-                </Typography>
-              </Box>
+                  <InfoOutlinedIcon
+                    sx={{
+                      color: theme.palette.info.main,
+                      fontSize: 20,
+                      mt: 0.25,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: theme.palette.text.primary,
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Descreva detalhadamente a divergência entre a quantidade
+                    prevista na Ordem de Fornecimento e a quantidade efetivamente
+                    recebida, incluindo informações sobre pendências ou remessas
+                    futuras, se aplicável.
+                  </Typography>
+                </Box>
 
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
-                  sx={{ mb: 1, fontSize: "0.9375rem" }}
-                >
-                  {FIELD_LABELS.comentarios_quantidade_ordem}
-                </Typography>
-                <TextField
-                  value={value.comentarios_quantidade_ordem || ""}
-                  onChange={(e) =>
-                    updateField("comentarios_quantidade_ordem")(e.target.value)
-                  }
-                  fullWidth
-                  multiline
-                  rows={4}
-                  variant="outlined"
-                  placeholder="Descreva a divergência entre a quantidade prevista na Ordem de Fornecimento e a quantidade efetivamente recebida"
-                  required
-                  disabled={disabled}
-                  InputLabelProps={{ shrink: false }}
-                  label=""
-                  sx={{
-                    ...inputSx,
-                    "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
-                      padding: "16px",
-                    },
-                  }}
-                />
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{ mb: 1, fontSize: "0.9375rem" }}
+                  >
+                    {FIELD_LABELS.comentarios_quantidade_ordem}
+                  </Typography>
+                  <TextField
+                    value={value.comentarios_quantidade_ordem || ""}
+                    onChange={(e) =>
+                      updateField("comentarios_quantidade_ordem")(e.target.value)
+                    }
+                    fullWidth
+                    multiline
+                    rows={4}
+                    variant="outlined"
+                    placeholder="Descreva a divergência entre a quantidade prevista na Ordem de Fornecimento e a quantidade efetivamente recebida"
+                    required
+                    disabled={disabled}
+                    InputLabelProps={{ shrink: false }}
+                    label=""
+                    sx={{
+                      ...inputSx,
+                      "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                        padding: "16px",
+                      },
+                    }}
+                  />
+                </Box>
               </Box>
             </Box>
           )}

@@ -1,7 +1,7 @@
 // src/services/api.ts
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { supabase } from '../infra/supabaseClient';
-import { isUuid } from '../utils/uuid';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { supabase } from "../infra/supabaseClient";
+import { isUuid } from "../utils/uuid";
 
 // ✅ Tipos TRP (ajuste o path se necessário)
 import type {
@@ -10,7 +10,7 @@ import type {
   TrpCondicaoQuantidade,
   TrpTipoBasePrazo,
   TrpItemObjetoPayload,
-} from '../lib/types/trp';
+} from "../lib/types/trp";
 
 function sanitizeFileName(input?: unknown): string | null {
   if (input === null || input === undefined) return null;
@@ -19,10 +19,16 @@ function sanitizeFileName(input?: unknown): string | null {
   if (!s) return null;
 
   // remove quebras, tabs, e normaliza espaços
-  s = s.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  s = s
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   // remove caracteres problemáticos para filename/logs
-  s = s.replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  s = s
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   // limite simples (para não ficar gigante)
   if (s.length > 120) s = s.slice(0, 120).trim();
@@ -35,7 +41,7 @@ function sanitizeFileName(input?: unknown): string | null {
 // - Caso contrário: usa '/api' que será proxyado pelo Vite (vite.config.ts) para http://localhost:4000
 const baseURL = import.meta.env.VITE_TRP_API_URL
   ? `${import.meta.env.VITE_TRP_API_URL}/api`
-  : '/api';
+  : "/api";
 
 export const api: AxiosInstance = axios.create({
   baseURL,
@@ -46,7 +52,7 @@ export const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const isDev =
-      import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+      import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
     let token: string | undefined;
     let orgIdValid: string | undefined;
@@ -59,18 +65,18 @@ api.interceptors.request.use(
       }
 
       // 2) Buscar orgId do localStorage e validar UUID
-      const orgId = localStorage.getItem('planco_active_org_id');
+      const orgId = localStorage.getItem("planco_active_org_id");
       if (orgId && isUuid(orgId)) {
         orgIdValid = orgId;
       }
 
       // 3) Setar headers apenas se token existir
       if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
+        config.headers["Authorization"] = `Bearer ${token}`;
 
         // 4) Setar x-org-id apenas se orgId for válido
         if (orgIdValid) {
-          config.headers['x-org-id'] = orgIdValid;
+          config.headers["x-org-id"] = orgIdValid;
         }
       }
       // Se não existir token: não setar Authorization (requisições públicas podem continuar)
@@ -78,26 +84,26 @@ api.interceptors.request.use(
       // Em caso de erro inesperado, continuar sem headers
       // Não quebrar requisições por causa de erro de auth
       if (isDev) {
-        console.warn('[API] Erro inesperado ao injetar headers:', error);
+        console.warn("[API] Erro inesperado ao injetar headers:", error);
       }
     }
 
     // 5) Logs apenas em dev
     if (isDev) {
       console.debug(
-        '[API]',
-        config.method?.toUpperCase() || 'UNKNOWN',
-        config.url || '/',
+        "[API]",
+        config.method?.toUpperCase() || "UNKNOWN",
+        config.url || "/",
         {
           hasAuth: !!token,
           hasOrg: !!orgIdValid,
-        }
+        },
       );
     }
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // ===================================================
@@ -107,7 +113,7 @@ api.interceptors.request.use(
 // Resposta do POST /trp/generate
 export interface TrpGenerateResponse {
   runId: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   createdAt: string;
 }
 
@@ -120,7 +126,7 @@ export interface TrpGenerateApiResponse {
 // Resposta do GET /trp/runs/:runId
 export interface TrpRunData {
   runId: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
 
   // ✅ NOVO: nome do termo (preferencial / top-level vindo do backend)
   // (se o backend ainda não enviar, será preenchido por fallback no fetchTrpRun)
@@ -136,7 +142,10 @@ export interface TrpRunData {
   camposTrpNormalizados?: Record<string, unknown>; // fallback camelCase
 
   // ✅ tipado com fallback para fileName dentro do contexto
-  contexto_recebimento_raw?: ({ fileName?: string | null } & Record<string, unknown>);
+  contexto_recebimento_raw?: { fileName?: string | null } & Record<
+    string,
+    unknown
+  >;
 
   createdAt?: string;
   updatedAt?: string;
@@ -151,7 +160,7 @@ export interface TrpRunApiResponse {
 // Resposta do GET /trp/runs?limit=20
 export interface TrpRunListItem {
   runId: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   createdAt: string;
   updatedAt?: string;
 
@@ -208,6 +217,7 @@ export interface GenerateTrpParams {
     competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
     tipoBasePrazo: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
     dataRecebimento?: string | null;
+    dataInicioServico?: string | null;
     dataConclusaoServico?: string | null;
     dataPrevistaEntregaContrato?: string | null;
     dataEntregaReal?: string | null;
@@ -239,7 +249,7 @@ export interface GenerateTrpParams {
  * O resultado completo deve ser buscado via fetchTrpRun(runId)
  */
 export async function generateTrp(
-  params: GenerateTrpParams
+  params: GenerateTrpParams,
 ): Promise<TrpGenerateResponse> {
   // ✅ validação mínima do novo fluxo
   if (
@@ -247,7 +257,28 @@ export async function generateTrp(
     params.dadosRecebimento.itens_objeto.length === 0
   ) {
     throw new Error(
-      'Informe pelo menos 1 item em "itens_objeto" para gerar o TRP.'
+      'Informe pelo menos 1 item em "itens_objeto" para gerar o TRP.',
+    );
+  }
+
+  // ✅ validação da data-base conforme tipoBasePrazo
+  const base = params.dadosRecebimento.tipoBasePrazo;
+
+  if (base === "DATA_RECEBIMENTO" && !params.dadosRecebimento.dataRecebimento) {
+    throw new Error(
+      'Informe "dataRecebimento" quando a base do prazo for DATA_RECEBIMENTO.',
+    );
+  }
+
+  if (base === "INICIO_SERVICO" && !params.dadosRecebimento.dataInicioServico) {
+    throw new Error(
+      'Informe "dataInicioServico" quando a base do prazo for INICIO_SERVICO.',
+    );
+  }
+
+  if (base === "SERVICO" && !params.dadosRecebimento.dataConclusaoServico) {
+    throw new Error(
+      'Informe "dataConclusaoServico" quando a base do prazo for SERVICO.',
     );
   }
 
@@ -258,47 +289,57 @@ export async function generateTrp(
     : { ...params.dadosRecebimento };
 
   const formData = new FormData();
-  formData.append('dadosRecebimento', JSON.stringify(dadosRecebimentoFinal));
+  formData.append("dadosRecebimento", JSON.stringify(dadosRecebimentoFinal));
 
   if (params.files.fichaContratualizacao) {
-    formData.append('fichaContratualizacao', params.files.fichaContratualizacao);
+    formData.append(
+      "fichaContratualizacao",
+      params.files.fichaContratualizacao,
+    );
   }
   if (params.files.notaFiscal) {
-    formData.append('notaFiscal', params.files.notaFiscal);
+    formData.append("notaFiscal", params.files.notaFiscal);
   }
   if (params.files.ordemFornecimento) {
-    formData.append('ordemFornecimento', params.files.ordemFornecimento);
+    formData.append("ordemFornecimento", params.files.ordemFornecimento);
   }
 
-  const response = await api.post<TrpGenerateApiResponse>('/trp/generate', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await api.post<TrpGenerateApiResponse>(
+    "/trp/generate",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
 
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   if (isDev) {
-    console.debug('[TRP API] Generate response:', {
+    console.debug("[TRP API] Generate response:", {
       keys: Object.keys(response.data),
-      hasSuccess: 'success' in response.data,
-      hasData: 'data' in response.data,
+      hasSuccess: "success" in response.data,
+      hasData: "data" in response.data,
     });
   }
 
   const wrapper = response.data;
 
   if (wrapper.success !== true) {
-    const errorMessage = wrapper.message || 'Falha ao gerar TRP no servidor.';
+    const errorMessage = wrapper.message || "Falha ao gerar TRP no servidor.";
     if (isDev) {
-      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+      console.error(
+        "[TRP API] Backend retornou success !== true:",
+        errorMessage,
+      );
     }
     throw new Error(errorMessage);
   }
 
   if (!wrapper.data) {
-    const errorMessage = 'Resposta do servidor não contém data.';
+    const errorMessage = "Resposta do servidor não contém data.";
     if (isDev) {
-      console.error('[TRP API]', errorMessage);
+      console.error("[TRP API]", errorMessage);
     }
     throw new Error(errorMessage);
   }
@@ -306,7 +347,7 @@ export async function generateTrp(
   const result = wrapper.data;
 
   if (isDev) {
-    console.debug('[TRP API] Generate result:', {
+    console.debug("[TRP API] Generate result:", {
       runId: result.runId,
       status: result.status,
       createdAt: result.createdAt,
@@ -322,19 +363,19 @@ export async function generateTrp(
  */
 export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   if (isDev) {
-    console.debug('[TRP API] Fetching run:', runId);
+    console.debug("[TRP API] Fetching run:", runId);
   }
 
   const response = await api.get<TrpRunApiResponse>(`/trp/runs/${runId}`);
 
   if (isDev) {
-    console.debug('[TRP API] Fetch response:', {
+    console.debug("[TRP API] Fetch response:", {
       keys: Object.keys(response.data),
-      hasSuccess: 'success' in response.data,
-      hasData: 'data' in response.data,
+      hasSuccess: "success" in response.data,
+      hasData: "data" in response.data,
     });
   }
 
@@ -343,7 +384,10 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   if (wrapper.success !== true) {
     const errorMessage = wrapper.message || `Falha ao buscar TRP ${runId}`;
     if (isDev) {
-      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+      console.error(
+        "[TRP API] Backend retornou success !== true:",
+        errorMessage,
+      );
     }
     throw new Error(errorMessage);
   }
@@ -351,7 +395,7 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   if (!wrapper.data) {
     const errorMessage = `TRP ${runId} não encontrado`;
     if (isDev) {
-      console.error('[TRP API]', errorMessage);
+      console.error("[TRP API]", errorMessage);
     }
     throw new Error(errorMessage);
   }
@@ -359,12 +403,14 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
   const result = wrapper.data;
 
   // ✅ Garantir fileName no retorno (fallback do contexto_recebimento_raw)
-  const ctxFileName = sanitizeFileName(result.contexto_recebimento_raw?.fileName);
+  const ctxFileName = sanitizeFileName(
+    result.contexto_recebimento_raw?.fileName,
+  );
   const topFileName = sanitizeFileName(result.fileName);
   result.fileName = topFileName || ctxFileName || null;
 
   if (isDev) {
-    console.debug('[TRP API] Run data:', {
+    console.debug("[TRP API] Run data:", {
       runId: result.runId,
       status: result.status,
       fileName: result.fileName,
@@ -389,34 +435,41 @@ export async function fetchTrpRun(runId: string): Promise<TrpRunData> {
  *
  * ✅ Backend retorna: { success: true, data: { items: [...], nextCursor: "..." } }
  */
-export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]> {
+export async function listTrpRuns(
+  limit: number = 20,
+): Promise<TrpRunListItem[]> {
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   if (isDev) {
-    console.debug('[TRP API] Listing runs with limit:', limit);
+    console.debug("[TRP API] Listing runs with limit:", limit);
   }
 
-  const response = await api.get<TrpListRunsApiResponse>(`/trp/runs?limit=${limit}`);
+  const response = await api.get<TrpListRunsApiResponse>(
+    `/trp/runs?limit=${limit}`,
+  );
 
   if (isDev) {
     const d = response.data?.data as any;
-    console.debug('[TRP API] List response:', {
+    console.debug("[TRP API] List response:", {
       keys: Object.keys(response.data),
-      hasSuccess: 'success' in response.data,
-      hasData: 'data' in response.data,
+      hasSuccess: "success" in response.data,
+      hasData: "data" in response.data,
       dataType: typeof response.data?.data,
       isArray: Array.isArray(response.data?.data),
-      hasItems: !!(d && typeof d === 'object' && 'items' in d),
+      hasItems: !!(d && typeof d === "object" && "items" in d),
     });
   }
 
   const wrapper = response.data;
 
   if (wrapper.success !== true) {
-    const errorMessage = wrapper.message || 'Falha ao listar TRPs';
+    const errorMessage = wrapper.message || "Falha ao listar TRPs";
     if (isDev) {
-      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+      console.error(
+        "[TRP API] Backend retornou success !== true:",
+        errorMessage,
+      );
     }
     throw new Error(errorMessage);
   }
@@ -424,7 +477,11 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
   // ✅ CORRETO: Backend retorna { items: [...], nextCursor: "..." }
   // Se wrapper.data for um objeto com items, usar items
   // Se wrapper.data for um array (compatibilidade), usar diretamente
-  if (wrapper.data && typeof wrapper.data === 'object' && 'items' in wrapper.data) {
+  if (
+    wrapper.data &&
+    typeof wrapper.data === "object" &&
+    "items" in wrapper.data
+  ) {
     return (wrapper.data as { items: TrpRunListItem[] }).items || [];
   }
 
@@ -442,7 +499,7 @@ export async function listTrpRuns(limit: number = 20): Promise<TrpRunListItem[]>
 export interface FetchTrpRunsParams {
   limit?: number;
   cursor?: string;
-  status?: 'ALL' | 'COMPLETED' | 'FAILED' | 'PENDING' | 'RUNNING';
+  status?: "ALL" | "COMPLETED" | "FAILED" | "PENDING" | "RUNNING";
   q?: string; // Busca por número de contrato ou NF
 }
 
@@ -452,21 +509,21 @@ export interface FetchTrpRunsResult {
 }
 
 export async function fetchTrpRuns(
-  params: FetchTrpRunsParams = {}
+  params: FetchTrpRunsParams = {},
 ): Promise<FetchTrpRunsResult> {
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   const { limit = 20, cursor, status, q } = params;
 
   const queryParams = new URLSearchParams();
-  queryParams.set('limit', limit.toString());
-  if (cursor) queryParams.set('cursor', cursor);
-  if (status && status !== 'ALL') queryParams.set('status', status);
-  if (q) queryParams.set('q', q);
+  queryParams.set("limit", limit.toString());
+  if (cursor) queryParams.set("cursor", cursor);
+  if (status && status !== "ALL") queryParams.set("status", status);
+  if (q) queryParams.set("q", q);
 
   if (isDev) {
-    console.debug('[TRP API] Fetching runs with params:', {
+    console.debug("[TRP API] Fetching runs with params:", {
       limit,
       cursor,
       status,
@@ -475,15 +532,18 @@ export async function fetchTrpRuns(
   }
 
   const response = await api.get<TrpListRunsApiResponse>(
-    `/trp/runs?${queryParams.toString()}`
+    `/trp/runs?${queryParams.toString()}`,
   );
 
   const wrapper = response.data;
 
   if (wrapper.success !== true) {
-    const errorMessage = wrapper.message || 'Falha ao buscar TRPs';
+    const errorMessage = wrapper.message || "Falha ao buscar TRPs";
     if (isDev) {
-      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+      console.error(
+        "[TRP API] Backend retornou success !== true:",
+        errorMessage,
+      );
     }
     throw new Error(errorMessage);
   }
@@ -491,8 +551,15 @@ export async function fetchTrpRuns(
   // ✅ CORRETO: Backend retorna { success: true, data: { items: [...], nextCursor: "..." } }
   // Se wrapper.data for um objeto com items, usar items e nextCursor de dentro
   // Se wrapper.data for um array (compatibilidade), usar diretamente
-  if (wrapper.data && typeof wrapper.data === 'object' && 'items' in wrapper.data) {
-    const dataObj = wrapper.data as { items: TrpRunListItem[]; nextCursor?: string };
+  if (
+    wrapper.data &&
+    typeof wrapper.data === "object" &&
+    "items" in wrapper.data
+  ) {
+    const dataObj = wrapper.data as {
+      items: TrpRunListItem[];
+      nextCursor?: string;
+    };
     return {
       items: dataObj.items || [],
       nextCursor: dataObj.nextCursor || wrapper.nextCursor,
@@ -518,20 +585,24 @@ export async function fetchTrpRuns(
  */
 export async function fetchTrpRunsSummary(): Promise<TrpRunsSummary> {
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   if (isDev) {
-    console.debug('[TRP API] Fetching runs summary');
+    console.debug("[TRP API] Fetching runs summary");
   }
 
-  const response = await api.get<TrpRunsSummaryApiResponse>('/trp/runs/summary');
+  const response =
+    await api.get<TrpRunsSummaryApiResponse>("/trp/runs/summary");
 
   const wrapper = response.data;
 
   if (wrapper.success !== true) {
-    const errorMessage = wrapper.message || 'Falha ao buscar resumo de TRPs';
+    const errorMessage = wrapper.message || "Falha ao buscar resumo de TRPs";
     if (isDev) {
-      console.error('[TRP API] Backend retornou success !== true:', errorMessage);
+      console.error(
+        "[TRP API] Backend retornou success !== true:",
+        errorMessage,
+      );
     }
     throw new Error(errorMessage);
   }
@@ -552,8 +623,8 @@ export interface TrpRunRequest {
   fileId: string;
   dadosRecebimento: {
     dataRecebimento: string;
-    condicaoPrazo: 'NO_PRAZO' | 'ATRASADO';
-    condicaoQuantidade: 'CONFORME_EMPENHO' | 'MENOR' | 'MAIOR';
+    condicaoPrazo: "NO_PRAZO" | "ATRASADO";
+    condicaoQuantidade: "CONFORME_EMPENHO" | "MENOR" | "MAIOR";
     observacoes: string | null;
   };
 }
@@ -567,19 +638,25 @@ export interface TrpRunResponse {
 
 export async function uploadFile(file: File): Promise<UploadFileResponse> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
-  const response = await api.post<UploadFileResponse>('/files/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
+  const response = await api.post<UploadFileResponse>(
+    "/files/upload",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     },
-  });
+  );
 
   return response.data;
 }
 
-export async function runTrpAgent(data: TrpRunRequest): Promise<TrpRunResponse> {
-  const response = await api.post<TrpRunResponse>('/agents/trp/run', data);
+export async function runTrpAgent(
+  data: TrpRunRequest,
+): Promise<TrpRunResponse> {
+  const response = await api.post<TrpRunResponse>("/agents/trp/run", data);
   return response.data;
 }
 
@@ -616,7 +693,7 @@ function extractFilenameFromDisposition(header?: string | null): string | null {
   }
 
   // Sanitizar mínimo: remover caracteres perigosos
-  filename = filename.replace(/[<>:"/\\|?*]/g, '_').trim();
+  filename = filename.replace(/[<>:"/\\|?*]/g, "_").trim();
 
   return filename || null;
 }
@@ -634,23 +711,23 @@ function extractFilenameFromDisposition(header?: string | null): string | null {
  */
 export async function downloadTrpRun(
   runId: string,
-  format: 'pdf' | 'docx'
+  format: "pdf" | "docx",
 ): Promise<void> {
   const isDev =
-    import.meta.env?.MODE === 'development' || import.meta.env?.DEV === true;
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
 
   // ✅ VALIDAÇÃO CRÍTICA: runId é obrigatório e deve ser string não vazia
-  if (!runId || typeof runId !== 'string' || runId.trim() === '') {
-    throw new Error('runId é obrigatório e deve ser uma string válida');
+  if (!runId || typeof runId !== "string" || runId.trim() === "") {
+    throw new Error("runId é obrigatório e deve ser uma string válida");
   }
 
   // ✅ VALIDAÇÃO: runId deve ser UUID válido
   if (!isUuid(runId)) {
-    throw new Error('runId deve ser um UUID válido');
+    throw new Error("runId deve ser um UUID válido");
   }
 
   if (isDev) {
-    console.debug('[TRP Download] Iniciando download:', { runId, format });
+    console.debug("[TRP Download] Iniciando download:", { runId, format });
   }
 
   // IMPORTANT: validateStatus: () => true para tratar erros manualmente
@@ -658,16 +735,17 @@ export async function downloadTrpRun(
   // ✅ Endpoint: GET /api/trp/runs/${runId}/download?format=${format}
   const res = await api.get(`/trp/runs/${runId}/download`, {
     params: { format },
-    responseType: 'blob',
+    responseType: "blob",
     validateStatus: () => true, // Não lançar exceção automaticamente
   });
 
   if (isDev) {
-    console.debug('[TRP Download] Resposta recebida:', {
+    console.debug("[TRP Download] Resposta recebida:", {
       status: res.status,
-      contentType: res.headers['content-type'] || res.headers['Content-Type'],
+      contentType: res.headers["content-type"] || res.headers["Content-Type"],
       contentDisposition:
-        res.headers['content-disposition'] || res.headers['Content-Disposition'],
+        res.headers["content-disposition"] ||
+        res.headers["Content-Disposition"],
     });
   }
 
@@ -689,7 +767,7 @@ export async function downloadTrpRun(
       }
 
       if (isDev) {
-        console.error('[TRP Download] Erro HTTP:', {
+        console.error("[TRP Download] Erro HTTP:", {
           status: res.status,
           message: msg,
         });
@@ -701,23 +779,23 @@ export async function downloadTrpRun(
       // Mapear status codes para mensagens específicas conforme requisitos
       switch (res.status) {
         case 401:
-          throw Object.assign(new Error('Sessão expirada / sem permissão'), {
+          throw Object.assign(new Error("Sessão expirada / sem permissão"), {
             status: 401,
           });
         case 403:
-          throw Object.assign(new Error('Sessão expirada / sem permissão'), {
+          throw Object.assign(new Error("Sessão expirada / sem permissão"), {
             status: 403,
           });
         case 404:
-          throw Object.assign(new Error('Documento não encontrado'), {
+          throw Object.assign(new Error("Documento não encontrado"), {
             status: 404,
           });
         case 409:
-          throw Object.assign(new Error('Documento ainda não finalizado'), {
+          throw Object.assign(new Error("Documento ainda não finalizado"), {
             status: 409,
           });
         case 429:
-          throw Object.assign(new Error('Aguarde antes de gerar novamente'), {
+          throw Object.assign(new Error("Aguarde antes de gerar novamente"), {
             status: 429,
           });
         default:
@@ -731,14 +809,14 @@ export async function downloadTrpRun(
       // Caso contrário, lançar erro genérico
       throw Object.assign(
         new Error(err.message || `Erro ao baixar arquivo (${res.status})`),
-        { status: res.status }
+        { status: res.status },
       );
     }
   }
 
   // Sucesso: extrair filename e fazer download
   const disposition =
-    res.headers['content-disposition'] || res.headers['Content-Disposition'];
+    res.headers["content-disposition"] || res.headers["Content-Disposition"];
   let filename = extractFilenameFromDisposition(disposition);
 
   // ✅ Fallback: usar runId se não encontrar no header
@@ -748,22 +826,23 @@ export async function downloadTrpRun(
   }
 
   if (isDev) {
-    console.debug('[TRP Download] Filename extraído:', filename);
+    console.debug("[TRP Download] Filename extraído:", filename);
   }
 
   // Criar blob com o tipo correto do header ou fallback
-  const contentType = res.headers['content-type'] || res.headers['Content-Type'];
+  const contentType =
+    res.headers["content-type"] || res.headers["Content-Type"];
   const blob = new Blob([res.data], {
     type:
       contentType ||
-      (format === 'pdf'
-        ? 'application/pdf'
-        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+      (format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
   });
 
   // Criar link temporário e fazer download
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -772,6 +851,6 @@ export async function downloadTrpRun(
   window.URL.revokeObjectURL(url);
 
   if (isDev) {
-    console.debug('[TRP Download] Download concluído:', filename);
+    console.debug("[TRP Download] Download concluído:", filename);
   }
 }

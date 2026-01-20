@@ -1,10 +1,21 @@
 // src/lib/types/trp.ts
 
-export type TrpStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "RUNNING";
+export type TrpStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED"
+  | "RUNNING";
 
 export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
-export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "SERVICO";
+
+// ✅ NOVO: adiciona INICIO_SERVICO (e mantém SERVICO p/ conclusão)
+export type TrpTipoBasePrazo =
+  | "DATA_RECEBIMENTO"
+  | "INICIO_SERVICO"
+  | "SERVICO";
+
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
 
 // ✅ Campos retornados pelo backend (campos_trp_normalizados)
@@ -21,7 +32,6 @@ export type TrpUnidadeMedida = string;
  * O fiscal digita valor_unitario como string (ex: "12,50").
  * O total do item pode ser calculado no front.
  */
-
 export interface TrpItemObjeto {
   descricao: string;
   unidade_medida: TrpUnidadeMedida;
@@ -65,7 +75,12 @@ export interface TrpInputForm {
   // base prazo
   tipo_base_prazo?: TrpTipoBasePrazo;
   data_recebimento?: string; // DD/MM/AAAA ou ISO
-  data_conclusao_servico?: string; // DD/MM/AAAA ou ISO
+
+  // ✅ NOVO: início do serviço (DD/MM/AAAA ou ISO)
+  data_inicio_servico?: string;
+
+  // conclusão do serviço (DD/MM/AAAA ou ISO)
+  data_conclusao_servico?: string;
 
   // prazo
   condicao_prazo?: TrpCondicaoPrazo;
@@ -91,7 +106,7 @@ export interface TrpInputForm {
   data_assinatura?: string;
   area_demandante_nome?: string;
 
-   // ✅ NOVO: nome curto para o fiscal identificar (vira fileName no backend/N8N)
+  // ✅ NOVO: nome curto para o fiscal identificar (vira fileName no backend/N8N)
   fileName?: string;
 }
 
@@ -117,6 +132,11 @@ export interface DadosRecebimentoPayload {
   // base prazo
   tipoBasePrazo: TrpTipoBasePrazo;
   dataRecebimento?: string | null;
+
+  // ✅ NOVO: início do serviço
+  dataInicioServico?: string | null;
+
+  // conclusão do serviço
   dataConclusaoServico?: string | null;
 
   // datas extras (se necessário)
