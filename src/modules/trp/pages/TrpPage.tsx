@@ -18,7 +18,11 @@ import { TrpUploadCard } from "../components/TrpUploadCard";
 import { TrpFormCard } from "../components/TrpFormCard";
 import { TrpActionsBar } from "../components/TrpActionsBar";
 
-import { TrpInputForm, TrpItemObjeto, TrpVencimentoTipo } from "../../../lib/types/trp";
+import {
+  TrpInputForm,
+  TrpItemObjeto,
+  TrpVencimentoTipo,
+} from "../../../lib/types/trp";
 import { generateTrp, GenerateTrpParams } from "../../../services/api";
 
 type SnackbarState = {
@@ -54,24 +58,21 @@ function sanitizeFileName(input?: unknown): string | null {
   if (!s) return null;
 
   // remove quebras e normaliza espaços
-  s = s.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  s = s
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   // remove caracteres problemáticos
-  s = s.replace(/[<>:"/\\|?*\x00-\x1F]/g, " ").replace(/\s{2,}/g, " ").trim();
+  s = s
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   // limite simples
   if (s.length > 120) s = s.slice(0, 120).trim();
 
   return s || null;
-}
-
-function parseIntSafe(raw: unknown): number | null {
-  if (raw === undefined || raw === null) return null;
-  const s = String(raw).trim();
-  if (!s) return null;
-  const n = Number(s.replace(/[^\d]/g, ""));
-  if (!Number.isFinite(n)) return null;
-  return Math.trunc(n);
 }
 
 export const TrpPage: React.FC = () => {
@@ -99,7 +100,7 @@ export const TrpPage: React.FC = () => {
       valor_unitario: "",
       valor_total_calculado: undefined,
     }),
-    []
+    [],
   );
 
   const [form, setForm] = useState<TrpInputForm>(() => ({
@@ -114,6 +115,9 @@ export const TrpPage: React.FC = () => {
     // ✅ NOVO: CIAS (prazos)
     prazo_provisorio_dias_uteis: undefined,
     prazo_definitivo_dias_uteis: undefined,
+
+    // ✅ NOVO: CIAS (liquidação - dias corridos)
+    prazo_liquidacao_dias_corridos: undefined,
 
     // ✅ NOVO: CIAS (vencimento)
     vencimento_tipo: undefined,
@@ -158,20 +162,28 @@ export const TrpPage: React.FC = () => {
     typeof v === "number" && Number.isFinite(v);
 
   const validateForm = useCallback((): string | null => {
-    if (!fichaContratualizacaoFile && !notaFiscalFile && !ordemFornecimentoFile) {
+    if (
+      !fichaContratualizacaoFile &&
+      !notaFiscalFile &&
+      !ordemFornecimentoFile
+    ) {
       return "É necessário enviar pelo menos um arquivo (Ficha de Contratualização, Nota Fiscal ou Ordem de Fornecimento).";
     }
 
     const safeName = sanitizeFileName(form.fileName);
     if (!safeName) return 'O campo "Nome" é obrigatório.';
 
-    if (!form.tipo_contratacao) return 'O campo "Tipo de contrato" é obrigatório.';
+    if (!form.tipo_contratacao)
+      return 'O campo "Tipo de contrato" é obrigatório.';
 
     if (form.tipo_contratacao === "SERVIÇOS" && !form.competencia_mes_ano) {
       return 'O campo "Mês/Ano de competência" é obrigatório quando o tipo de contrato é SERVIÇOS.';
     }
 
-    if (form.competencia_mes_ano && !/^\d{2}\/\d{4}$/.test(form.competencia_mes_ano)) {
+    if (
+      form.competencia_mes_ano &&
+      !/^\d{2}\/\d{4}$/.test(form.competencia_mes_ano)
+    ) {
       return 'O campo "Mês/Ano de competência" deve estar no formato MM/AAAA (ex: 12/2025).';
     }
 
@@ -183,7 +195,10 @@ export const TrpPage: React.FC = () => {
       return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
     }
 
-    if (form.tipo_base_prazo === "INICIO_SERVICO" && !form.data_inicio_servico) {
+    if (
+      form.tipo_base_prazo === "INICIO_SERVICO" &&
+      !form.data_inicio_servico
+    ) {
       return 'O campo "Data de Início do Serviço" é obrigatório quando a base de prazo é INICIO_SERVICO.';
     }
 
@@ -200,6 +215,12 @@ export const TrpPage: React.FC = () => {
     }
     if (!isValidNumber(pDef) || pDef < 0) {
       return 'O campo "Definitivo (dias úteis)" é obrigatório e deve ser >= 0.';
+    }
+
+    // ✅ NOVO: liquidação (dias corridos)
+    const pLiq = form.prazo_liquidacao_dias_corridos;
+    if (!isValidNumber(pLiq) || pLiq < 0) {
+      return 'O campo "Liquidação (dias corridos)" é obrigatório e deve ser >= 0.';
     }
 
     // ✅ NOVO: validação vencimento CIAS
@@ -280,7 +301,7 @@ export const TrpPage: React.FC = () => {
 
   const canExecute = useMemo(() => {
     const hasAnyFile = Boolean(
-      fichaContratualizacaoFile || notaFiscalFile || ordemFornecimentoFile
+      fichaContratualizacaoFile || notaFiscalFile || ordemFornecimentoFile,
     );
     if (!hasAnyFile) return false;
     return validateForm() === null;
@@ -299,7 +320,11 @@ export const TrpPage: React.FC = () => {
       const validationError = validateForm();
       if (validationError) {
         setErrorMessage(validationError);
-        setSnackbar({ open: true, message: validationError, severity: "error" });
+        setSnackbar({
+          open: true,
+          message: validationError,
+          severity: "error",
+        });
         return;
       }
 
@@ -313,7 +338,7 @@ export const TrpPage: React.FC = () => {
           const valor_unitario_num = parseMoneyBR(valor_unitario_raw) ?? 0;
 
           const valor_total_calculado = Number(
-            (quantidade * valor_unitario_num).toFixed(2)
+            (quantidade * valor_unitario_num).toFixed(2),
           );
 
           return {
@@ -330,7 +355,7 @@ export const TrpPage: React.FC = () => {
       const valor_total_geral = Number(
         itens_objeto
           .reduce((acc, it) => acc + (it.valor_total_calculado || 0), 0)
-          .toFixed(2)
+          .toFixed(2),
       );
 
       const fileName = sanitizeFileName(form.fileName);
@@ -351,11 +376,13 @@ export const TrpPage: React.FC = () => {
         // ✅ NOVO CIAS
         prazoProvisorioDiasUteis: form.prazo_provisorio_dias_uteis ?? null,
         prazoDefinitivoDiasUteis: form.prazo_definitivo_dias_uteis ?? null,
+        prazoLiquidacaoDiasCorridos: form.prazo_liquidacao_dias_corridos ?? null,
         vencimentoTipo: (form.vencimento_tipo as TrpVencimentoTipo) ?? null,
         vencimentoDiasCorridos: form.vencimento_dias_corridos ?? null,
         vencimentoDiaFixo: form.vencimento_dia_fixo ?? null,
 
-        dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || null,
+        dataPrevistaEntregaContrato:
+          form.data_prevista_entrega_contrato || null,
         dataEntregaReal: form.data_entrega_real || null,
         motivoAtraso: form.motivo_atraso || null,
         comentariosQuantidadeOrdem: form.comentarios_quantidade_ordem || null,
@@ -416,6 +443,7 @@ export const TrpPage: React.FC = () => {
       // ✅ NOVO CIAS
       prazo_provisorio_dias_uteis: undefined,
       prazo_definitivo_dias_uteis: undefined,
+      prazo_liquidacao_dias_corridos: undefined,
       vencimento_tipo: undefined,
       vencimento_dias_corridos: undefined,
       vencimento_dia_fixo: undefined,
@@ -490,7 +518,8 @@ export const TrpPage: React.FC = () => {
                 mx: "auto",
               }}
             >
-              Preencha os dados abaixo para gerar um novo TRP com assistência da nossa IA.
+              Preencha os dados abaixo para gerar um novo TRP com assistência da
+              nossa IA.
             </Typography>
           </Box>
 
@@ -543,7 +572,8 @@ export const TrpPage: React.FC = () => {
                 maxWidth: 780,
               }}
             >
-              Esse nome será usado para identificar o arquivo gerado (ex: “TRP – Planco AI”).
+              Esse nome será usado para identificar o arquivo gerado (ex: “TRP –
+              Planco AI”).
             </Typography>
 
             <TextField

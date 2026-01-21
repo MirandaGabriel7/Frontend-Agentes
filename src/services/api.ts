@@ -227,6 +227,9 @@ export interface GenerateTrpParams {
     prazoProvisorioDiasUteis?: number | null;
     prazoDefinitivoDiasUteis?: number | null;
 
+    // ✅ NOVO: prazo de liquidação (dias corridos)
+    prazoLiquidacaoDiasCorridos?: number | null;
+
     // ✅ NOVO: vencimento CIAS
     vencimentoTipo?: TrpVencimentoTipo | null; // "DIAS_CORRIDOS" | "DIA_FIXO"
     vencimentoDiasCorridos?: number | null;
@@ -295,16 +298,38 @@ export async function generateTrp(
   // ✅ NOVO: validação mínima dos prazos CIAS
   const pProv = params.dadosRecebimento.prazoProvisorioDiasUteis;
   const pDef = params.dadosRecebimento.prazoDefinitivoDiasUteis;
+  const pLiq = params.dadosRecebimento.prazoLiquidacaoDiasCorridos;
 
-  if (pProv === undefined || pProv === null || !Number.isFinite(pProv) || pProv < 0) {
+  if (
+    pProv === undefined ||
+    pProv === null ||
+    !Number.isFinite(pProv) ||
+    pProv < 0
+  ) {
     throw new Error(
       'Informe "prazoProvisorioDiasUteis" (>= 0) para gerar o TRP.',
     );
   }
 
-  if (pDef === undefined || pDef === null || !Number.isFinite(pDef) || pDef < 0) {
+  if (
+    pDef === undefined ||
+    pDef === null ||
+    !Number.isFinite(pDef) ||
+    pDef < 0
+  ) {
     throw new Error(
       'Informe "prazoDefinitivoDiasUteis" (>= 0) para gerar o TRP.',
+    );
+  }
+
+  if (
+    pLiq === undefined ||
+    pLiq === null ||
+    !Number.isFinite(pLiq) ||
+    pLiq < 0
+  ) {
+    throw new Error(
+      'Informe "prazoLiquidacaoDiasCorridos" (>= 0) para gerar o TRP.',
     );
   }
 
@@ -317,7 +342,12 @@ export async function generateTrp(
 
   if (vTipo === "DIAS_CORRIDOS") {
     const dias = params.dadosRecebimento.vencimentoDiasCorridos;
-    if (dias === undefined || dias === null || !Number.isFinite(dias) || dias < 0) {
+    if (
+      dias === undefined ||
+      dias === null ||
+      !Number.isFinite(dias) ||
+      dias < 0
+    ) {
       throw new Error(
         'Informe "vencimentoDiasCorridos" (>= 0) quando vencimentoTipo for DIAS_CORRIDOS.',
       );

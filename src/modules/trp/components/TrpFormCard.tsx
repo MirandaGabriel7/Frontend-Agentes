@@ -66,7 +66,8 @@ const FIELD_LABELS = {
   tipo_contratacao: "Qual é o tipo de contrato?",
   competencia_mes_ano: "Qual é o mês/ano de competência?",
   itens_objeto: "Quais foram os itens entregues ou serviços prestados?",
-  condicao_quantidade_ordem: "A quantidade confere com a Ordem de Fornecimento?",
+  condicao_quantidade_ordem:
+    "A quantidade confere com a Ordem de Fornecimento?",
   comentarios_quantidade_ordem: "Explique a divergência/pendência",
 
   // Prazos
@@ -75,8 +76,11 @@ const FIELD_LABELS = {
   data_inicio_servico: "Qual é a data de início do serviço?",
   data_conclusao_servico: "Qual é a data de conclusão do serviço?",
   prazos: "Quais os Prazos do Contrato?",
-  prazo_provisorio_dias_uteis: "Qual o prazo para o Termo de Recebimento Provisório?",
-  prazo_definitivo_dias_uteis: "Qual o prazo para o Termo de Recebimento Definitivo?",
+  prazo_provisorio_dias_uteis:
+    "Qual o prazo para o Termo de Recebimento Provisório?",
+  prazo_definitivo_dias_uteis:
+    "Qual o prazo para o Termo de Recebimento Definitivo?",
+  prazo_liquidacao_dias_corridos: "Qual o prazo para a Liquidação?",
   vencimento_tipo: "Vencimento: como é definido?",
   vencimento_dias_corridos: "Vencimento: informe quantos dias corridos",
   vencimento_dia_fixo: "Vencimento fixo: informe o dia do mês (1 a 31)",
@@ -145,8 +149,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   const theme = useTheme();
 
   const updateField =
-    (field: keyof TrpInputForm) => (newValue: TrpInputForm[keyof TrpInputForm]) => {
-      onChange({ ...value, [field]: newValue } as TrpInputForm);
+    <K extends keyof TrpInputForm>(field: K) =>
+    (newValue: TrpInputForm[K]) => {
+      onChange({ ...value, [field]: newValue });
     };
 
   const formatDateToDDMMYYYY = (date: Dayjs | null): string => {
@@ -199,7 +204,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   };
 
   const handleCondicaoQuantidadeOrdemChange = (
-    newValue: TrpCondicaoQuantidade
+    newValue: TrpCondicaoQuantidade,
   ) => {
     const updates: Partial<TrpInputForm> = {
       condicao_quantidade_ordem: newValue,
@@ -229,6 +234,12 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
     if (value.prazo_definitivo_dias_uteis === undefined) {
       updates.prazo_definitivo_dias_uteis = 8;
     }
+
+    // ✅ NOVO: liquidação (dias corridos)
+    if (value.prazo_liquidacao_dias_corridos === undefined) {
+      updates.prazo_liquidacao_dias_corridos = 10;
+    }
+
     if (!value.vencimento_tipo) {
       updates.vencimento_tipo = "DIAS_CORRIDOS";
     }
@@ -236,7 +247,10 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       | TrpVencimentoTipo
       | undefined;
 
-    if (tipo === "DIAS_CORRIDOS" && value.vencimento_dias_corridos === undefined) {
+    if (
+      tipo === "DIAS_CORRIDOS" &&
+      value.vencimento_dias_corridos === undefined
+    ) {
       updates.vencimento_dias_corridos = 30;
     }
 
@@ -354,9 +368,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             (typeof it.valor_total_calculado === "number"
               ? it.valor_total_calculado
               : 0),
-          0
+          0,
         )
-        .toFixed(2)
+        .toFixed(2),
     );
 
   const updateItem = (idx: number, patch: Partial<TrpItemObjeto>) => {
@@ -393,17 +407,29 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
   const addItem = () => {
     const next = [...itens, { ...EMPTY_ITEM }];
     const totalGeral = computeTotalGeral(next);
-    onChange({ ...value, itens_objeto: next, valor_total_geral: totalGeral } as TrpInputForm);
+    onChange({
+      ...value,
+      itens_objeto: next,
+      valor_total_geral: totalGeral,
+    } as TrpInputForm);
   };
 
   const removeItem = (idx: number) => {
     if (itens.length === 1) {
-      onChange({ ...value, itens_objeto: [{ ...EMPTY_ITEM }], valor_total_geral: 0 } as TrpInputForm);
+      onChange({
+        ...value,
+        itens_objeto: [{ ...EMPTY_ITEM }],
+        valor_total_geral: 0,
+      } as TrpInputForm);
       return;
     }
     const next = itens.filter((_, i) => i !== idx);
     const totalGeral = computeTotalGeral(next);
-    onChange({ ...value, itens_objeto: next, valor_total_geral: totalGeral } as TrpInputForm);
+    onChange({
+      ...value,
+      itens_objeto: next,
+      valor_total_geral: totalGeral,
+    } as TrpInputForm);
   };
 
   const totalGeral = computeTotalGeral(itens);
@@ -459,7 +485,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       <Paper elevation={0} sx={cardSx}>
         {sectionHeader(
           "2. Informações do Recebimento (Objeto)",
-          "Informe o tipo de contrato, descreva os itens/serviços e registre se a quantidade confere com a Ordem de Fornecimento. O total será calculado automaticamente."
+          "Informe o tipo de contrato, descreva os itens/serviços e registre se a quantidade confere com a Ordem de Fornecimento. O total será calculado automaticamente.",
         )}
 
         <Divider sx={{ my: 1 }} />
@@ -468,7 +494,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           {/* Tipo de contrato + competência */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.tipo_contratacao}
               </Typography>
 
@@ -476,13 +506,19 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 <Select
                   value={value.tipo_contratacao || ""}
                   onChange={(e) =>
-                    handleTipoContratacaoChange(e.target.value as TrpTipoContrato)
+                    handleTipoContratacaoChange(
+                      e.target.value as TrpTipoContrato,
+                    )
                   }
                   disabled={disabled}
                   displayEmpty
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <Box sx={{ color: "text.secondary", opacity: 0.7 }}>Selecione o tipo de contrato</Box>;
+                      return (
+                        <Box sx={{ color: "text.secondary", opacity: 0.7 }}>
+                          Selecione o tipo de contrato
+                        </Box>
+                      );
                     }
                     return formatSelectValue(selected);
                   }}
@@ -497,11 +533,22 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showCompetenciaField && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 0.5, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.competencia_mes_ano}
                 </Typography>
 
-                <Typography variant="body2" sx={{ mb: 1.5, fontSize: "0.8125rem", color: alpha(theme.palette.text.secondary, 0.8) }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    mb: 1.5,
+                    fontSize: "0.8125rem",
+                    color: alpha(theme.palette.text.secondary, 0.8),
+                  }}
+                >
                   Informe o mês e ano da prestação do serviço (MM/AAAA)
                 </Typography>
 
@@ -540,13 +587,25 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
           {/* Itens do objeto */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5, fontSize: "0.9375rem" }}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              sx={{ mb: 0.5, fontSize: "0.9375rem" }}
+            >
               {FIELD_LABELS.itens_objeto}
             </Typography>
 
-            <Typography variant="body2" sx={{ mb: 1, fontSize: "0.8125rem", color: alpha(theme.palette.text.secondary, 0.8) }}>
-              Adicione 1 ou mais itens. Para cada item, informe a descrição, unidade, quantidade e valor unitário.
-              O total do item e o total geral serão calculados automaticamente.
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 1,
+                fontSize: "0.8125rem",
+                color: alpha(theme.palette.text.secondary, 0.8),
+              }}
+            >
+              Adicione 1 ou mais itens. Para cada item, informe a descrição,
+              unidade, quantidade e valor unitário. O total do item e o total
+              geral serão calculados automaticamente.
             </Typography>
 
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -566,7 +625,14 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                       bgcolor: alpha(theme.palette.background.default, 0.4),
                     }}
                   >
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        mb: 2,
+                      }}
+                    >
                       <Typography variant="body2" fontWeight={800}>
                         Item {idx + 1}
                       </Typography>
@@ -575,20 +641,37 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                         variant="text"
                         onClick={() => removeItem(idx)}
                         disabled={disabled}
-                        sx={{ textTransform: "none", fontWeight: 700, color: alpha(theme.palette.error.main, 0.9) }}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 700,
+                          color: alpha(theme.palette.error.main, 0.9),
+                        }}
                       >
                         Remover
                       </Button>
                     </Box>
 
                     {/* Descrição */}
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-                      <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.9375rem" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                        mb: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ fontSize: "0.9375rem" }}
+                      >
                         Descrição do item
                       </Typography>
                       <TextField
                         value={item.descricao || ""}
-                        onChange={(e) => updateItem(idx, { descricao: e.target.value })}
+                        onChange={(e) =>
+                          updateItem(idx, { descricao: e.target.value })
+                        }
                         fullWidth
                         multiline
                         rows={2}
@@ -599,20 +682,42 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                         label=""
                         sx={{
                           ...inputSx,
-                          "& .MuiInputBase-input.MuiInputBase-inputMultiline": { padding: "16px" },
+                          "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                            padding: "16px",
+                          },
                         }}
                       />
                     </Box>
 
                     {/* Unidade + Quantidade */}
-                    <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 3, mb: 2 }}>
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.9375rem" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", md: "row" },
+                        gap: 3,
+                        mb: 2,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ fontSize: "0.9375rem" }}
+                        >
                           Unidade de medida
                         </Typography>
                         <TextField
                           value={item.unidade_medida || ""}
-                          onChange={(e) => updateItem(idx, { unidade_medida: e.target.value })}
+                          onChange={(e) =>
+                            updateItem(idx, { unidade_medida: e.target.value })
+                          }
                           fullWidth
                           variant="outlined"
                           placeholder="Ex: UN / CX / FR / H / KM"
@@ -623,19 +728,33 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                         />
                       </Box>
 
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.9375rem" }}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ fontSize: "0.9375rem" }}
+                        >
                           Quantidade recebida
                         </Typography>
                         <TextField
                           value={item.quantidade_recebida ?? ""}
                           onChange={(e) => {
                             const raw = e.target.value;
-                            const cleaned = raw.replace(/[^\d.,]/g, "").replace(",", ".");
+                            const cleaned = raw
+                              .replace(/[^\d.,]/g, "")
+                              .replace(",", ".");
                             const safe = clampDecimals(cleaned, 3);
                             const n = safe ? Number(safe) : null;
                             updateItem(idx, {
-                              quantidade_recebida: n === null || !isFinite(n) ? undefined : n,
+                              quantidade_recebida:
+                                n === null || !isFinite(n) ? undefined : n,
                             });
                           }}
                           fullWidth
@@ -651,9 +770,26 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                     </Box>
 
                     {/* Valor Unitário + Total */}
-                    <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 3 }}>
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.9375rem" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", md: "row" },
+                        gap: 3,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ fontSize: "0.9375rem" }}
+                        >
                           Valor unitário
                         </Typography>
 
@@ -672,14 +808,29 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                           label=""
                           inputProps={{ inputMode: "decimal" }}
                           InputProps={{
-                            startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                R$
+                              </InputAdornment>
+                            ),
                           }}
                           sx={inputSx}
                         />
                       </Box>
 
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.9375rem" }}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight={700}
+                          sx={{ fontSize: "0.9375rem" }}
+                        >
                           Valor total (calculado)
                         </Typography>
                         <TextField
@@ -699,18 +850,31 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 );
               })}
 
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Button
                   variant="contained"
                   onClick={addItem}
                   disabled={disabled}
-                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 800,
+                    borderRadius: 2,
+                  }}
                 >
                   Adicionar item
                 </Button>
 
                 <Box sx={{ textAlign: "right" }}>
-                  <Typography variant="body2" sx={{ color: alpha(theme.palette.text.secondary, 0.8) }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: alpha(theme.palette.text.secondary, 0.8) }}
+                  >
                     Total geral
                   </Typography>
                   <Typography variant="body1" fontWeight={900}>
@@ -726,7 +890,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           {/* Quantidade vs Ordem */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.condicao_quantidade_ordem}
               </Typography>
 
@@ -735,14 +903,18 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                   value={value.condicao_quantidade_ordem || ""}
                   onChange={(e) =>
                     handleCondicaoQuantidadeOrdemChange(
-                      e.target.value as TrpCondicaoQuantidade
+                      e.target.value as TrpCondicaoQuantidade,
                     )
                   }
                   disabled={disabled}
                   displayEmpty
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <Box sx={{ color: "text.secondary", opacity: 0.7 }}>Selecione a condição</Box>;
+                      return (
+                        <Box sx={{ color: "text.secondary", opacity: 0.7 }}>
+                          Selecione a condição
+                        </Box>
+                      );
                     }
                     return formatSelectValue(selected);
                   }}
@@ -783,20 +955,33 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                         flexShrink: 0,
                       }}
                     />
-                    <Typography variant="body2" sx={{ fontSize: "0.8125rem", lineHeight: 1.6 }}>
-                      Descreva detalhadamente a divergência entre a quantidade prevista na Ordem de Fornecimento
-                      e a quantidade efetivamente recebida, incluindo pendências ou remessas futuras.
+                    <Typography
+                      variant="body2"
+                      sx={{ fontSize: "0.8125rem", lineHeight: 1.6 }}
+                    >
+                      Descreva detalhadamente a divergência entre a quantidade
+                      prevista na Ordem de Fornecimento e a quantidade
+                      efetivamente recebida, incluindo pendências ou remessas
+                      futuras.
                     </Typography>
                   </Box>
 
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      sx={{ mb: 1, fontSize: "0.9375rem" }}
+                    >
                       {FIELD_LABELS.comentarios_quantidade_ordem}
                     </Typography>
                     <TextField
                       value={value.comentarios_quantidade_ordem || ""}
                       onChange={(e) =>
-                        updateField("comentarios_quantidade_ordem")(e.target.value)
+                        updateField("comentarios_quantidade_ordem")(
+                          e.target.value,
+                        )
                       }
                       fullWidth
                       multiline
@@ -809,7 +994,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                       label=""
                       sx={{
                         ...inputSx,
-                        "& .MuiInputBase-input.MuiInputBase-inputMultiline": { padding: "16px" },
+                        "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                          padding: "16px",
+                        },
                       }}
                     />
                   </Box>
@@ -826,7 +1013,7 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       <Paper elevation={0} sx={cardSx}>
         {sectionHeader(
           "3. Informações de Prazos",
-          "Selecione a base do prazo e informe os prazos do contrato (padrão CIAS)."
+          "Selecione a base do prazo e informe os prazos do contrato (padrão CIAS).",
         )}
 
         <Divider sx={{ my: 1 }} />
@@ -835,11 +1022,22 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           {/* Base do prazo + datas */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.tipo_base_prazo}
               </Typography>
 
-              <Typography variant="body2" sx={{ mb: 1.5, fontSize: "0.8125rem", color: alpha(theme.palette.text.secondary, 0.8) }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  mb: 1.5,
+                  fontSize: "0.8125rem",
+                  color: alpha(theme.palette.text.secondary, 0.8),
+                }}
+              >
                 Selecione a partir de qual data o prazo será contado.
               </Typography>
 
@@ -847,19 +1045,27 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 <Select
                   value={value.tipo_base_prazo || ""}
                   onChange={(e) =>
-                    handleTipoBasePrazoChange(e.target.value as TrpTipoBasePrazo)
+                    handleTipoBasePrazoChange(
+                      e.target.value as TrpTipoBasePrazo,
+                    )
                   }
                   disabled={disabled}
                   displayEmpty
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <Box sx={{ color: "text.secondary", opacity: 0.7 }}>Selecione a base</Box>;
+                      return (
+                        <Box sx={{ color: "text.secondary", opacity: 0.7 }}>
+                          Selecione a base
+                        </Box>
+                      );
                     }
                     return formatSelectValue(selected);
                   }}
                   sx={selectSx}
                 >
-                  <MenuItem value="DATA_RECEBIMENTO">Data de Recebimento</MenuItem>
+                  <MenuItem value="DATA_RECEBIMENTO">
+                    Data de Recebimento
+                  </MenuItem>
                   <MenuItem value="INICIO_SERVICO">Início do Serviço</MenuItem>
                   <MenuItem value="SERVICO">Conclusão do Serviço</MenuItem>
                 </Select>
@@ -868,14 +1074,23 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showDataRecebimento && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.data_recebimento}
                 </Typography>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                <LocalizationProvider
+                  dateAdapter={AdapterDayjs}
+                  adapterLocale="pt-br"
+                >
                   <DatePicker
                     value={parseDateFromDDMMYYYY(value.data_recebimento)}
                     onChange={(newValue: Dayjs | null) => {
-                      updateField("data_recebimento")(formatDateToDDMMYYYY(newValue));
+                      updateField("data_recebimento")(
+                        formatDateToDDMMYYYY(newValue),
+                      );
                     }}
                     disabled={disabled}
                     format="DD/MM/YYYY"
@@ -897,14 +1112,23 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showDataInicioServico && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.data_inicio_servico}
                 </Typography>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                <LocalizationProvider
+                  dateAdapter={AdapterDayjs}
+                  adapterLocale="pt-br"
+                >
                   <DatePicker
                     value={parseDateFromDDMMYYYY(value.data_inicio_servico)}
                     onChange={(newValue: Dayjs | null) => {
-                      updateField("data_inicio_servico")(formatDateToDDMMYYYY(newValue));
+                      updateField("data_inicio_servico")(
+                        formatDateToDDMMYYYY(newValue),
+                      );
                     }}
                     disabled={disabled}
                     format="DD/MM/YYYY"
@@ -926,14 +1150,23 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showDataConclusaoServico && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.data_conclusao_servico}
                 </Typography>
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                <LocalizationProvider
+                  dateAdapter={AdapterDayjs}
+                  adapterLocale="pt-br"
+                >
                   <DatePicker
                     value={parseDateFromDDMMYYYY(value.data_conclusao_servico)}
                     onChange={(newValue: Dayjs | null) => {
-                      updateField("data_conclusao_servico")(formatDateToDDMMYYYY(newValue));
+                      updateField("data_conclusao_servico")(
+                        formatDateToDDMMYYYY(newValue),
+                      );
                     }}
                     disabled={disabled}
                     format="DD/MM/YYYY"
@@ -959,7 +1192,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           {/* Prazos CIAS */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.9375rem" }}>
+              <Typography
+                variant="body2"
+                fontWeight={800}
+                sx={{ fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.prazos}
               </Typography>
 
@@ -973,20 +1210,46 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               </Button>
             </Box>
 
-            <Typography variant="body2" sx={{ fontSize: "0.8125rem", color: alpha(theme.palette.text.secondary, 0.8) }}>
-              Provisório e Definitivo em <b>dias úteis</b>. Vencimento em <b>dias corridos</b> ou <b>dia fixo</b>.
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: "0.8125rem",
+                color: alpha(theme.palette.text.secondary, 0.8),
+              }}
+            >
+              Provisório e Definitivo em <b>dias úteis</b>. Vencimento em{" "}
+              <b>dias corridos</b> ou <b>dia fixo</b>.
             </Typography>
 
-            <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 3 }}>
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column", md: "row" },
+                gap: 3,
+              }}
+            >
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.prazo_provisorio_dias_uteis}
                 </Typography>
                 <TextField
                   value={value.prazo_provisorio_dias_uteis ?? ""}
                   onChange={(e) => {
                     const n = parseIntSafe(e.target.value);
-                    updateField("prazo_provisorio_dias_uteis")(n === null ? undefined : n);
+                    updateField("prazo_provisorio_dias_uteis")(
+                      n === null ? undefined : n,
+                    );
                   }}
                   fullWidth
                   variant="outlined"
@@ -997,15 +1260,28 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 />
               </Box>
 
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.prazo_definitivo_dias_uteis}
                 </Typography>
                 <TextField
                   value={value.prazo_definitivo_dias_uteis ?? ""}
                   onChange={(e) => {
                     const n = parseIntSafe(e.target.value);
-                    updateField("prazo_definitivo_dias_uteis")(n === null ? undefined : n);
+                    updateField("prazo_definitivo_dias_uteis")(
+                      n === null ? undefined : n,
+                    );
                   }}
                   fullWidth
                   variant="outlined"
@@ -1017,9 +1293,55 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
               </Box>
             </Box>
 
+            {/* Liquidação (dias corridos) */}
+            <Box
+              sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
+                {FIELD_LABELS.prazo_liquidacao_dias_corridos}
+              </Typography>
+
+              <Typography
+                variant="body2"
+                sx={{
+                  mb: 1.5,
+                  fontSize: "0.8125rem",
+                  color: alpha(theme.palette.text.secondary, 0.8),
+                }}
+              >
+                Informe em <b>dias corridos</b> (ex: 10).
+              </Typography>
+
+              <TextField
+                value={value.prazo_liquidacao_dias_corridos ?? ""}
+                onChange={(e) => {
+                  const n = parseIntSafe(e.target.value);
+                  updateField("prazo_liquidacao_dias_corridos")(
+                    n === null ? undefined : n,
+                  );
+                }}
+                fullWidth
+                variant="outlined"
+                placeholder="Ex: 10"
+                disabled={disabled}
+                inputProps={{ inputMode: "numeric", min: 0 }}
+                sx={inputSx}
+              />
+            </Box>
+
             {/* Vencimento */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+            <Box
+              sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.vencimento_tipo}
               </Typography>
 
@@ -1027,13 +1349,19 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 <Select
                   value={value.vencimento_tipo || ""}
                   onChange={(e) =>
-                    handleVencimentoTipoChange(e.target.value as TrpVencimentoTipo)
+                    handleVencimentoTipoChange(
+                      e.target.value as TrpVencimentoTipo,
+                    )
                   }
                   disabled={disabled}
                   displayEmpty
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <Box sx={{ color: "text.secondary", opacity: 0.7 }}>Selecione o tipo</Box>;
+                      return (
+                        <Box sx={{ color: "text.secondary", opacity: 0.7 }}>
+                          Selecione o tipo
+                        </Box>
+                      );
                     }
                     return formatSelectValue(selected);
                   }}
@@ -1047,14 +1375,20 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showVencDiasCorridos && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.vencimento_dias_corridos}
                 </Typography>
                 <TextField
                   value={value.vencimento_dias_corridos ?? ""}
                   onChange={(e) => {
                     const n = parseIntSafe(e.target.value);
-                    updateField("vencimento_dias_corridos")(n === null ? undefined : n);
+                    updateField("vencimento_dias_corridos")(
+                      n === null ? undefined : n,
+                    );
                   }}
                   fullWidth
                   variant="outlined"
@@ -1068,15 +1402,22 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
 
             {showVencDiaFixo && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  sx={{ mb: 1, fontSize: "0.9375rem" }}
+                >
                   {FIELD_LABELS.vencimento_dia_fixo}
                 </Typography>
                 <TextField
                   value={value.vencimento_dia_fixo ?? ""}
                   onChange={(e) => {
                     const n = parseIntSafe(e.target.value);
-                    const clamped = n === null ? null : Math.max(1, Math.min(31, n));
-                    updateField("vencimento_dia_fixo")(clamped === null ? undefined : clamped);
+                    const clamped =
+                      n === null ? null : Math.max(1, Math.min(31, n));
+                    updateField("vencimento_dia_fixo")(
+                      clamped === null ? undefined : clamped,
+                    );
                   }}
                   fullWidth
                   variant="outlined"
@@ -1094,7 +1435,11 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
           {/* Condição de prazo + atraso */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ mb: 1, fontSize: "0.9375rem" }}
+              >
                 {FIELD_LABELS.condicao_prazo}
               </Typography>
 
@@ -1102,13 +1447,19 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 <Select
                   value={value.condicao_prazo || ""}
                   onChange={(e) =>
-                    handleCondicaoPrazoChange(e.target.value as TrpCondicaoPrazo)
+                    handleCondicaoPrazoChange(
+                      e.target.value as TrpCondicaoPrazo,
+                    )
                   }
                   disabled={disabled}
                   displayEmpty
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <Box sx={{ color: "text.secondary", opacity: 0.7 }}>Selecione a condição</Box>;
+                      return (
+                        <Box sx={{ color: "text.secondary", opacity: 0.7 }}>
+                          Selecione a condição
+                        </Box>
+                      );
                     }
                     return formatSelectValue(selected);
                   }}
@@ -1130,16 +1481,40 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                 }}
               >
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 3 }}>
-                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                      <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: 3,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ mb: 1, fontSize: "0.9375rem" }}
+                      >
                         {FIELD_LABELS.data_prevista_entrega_contrato}
                       </Typography>
-                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                      <LocalizationProvider
+                        dateAdapter={AdapterDayjs}
+                        adapterLocale="pt-br"
+                      >
                         <DatePicker
-                          value={parseDateFromDDMMYYYY(value.data_prevista_entrega_contrato)}
+                          value={parseDateFromDDMMYYYY(
+                            value.data_prevista_entrega_contrato,
+                          )}
                           onChange={(newValue: Dayjs | null) => {
-                            updateField("data_prevista_entrega_contrato")(formatDateToDDMMYYYY(newValue));
+                            updateField("data_prevista_entrega_contrato")(
+                              formatDateToDDMMYYYY(newValue),
+                            );
                           }}
                           disabled={disabled}
                           format="DD/MM/YYYY"
@@ -1157,15 +1532,31 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                       </LocalizationProvider>
                     </Box>
 
-                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
-                      <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                    <Box
+                      sx={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ mb: 1, fontSize: "0.9375rem" }}
+                      >
                         {FIELD_LABELS.data_entrega_real}
                       </Typography>
-                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
+                      <LocalizationProvider
+                        dateAdapter={AdapterDayjs}
+                        adapterLocale="pt-br"
+                      >
                         <DatePicker
                           value={parseDateFromDDMMYYYY(value.data_entrega_real)}
                           onChange={(newValue: Dayjs | null) => {
-                            updateField("data_entrega_real")(formatDateToDDMMYYYY(newValue));
+                            updateField("data_entrega_real")(
+                              formatDateToDDMMYYYY(newValue),
+                            );
                           }}
                           disabled={disabled}
                           format="DD/MM/YYYY"
@@ -1184,13 +1575,21 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
                     </Box>
                   </Box>
 
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      sx={{ mb: 1, fontSize: "0.9375rem" }}
+                    >
                       {FIELD_LABELS.motivo_atraso}
                     </Typography>
                     <TextField
                       value={value.motivo_atraso || ""}
-                      onChange={(e) => updateField("motivo_atraso")(e.target.value)}
+                      onChange={(e) =>
+                        updateField("motivo_atraso")(e.target.value)
+                      }
                       fullWidth
                       multiline
                       rows={3}
@@ -1223,23 +1622,36 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
       <Paper elevation={0} sx={cardSx}>
         {sectionHeader(
           "4. Observações",
-          "Registre informações relevantes para auditoria e histórico (opcional)."
+          "Registre informações relevantes para auditoria e histórico (opcional).",
         )}
 
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography variant="body2" fontWeight={700} sx={{ mb: 1, fontSize: "0.9375rem" }}>
+          <Typography
+            variant="body2"
+            fontWeight={700}
+            sx={{ mb: 1, fontSize: "0.9375rem" }}
+          >
             {FIELD_LABELS.observacoes_recebimento}
           </Typography>
 
-          <Typography variant="body2" sx={{ mb: 1.5, fontSize: "0.8125rem", color: alpha(theme.palette.text.secondary, 0.8) }}>
+          <Typography
+            variant="body2"
+            sx={{
+              mb: 1.5,
+              fontSize: "0.8125rem",
+              color: alpha(theme.palette.text.secondary, 0.8),
+            }}
+          >
             Adicione observações relevantes sobre o recebimento.
           </Typography>
 
           <TextField
             value={value.observacoes_recebimento || ""}
-            onChange={(e) => updateField("observacoes_recebimento")(e.target.value)}
+            onChange={(e) =>
+              updateField("observacoes_recebimento")(e.target.value)
+            }
             fullWidth
             multiline
             rows={4}
@@ -1250,7 +1662,9 @@ export const TrpFormCard: React.FC<TrpFormCardProps> = ({
             label=""
             sx={{
               ...inputSx,
-              "& .MuiInputBase-input.MuiInputBase-inputMultiline": { padding: "16px" },
+              "& .MuiInputBase-input.MuiInputBase-inputMultiline": {
+                padding: "16px",
+              },
             }}
           />
         </Box>

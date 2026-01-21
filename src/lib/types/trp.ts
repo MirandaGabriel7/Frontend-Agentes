@@ -11,7 +11,10 @@ export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
 
 // ✅ NOVO: adiciona INICIO_SERVICO (e mantém SERVICO p/ conclusão)
-export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "INICIO_SERVICO" | "SERVICO";
+export type TrpTipoBasePrazo =
+  | "DATA_RECEBIMENTO"
+  | "INICIO_SERVICO"
+  | "SERVICO";
 
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
 
@@ -89,6 +92,9 @@ export interface TrpInputForm {
   prazo_provisorio_dias_uteis?: number;
   prazo_definitivo_dias_uteis?: number;
 
+  // ✅ NOVO: prazo de liquidação (dias corridos)
+  prazo_liquidacao_dias_corridos?: number;
+  
   // ✅ NOVO: vencimento da NF (CIAS)
   vencimento_tipo?: TrpVencimentoTipo;
   vencimento_dias_corridos?: number;
@@ -154,6 +160,9 @@ export interface DadosRecebimentoPayload {
   // ✅ NOVO: prazos CIAS
   prazoProvisorioDiasUteis?: number | null;
   prazoDefinitivoDiasUteis?: number | null;
+
+  // ✅ NOVO: prazo de liquidação (dias corridos)
+  prazoLiquidaçãoDiasCorridos?: number | null;
 
   // ✅ NOVO: vencimento CIAS
   vencimentoTipo?: TrpVencimentoTipo | null;
