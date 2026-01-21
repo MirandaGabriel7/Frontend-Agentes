@@ -18,7 +18,7 @@ import { TrpUploadCard } from "../components/TrpUploadCard";
 import { TrpFormCard } from "../components/TrpFormCard";
 import { TrpActionsBar } from "../components/TrpActionsBar";
 
-import { TrpInputForm, TrpItemObjeto } from "../../../lib/types/trp";
+import { TrpInputForm, TrpItemObjeto, TrpVencimentoTipo } from "../../../lib/types/trp";
 import { generateTrp, GenerateTrpParams } from "../../../services/api";
 
 type SnackbarState = {
@@ -65,6 +65,15 @@ function sanitizeFileName(input?: unknown): string | null {
   return s || null;
 }
 
+function parseIntSafe(raw: unknown): number | null {
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const n = Number(s.replace(/[^\d]/g, ""));
+  if (!Number.isFinite(n)) return null;
+  return Math.trunc(n);
+}
+
 export const TrpPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -86,45 +95,52 @@ export const TrpPage: React.FC = () => {
     () => ({
       descricao: "",
       unidade_medida: "",
-      quantidade_recebida: undefined as any, // mantenho compatível com seu type atual
+      quantidade_recebida: undefined,
       valor_unitario: "",
       valor_total_calculado: undefined,
     }),
     []
   );
 
-  const [form, setForm] = useState<TrpInputForm>(
-    {
-      tipo_contratacao: undefined,
-      competencia_mes_ano: undefined,
+  const [form, setForm] = useState<TrpInputForm>(() => ({
+    tipo_contratacao: undefined,
+    competencia_mes_ano: undefined,
 
-      tipo_base_prazo: undefined,
-      data_recebimento: undefined,
-      data_inicio_servico: undefined,
-      data_conclusao_servico: undefined,
+    tipo_base_prazo: undefined,
+    data_recebimento: undefined,
+    data_inicio_servico: undefined,
+    data_conclusao_servico: undefined,
 
-      data_prevista_entrega_contrato: undefined,
-      data_entrega_real: undefined,
+    // ✅ NOVO: CIAS (prazos)
+    prazo_provisorio_dias_uteis: undefined,
+    prazo_definitivo_dias_uteis: undefined,
 
-      condicao_prazo: undefined,
-      motivo_atraso: undefined,
+    // ✅ NOVO: CIAS (vencimento)
+    vencimento_tipo: undefined,
+    vencimento_dias_corridos: undefined,
+    vencimento_dia_fixo: undefined,
 
-      condicao_quantidade_ordem: undefined,
-      comentarios_quantidade_ordem: undefined,
+    data_prevista_entrega_contrato: undefined,
+    data_entrega_real: undefined,
 
-      itens_objeto: [EMPTY_ITEM as any],
-      valor_total_geral: 0 as any,
+    condicao_prazo: undefined,
+    motivo_atraso: undefined,
 
-      observacoes_recebimento: undefined,
+    condicao_quantidade_ordem: undefined,
+    comentarios_quantidade_ordem: undefined,
 
-      // (assinaturas – se ainda estiver no type, deixa)
-      fiscal_contrato_nome: undefined,
-      data_assinatura: undefined,
-      area_demandante_nome: undefined,
+    itens_objeto: [EMPTY_ITEM],
+    valor_total_geral: 0,
 
-      fileName: "",
-    } as any
-  );
+    observacoes_recebimento: undefined,
+
+    // assinaturas (se usar depois)
+    fiscal_contrato_nome: undefined,
+    data_assinatura: undefined,
+    area_demandante_nome: undefined,
+
+    fileName: "",
+  }));
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -134,11 +150,9 @@ export const TrpPage: React.FC = () => {
   }, []);
 
   const ensureItens = useCallback((): TrpItemObjeto[] => {
-    const itens = Array.isArray((form as any).itens_objeto)
-      ? ((form as any).itens_objeto as TrpItemObjeto[])
-      : [];
+    const itens = Array.isArray(form.itens_objeto) ? form.itens_objeto : [];
     return itens.length > 0 ? itens : [EMPTY_ITEM];
-  }, [form, EMPTY_ITEM]);
+  }, [form.itens_objeto, EMPTY_ITEM]);
 
   const isValidNumber = (v: unknown): v is number =>
     typeof v === "number" && Number.isFinite(v);
@@ -165,18 +179,48 @@ export const TrpPage: React.FC = () => {
       return 'O campo "Base para contagem de Prazo" é obrigatório.';
     }
 
-if (form.tipo_base_prazo === "DATA_RECEBIMENTO" && !form.data_recebimento) {
-  return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
-}
+    if (form.tipo_base_prazo === "DATA_RECEBIMENTO" && !form.data_recebimento) {
+      return 'O campo "Data de Recebimento" é obrigatório quando a base de prazo é DATA_RECEBIMENTO.';
+    }
 
-if (form.tipo_base_prazo === "INICIO_SERVICO" && !form.data_inicio_servico) {
-  return 'O campo "Data de Início do Serviço" é obrigatório quando a base de prazo é INICIO_SERVICO.';
-}
+    if (form.tipo_base_prazo === "INICIO_SERVICO" && !form.data_inicio_servico) {
+      return 'O campo "Data de Início do Serviço" é obrigatório quando a base de prazo é INICIO_SERVICO.';
+    }
 
-if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
-  return 'O campo "Data de Conclusão do Serviço" é obrigatório quando a base de prazo é SERVICO.';
-}
+    if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
+      return 'O campo "Data de Conclusão do Serviço" é obrigatório quando a base de prazo é SERVICO.';
+    }
 
+    // ✅ NOVO: validação prazos CIAS
+    const pProv = form.prazo_provisorio_dias_uteis;
+    const pDef = form.prazo_definitivo_dias_uteis;
+
+    if (!isValidNumber(pProv) || pProv < 0) {
+      return 'O campo "Provisório (dias úteis)" é obrigatório e deve ser >= 0.';
+    }
+    if (!isValidNumber(pDef) || pDef < 0) {
+      return 'O campo "Definitivo (dias úteis)" é obrigatório e deve ser >= 0.';
+    }
+
+    // ✅ NOVO: validação vencimento CIAS
+    const vTipo = form.vencimento_tipo;
+    if (!vTipo) {
+      return 'O campo "Vencimento: como é definido?" é obrigatório.';
+    }
+
+    if (vTipo === "DIAS_CORRIDOS") {
+      const dias = form.vencimento_dias_corridos;
+      if (!isValidNumber(dias) || dias < 0) {
+        return 'O campo "Vencimento (dias corridos)" é obrigatório e deve ser >= 0.';
+      }
+    }
+
+    if (vTipo === "DIA_FIXO") {
+      const dia = form.vencimento_dia_fixo;
+      if (!isValidNumber(dia) || dia < 1 || dia > 31) {
+        return 'O campo "Vencimento (dia fixo)" é obrigatório e deve estar entre 1 e 31.';
+      }
+    }
 
     if (!form.condicao_prazo) {
       return 'O campo "Condição quanto ao prazo" é obrigatório.';
@@ -190,7 +234,10 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
       return 'O campo "Quantidade conforme Ordem de Fornecimento" é obrigatório.';
     }
 
-    if (form.condicao_quantidade_ordem === "PARCIAL" && !form.comentarios_quantidade_ordem) {
+    if (
+      form.condicao_quantidade_ordem === "PARCIAL" &&
+      !form.comentarios_quantidade_ordem
+    ) {
       return 'O campo "Comentários sobre divergência/pendências" é obrigatório quando a quantidade conforme Ordem de Fornecimento é PARCIAL.';
     }
 
@@ -211,12 +258,12 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
         return `O campo "Unidade de medida" é obrigatório no Item ${idx}.`;
       }
 
-      const qtd = (item as any).quantidade_recebida;
+      const qtd = item.quantidade_recebida;
       if (!isValidNumber(qtd) || qtd <= 0) {
         return `O campo "Quantidade recebida" é obrigatório e deve ser maior que 0 no Item ${idx}.`;
       }
 
-      const vuNum = parseMoneyBR(String((item as any).valor_unitario ?? ""));
+      const vuNum = parseMoneyBR(String(item.valor_unitario ?? ""));
       if (vuNum === null || !Number.isFinite(vuNum) || vuNum < 0) {
         return `O campo "Valor unitário" é obrigatório e deve ser um valor válido (>= 0) no Item ${idx}.`;
       }
@@ -237,7 +284,12 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
     );
     if (!hasAnyFile) return false;
     return validateForm() === null;
-  }, [fichaContratualizacaoFile, notaFiscalFile, ordemFornecimentoFile, validateForm]);
+  }, [
+    fichaContratualizacaoFile,
+    notaFiscalFile,
+    ordemFornecimentoFile,
+    validateForm,
+  ]);
 
   const handleGenerateTrp = useCallback(async (): Promise<void> => {
     try {
@@ -255,9 +307,9 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
 
       const itens_objeto: GenerateTrpParams["dadosRecebimento"]["itens_objeto"] =
         itens.map((item) => {
-          const quantidade = Number((item as any).quantidade_recebida ?? 0);
+          const quantidade = Number(item.quantidade_recebida ?? 0);
 
-          const valor_unitario_raw = String((item as any).valor_unitario ?? "").trim();
+          const valor_unitario_raw = String(item.valor_unitario ?? "").trim();
           const valor_unitario_num = parseMoneyBR(valor_unitario_raw) ?? 0;
 
           const valor_total_calculado = Number(
@@ -265,8 +317,8 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
           );
 
           return {
-            descricao: String((item as any).descricao || "").trim(),
-            unidade_medida: String((item as any).unidade_medida || "").trim(),
+            descricao: String(item.descricao || "").trim(),
+            unidade_medida: String(item.unidade_medida || "").trim(),
             quantidade_recebida: quantidade,
 
             valor_unitario_raw,
@@ -295,6 +347,14 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
         dataRecebimento: form.data_recebimento || null,
         dataInicioServico: form.data_inicio_servico || null,
         dataConclusaoServico: form.data_conclusao_servico || null,
+
+        // ✅ NOVO CIAS
+        prazoProvisorioDiasUteis: form.prazo_provisorio_dias_uteis ?? null,
+        prazoDefinitivoDiasUteis: form.prazo_definitivo_dias_uteis ?? null,
+        vencimentoTipo: (form.vencimento_tipo as TrpVencimentoTipo) ?? null,
+        vencimentoDiasCorridos: form.vencimento_dias_corridos ?? null,
+        vencimentoDiaFixo: form.vencimento_dia_fixo ?? null,
+
         dataPrevistaEntregaContrato: form.data_prevista_entrega_contrato || null,
         dataEntregaReal: form.data_entrega_real || null,
         motivoAtraso: form.motivo_atraso || null,
@@ -344,37 +404,42 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
     setNotaFiscalFile(null);
     setOrdemFornecimentoFile(null);
 
-    setForm(
-      {
-        tipo_contratacao: undefined,
-        competencia_mes_ano: undefined,
+    setForm({
+      tipo_contratacao: undefined,
+      competencia_mes_ano: undefined,
 
-        tipo_base_prazo: undefined,
-        data_recebimento: undefined,
-        data_inicio_servico: undefined,
-        data_conclusao_servico: undefined,
+      tipo_base_prazo: undefined,
+      data_recebimento: undefined,
+      data_inicio_servico: undefined,
+      data_conclusao_servico: undefined,
 
-        data_prevista_entrega_contrato: undefined,
-        data_entrega_real: undefined,
+      // ✅ NOVO CIAS
+      prazo_provisorio_dias_uteis: undefined,
+      prazo_definitivo_dias_uteis: undefined,
+      vencimento_tipo: undefined,
+      vencimento_dias_corridos: undefined,
+      vencimento_dia_fixo: undefined,
 
-        condicao_prazo: undefined,
-        motivo_atraso: undefined,
+      data_prevista_entrega_contrato: undefined,
+      data_entrega_real: undefined,
 
-        condicao_quantidade_ordem: undefined,
-        comentarios_quantidade_ordem: undefined,
+      condicao_prazo: undefined,
+      motivo_atraso: undefined,
 
-        itens_objeto: [EMPTY_ITEM as any],
-        valor_total_geral: 0 as any,
+      condicao_quantidade_ordem: undefined,
+      comentarios_quantidade_ordem: undefined,
 
-        observacoes_recebimento: undefined,
+      itens_objeto: [EMPTY_ITEM],
+      valor_total_geral: 0,
 
-        fiscal_contrato_nome: undefined,
-        data_assinatura: undefined,
-        area_demandante_nome: undefined,
+      observacoes_recebimento: undefined,
 
-        fileName: "",
-      } as any
-    );
+      fiscal_contrato_nome: undefined,
+      data_assinatura: undefined,
+      area_demandante_nome: undefined,
+
+      fileName: "",
+    });
 
     setErrorMessage(null);
     setSnackbar({ open: false, message: "", severity: "success" });
@@ -484,8 +549,10 @@ if (form.tipo_base_prazo === "SERVICO" && !form.data_conclusao_servico) {
             <TextField
               value={form.fileName || ""}
               onChange={(e) => {
-                const cleaned = (e.target.value || "").replace(/\r?\n/g, " ").slice(0, 120);
-                setForm((prev: any) => ({ ...prev, fileName: cleaned }));
+                const cleaned = (e.target.value || "")
+                  .replace(/\r?\n/g, " ")
+                  .slice(0, 120);
+                setForm((prev) => ({ ...prev, fileName: cleaned }));
               }}
               fullWidth
               variant="outlined"

@@ -10,6 +10,7 @@ import type {
   TrpCondicaoQuantidade,
   TrpTipoBasePrazo,
   TrpItemObjetoPayload,
+  TrpVencimentoTipo, // ✅ NOVO
 } from "../lib/types/trp";
 
 function sanitizeFileName(input?: unknown): string | null {
@@ -196,7 +197,7 @@ export interface TrpRunsSummaryApiResponse {
 }
 
 // ===================================================
-// ✅ Payload do generate (NOVO) — com itens_objeto
+// ✅ Payload do generate (NOVO) — com itens_objeto + prazos CIAS
 // ===================================================
 
 export interface GenerateTrpParams {
@@ -215,12 +216,21 @@ export interface GenerateTrpParams {
 
     // ✅ campos de prazo/datas
     competenciaMesAno?: string | null; // MM/AAAA (só quando tipoContratacao == "SERVIÇOS")
-    tipoBasePrazo: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "SERVICO"
+    tipoBasePrazo: TrpTipoBasePrazo; // "DATA_RECEBIMENTO" | "INICIO_SERVICO" | "SERVICO"
     dataRecebimento?: string | null;
     dataInicioServico?: string | null;
     dataConclusaoServico?: string | null;
     dataPrevistaEntregaContrato?: string | null;
     dataEntregaReal?: string | null;
+
+    // ✅ NOVO: prazos CIAS
+    prazoProvisorioDiasUteis?: number | null;
+    prazoDefinitivoDiasUteis?: number | null;
+
+    // ✅ NOVO: vencimento CIAS
+    vencimentoTipo?: TrpVencimentoTipo | null; // "DIAS_CORRIDOS" | "DIA_FIXO"
+    vencimentoDiasCorridos?: number | null;
+    vencimentoDiaFixo?: number | null;
 
     condicaoPrazo: TrpCondicaoPrazo;
     motivoAtraso?: string | null;
@@ -280,6 +290,53 @@ export async function generateTrp(
     throw new Error(
       'Informe "dataConclusaoServico" quando a base do prazo for SERVICO.',
     );
+  }
+
+  // ✅ NOVO: validação mínima dos prazos CIAS
+  const pProv = params.dadosRecebimento.prazoProvisorioDiasUteis;
+  const pDef = params.dadosRecebimento.prazoDefinitivoDiasUteis;
+
+  if (pProv === undefined || pProv === null || !Number.isFinite(pProv) || pProv < 0) {
+    throw new Error(
+      'Informe "prazoProvisorioDiasUteis" (>= 0) para gerar o TRP.',
+    );
+  }
+
+  if (pDef === undefined || pDef === null || !Number.isFinite(pDef) || pDef < 0) {
+    throw new Error(
+      'Informe "prazoDefinitivoDiasUteis" (>= 0) para gerar o TRP.',
+    );
+  }
+
+  // ✅ NOVO: validação mínima do vencimento CIAS
+  const vTipo = params.dadosRecebimento.vencimentoTipo;
+
+  if (!vTipo) {
+    throw new Error('Informe "vencimentoTipo" para gerar o TRP.');
+  }
+
+  if (vTipo === "DIAS_CORRIDOS") {
+    const dias = params.dadosRecebimento.vencimentoDiasCorridos;
+    if (dias === undefined || dias === null || !Number.isFinite(dias) || dias < 0) {
+      throw new Error(
+        'Informe "vencimentoDiasCorridos" (>= 0) quando vencimentoTipo for DIAS_CORRIDOS.',
+      );
+    }
+  }
+
+  if (vTipo === "DIA_FIXO") {
+    const dia = params.dadosRecebimento.vencimentoDiaFixo;
+    if (
+      dia === undefined ||
+      dia === null ||
+      !Number.isFinite(dia) ||
+      dia < 1 ||
+      dia > 31
+    ) {
+      throw new Error(
+        'Informe "vencimentoDiaFixo" (1..31) quando vencimentoTipo for DIA_FIXO.',
+      );
+    }
   }
 
   // ✅ FOCO: sanitizar e enviar fileName (nome do fiscal) dentro do JSON

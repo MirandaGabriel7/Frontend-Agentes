@@ -11,12 +11,12 @@ export type TrpCondicaoPrazo = "NO_PRAZO" | "FORA_DO_PRAZO";
 export type TrpCondicaoQuantidade = "TOTAL" | "PARCIAL";
 
 // ✅ NOVO: adiciona INICIO_SERVICO (e mantém SERVICO p/ conclusão)
-export type TrpTipoBasePrazo =
-  | "DATA_RECEBIMENTO"
-  | "INICIO_SERVICO"
-  | "SERVICO";
+export type TrpTipoBasePrazo = "DATA_RECEBIMENTO" | "INICIO_SERVICO" | "SERVICO";
 
 export type TrpTipoContrato = "BENS" | "SERVIÇOS" | "OBRA";
+
+// ✅ NOVO: vencimento (padrão CIAS)
+export type TrpVencimentoTipo = "DIAS_CORRIDOS" | "DIA_FIXO";
 
 // ✅ Campos retornados pelo backend (campos_trp_normalizados)
 // Mantemos flexível porque o schema pode evoluir sem quebrar UI.
@@ -31,16 +31,19 @@ export type TrpUnidadeMedida = string;
  * =========================
  * O fiscal digita valor_unitario como string (ex: "12,50").
  * O total do item pode ser calculado no front.
+ *
+ * ✅ Importante: aqui precisa aceitar estado "incompleto" durante digitação.
+ * A validação/submit garante obrigatoriedade.
  */
 export interface TrpItemObjeto {
   descricao: string;
   unidade_medida: TrpUnidadeMedida;
 
-  // No teu fluxo/validação você trata como obrigatório (> 0)
-  quantidade_recebida: number;
+  // ✅ no form pode estar vazio enquanto digita
+  quantidade_recebida?: number;
 
-  // string digitável "12,50"
-  valor_unitario: string;
+  // ✅ no form pode estar vazio enquanto digita
+  valor_unitario?: string;
 
   // calculado no front (quantidade * valor_unitario_num)
   valor_total_calculado?: number;
@@ -82,7 +85,16 @@ export interface TrpInputForm {
   // conclusão do serviço (DD/MM/AAAA ou ISO)
   data_conclusao_servico?: string;
 
-  // prazo
+  // ✅ NOVO: prazos padronizados (CIAS)
+  prazo_provisorio_dias_uteis?: number;
+  prazo_definitivo_dias_uteis?: number;
+
+  // ✅ NOVO: vencimento da NF (CIAS)
+  vencimento_tipo?: TrpVencimentoTipo;
+  vencimento_dias_corridos?: number;
+  vencimento_dia_fixo?: number;
+
+  // prazo (condição)
   condicao_prazo?: TrpCondicaoPrazo;
   motivo_atraso?: string;
   data_prevista_entrega_contrato?: string;
@@ -92,7 +104,7 @@ export interface TrpInputForm {
   condicao_quantidade_ordem?: TrpCondicaoQuantidade;
   comentarios_quantidade_ordem?: string;
 
-  // ✅ NOVO: itens (1+)
+  // ✅ itens (1+)
   itens_objeto: TrpItemObjeto[];
 
   // total geral (opcional)
@@ -106,7 +118,7 @@ export interface TrpInputForm {
   data_assinatura?: string;
   area_demandante_nome?: string;
 
-  // ✅ NOVO: nome curto para o fiscal identificar (vira fileName no backend/N8N)
+  // ✅ nome curto para o fiscal identificar (vira fileName no backend/N8N)
   fileName?: string;
 }
 
@@ -123,7 +135,7 @@ export interface DadosRecebimentoPayload {
   // ✅ total geral dos itens
   valor_total_geral?: number | null;
 
-  // ✅ NOVO: vai para o backend e vira o fileName enviado ao N8N
+  // ✅ vai para o backend e vira o fileName enviado ao N8N
   fileName?: string | null;
 
   // serviços
@@ -133,11 +145,20 @@ export interface DadosRecebimentoPayload {
   tipoBasePrazo: TrpTipoBasePrazo;
   dataRecebimento?: string | null;
 
-  // ✅ NOVO: início do serviço
+  // ✅ início do serviço
   dataInicioServico?: string | null;
 
   // conclusão do serviço
   dataConclusaoServico?: string | null;
+
+  // ✅ NOVO: prazos CIAS
+  prazoProvisorioDiasUteis?: number | null;
+  prazoDefinitivoDiasUteis?: number | null;
+
+  // ✅ NOVO: vencimento CIAS
+  vencimentoTipo?: TrpVencimentoTipo | null;
+  vencimentoDiasCorridos?: number | null;
+  vencimentoDiaFixo?: number | null;
 
   // datas extras (se necessário)
   dataPrevistaEntregaContrato?: string | null;
