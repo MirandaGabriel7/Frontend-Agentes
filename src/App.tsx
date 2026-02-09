@@ -21,6 +21,9 @@ import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
 
+// ✅ NOVO: TRD Result Page
+import { TrdResultPage } from "./modules/trd/pages/TrdResultPage";
+
 import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
 
 function AppShell() {
@@ -112,9 +115,30 @@ function AppShell() {
                 }
               />
 
-              <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
-              <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
-              <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
+              {/* ✅ NOVO: TRD resultado */}
+              <Route
+                path="/agents/trd/resultado/:id"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrdResultPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/agents/trp/novo"
+                element={<Navigate to="/agents/trp" replace />}
+              />
+              <Route
+                path="/agents/trp/lista"
+                element={<Navigate to="/agents/trp/historico" replace />}
+              />
+              <Route
+                path="/agents/trp/:id"
+                element={<Navigate to="/agents/trp/historico" replace />}
+              />
 
               <Route
                 path="/agents/dfd"

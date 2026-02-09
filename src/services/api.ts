@@ -941,3 +941,325 @@ export async function downloadTrpRun(
     console.debug("[TRP Download] Download concluído:", filename);
   }
 }
+
+// ===================================================
+// ✅ TRD API (mesmo padrão TRP)
+// ===================================================
+
+export type TrdRunStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+// POST /trd/generate
+export interface TrdGenerateResponse {
+  runId: string;
+  status: TrdRunStatus;
+  createdAt: string;
+}
+
+export interface TrdGenerateApiResponse {
+  success: boolean;
+  data?: TrdGenerateResponse;
+  message?: string;
+}
+
+// GET /trd/runs/:runId
+export interface TrdRunData {
+  runId: string;
+  trpRunId?: string;
+  status: TrdRunStatus;
+
+  fileName?: string | null;
+
+  documento_markdown_final?: string;
+  documento_markdown_prime?: string;
+
+  campos_trd_normalizados?: Record<string, unknown>;
+
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TrdRunApiResponse {
+  success: boolean;
+  data?: TrdRunData;
+  message?: string;
+}
+
+// GET /trd/runs (list)
+export interface TrdRunListItem {
+  runId: string;
+  status: TrdRunStatus;
+  createdAt: string;
+
+  trp_run_id?: string;
+  trp_created_at?: string;
+  houve_ressalvas?: boolean;
+}
+
+export interface TrdListRunsApiResponse {
+  success: boolean;
+  data?: { items: TrdRunListItem[]; nextCursor?: string } | TrdRunListItem[];
+  nextCursor?: string;
+  message?: string;
+}
+
+// GET /trd/runs/summary
+export interface TrdRunsSummary {
+  total_runs: number;
+  total_completed: number;
+  total_failed: number;
+  last_run_at?: string | null;
+  last_completed_at?: string | null;
+}
+
+export interface TrdRunsSummaryApiResponse {
+  success: boolean;
+  data?: TrdRunsSummary;
+  message?: string;
+}
+
+// Payload do TRD generate
+export interface GenerateTrdParams {
+  trp_run_id: string;
+  houve_ressalvas: boolean;
+  ressalvas_texto?: string | null;
+}
+
+/**
+ * Gera um novo TRD a partir de um TRP
+ * Endpoint: POST /api/trd/generate
+ */
+export async function generateTrd(params: GenerateTrdParams): Promise<TrdGenerateResponse> {
+  const isDev =
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+  if (!params?.trp_run_id || typeof params.trp_run_id !== "string" || !params.trp_run_id.trim()) {
+    throw new Error("trp_run_id é obrigatório");
+  }
+
+  if (typeof params.houve_ressalvas !== "boolean") {
+    throw new Error('houve_ressalvas é obrigatório (true/false)');
+  }
+
+  // regra simples: se marcou ressalvas, texto é recomendado (backend aceita vazio, mas UX não)
+  const rt = params.ressalvas_texto?.trim?.() ?? "";
+  if (params.houve_ressalvas && rt.length === 0) {
+    throw new Error("Informe o texto das ressalvas");
+  }
+
+  const response = await api.post<TrdGenerateApiResponse>("/trd/generate", {
+    trp_run_id: params.trp_run_id,
+    houve_ressalvas: params.houve_ressalvas,
+    ressalvas_texto: params.ressalvas_texto ?? null,
+    source: "UI",
+  });
+
+  const wrapper = response.data;
+
+  if (isDev) {
+    console.debug("[TRD API] Generate response:", {
+      keys: Object.keys(wrapper || {}),
+      success: wrapper?.success,
+      hasData: !!wrapper?.data,
+    });
+  }
+
+  if (wrapper.success !== true) {
+    throw new Error(wrapper.message || "Falha ao gerar TRD no servidor.");
+  }
+
+  if (!wrapper.data) {
+    throw new Error("Resposta do servidor não contém data.");
+  }
+
+  return wrapper.data;
+}
+
+/**
+ * Busca um TRD completo pelo runId
+ * Endpoint: GET /api/trd/runs/:runId
+ */
+export async function fetchTrdRun(runId: string): Promise<TrdRunData> {
+  const isDev =
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+  if (!runId || typeof runId !== "string" || runId.trim() === "") {
+    throw new Error("runId é obrigatório e deve ser uma string válida");
+  }
+
+  const response = await api.get<TrdRunApiResponse>(`/trd/runs/${runId}`);
+  const wrapper = response.data;
+
+  if (isDev) {
+    console.debug("[TRD API] Fetch response:", {
+      keys: Object.keys(wrapper || {}),
+      success: wrapper?.success,
+      hasData: !!wrapper?.data,
+    });
+  }
+
+  if (wrapper.success !== true) {
+    throw new Error(wrapper.message || `Falha ao buscar TRD ${runId}`);
+  }
+
+  if (!wrapper.data) {
+    throw new Error(`TRD ${runId} não encontrado`);
+  }
+
+  return wrapper.data;
+}
+
+/**
+ * Busca TRDs com filtros e paginação
+ * Endpoint: GET /api/trd/runs?limit=&cursor=&status=&q=
+ */
+export interface FetchTrdRunsParams {
+  limit?: number;
+  cursor?: string;
+  status?: "ALL" | TrdRunStatus;
+  q?: string;
+}
+
+export interface FetchTrdRunsResult {
+  items: TrdRunListItem[];
+  nextCursor?: string | null;
+}
+
+export async function fetchTrdRuns(params: FetchTrdRunsParams = {}): Promise<FetchTrdRunsResult> {
+  const isDev =
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+  const { limit = 20, cursor, status, q } = params;
+
+  const queryParams = new URLSearchParams();
+  queryParams.set("limit", String(limit));
+  if (cursor) queryParams.set("cursor", cursor);
+  if (status && status !== "ALL") queryParams.set("status", status);
+  if (q) queryParams.set("q", q);
+
+  const response = await api.get<TrdListRunsApiResponse>(`/trd/runs?${queryParams.toString()}`);
+  const wrapper = response.data;
+
+  if (isDev) {
+    const d: any = wrapper?.data as any;
+    console.debug("[TRD API] List response:", {
+      success: wrapper?.success,
+      dataType: typeof wrapper?.data,
+      isArray: Array.isArray(wrapper?.data),
+      hasItems: !!(d && typeof d === "object" && "items" in d),
+    });
+  }
+
+  if (wrapper.success !== true) {
+    throw new Error(wrapper.message || "Falha ao buscar TRDs");
+  }
+
+  if (wrapper.data && typeof wrapper.data === "object" && "items" in wrapper.data) {
+    const dataObj = wrapper.data as { items: TrdRunListItem[]; nextCursor?: string };
+    return { items: dataObj.items || [], nextCursor: dataObj.nextCursor || null };
+  }
+
+  if (Array.isArray(wrapper.data)) {
+    return { items: wrapper.data, nextCursor: wrapper.nextCursor || null };
+  }
+
+  return { items: [], nextCursor: wrapper.nextCursor || null };
+}
+
+/**
+ * Busca resumo de TRDs
+ * Endpoint: GET /api/trd/runs/summary
+ */
+export async function fetchTrdRunsSummary(): Promise<TrdRunsSummary> {
+  const response = await api.get<TrdRunsSummaryApiResponse>("/trd/runs/summary");
+  const wrapper = response.data;
+
+  if (wrapper.success !== true) {
+    throw new Error(wrapper.message || "Falha ao buscar resumo de TRDs");
+  }
+
+  return (
+    wrapper.data || {
+      total_runs: 0,
+      total_completed: 0,
+      total_failed: 0,
+      last_run_at: null,
+      last_completed_at: null,
+    }
+  );
+}
+
+/**
+ * Download TRD em PDF ou DOCX
+ * Endpoint: GET /api/trd/runs/:runId/download?format=pdf|docx
+ */
+export async function downloadTrdRun(runId: string, format: "pdf" | "docx"): Promise<void> {
+  const isDev =
+    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+  if (!runId || typeof runId !== "string" || runId.trim() === "") {
+    throw new Error("runId é obrigatório e deve ser uma string válida");
+  }
+  if (!format || (format !== "pdf" && format !== "docx")) {
+    throw new Error("format deve ser pdf ou docx");
+  }
+
+  const res = await api.get(`/trd/runs/${runId}/download`, {
+    params: { format },
+    responseType: "blob",
+    validateStatus: () => true,
+  });
+
+  if (isDev) {
+    console.debug("[TRD Download] Resposta recebida:", {
+      status: res.status,
+      contentType: res.headers["content-type"] || res.headers["Content-Type"],
+      disposition: res.headers["content-disposition"] || res.headers["Content-Disposition"],
+    });
+  }
+
+  if (res.status >= 400) {
+    const text = await new Response(res.data).text();
+    let msg = `Falha no download (${res.status})`;
+
+    try {
+      const json = JSON.parse(text);
+      msg = json.message || json.error || msg;
+    } catch {
+      if (text && text.length < 200) msg = text;
+    }
+
+    // mensagens amigáveis (mesmo padrão TRP)
+    switch (res.status) {
+      case 401:
+      case 403:
+        throw Object.assign(new Error("Sessão expirada / sem permissão"), { status: res.status });
+      case 404:
+        throw Object.assign(new Error("Documento não encontrado"), { status: 404 });
+      case 429:
+        throw Object.assign(new Error("Aguarde antes de gerar novamente"), { status: 429 });
+      default:
+        throw Object.assign(new Error(msg), { status: res.status });
+    }
+  }
+
+  const disposition = res.headers["content-disposition"] || res.headers["Content-Disposition"];
+  let filename = extractFilenameFromDisposition(disposition) || `TRD_${runId}.${format}`;
+
+  const contentType = res.headers["content-type"] || res.headers["Content-Type"];
+  const blob = new Blob([res.data], {
+    type:
+      contentType ||
+      (format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
