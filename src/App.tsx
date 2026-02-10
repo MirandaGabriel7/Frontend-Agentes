@@ -21,7 +21,9 @@ import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
 
-// ✅ NOVO: TRD Result Page
+// ✅ TRD
+import { TrdPage } from "./modules/trd/pages/TrdPage";
+import { TrdHistoryPage } from "./modules/trd/pages/TrdHistoryPage";
 import { TrdResultPage } from "./modules/trd/pages/TrdResultPage";
 
 import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
@@ -36,8 +38,10 @@ function AppShell() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
+              {/* Public */}
               <Route path="/login" element={<LoginPage />} />
 
+              {/* Root */}
               <Route
                 path="/"
                 element={
@@ -49,6 +53,7 @@ function AppShell() {
                 }
               />
 
+              {/* Dashboard / Agents */}
               <Route
                 path="/agents"
                 element={
@@ -60,6 +65,7 @@ function AppShell() {
                 }
               />
 
+              {/* Settings/Profile */}
               <Route
                 path="/agents/settings"
                 element={
@@ -70,7 +76,6 @@ function AppShell() {
                   </ProtectedRoute>
                 }
               />
-
               <Route
                 path="/agents/profile"
                 element={
@@ -82,6 +87,7 @@ function AppShell() {
                 }
               />
 
+              {/* ===================== TRP ===================== */}
               <Route
                 path="/agents/trp"
                 element={
@@ -92,7 +98,16 @@ function AppShell() {
                   </ProtectedRoute>
                 }
               />
-
+              <Route
+                path="/agents/trp/historico"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrpHistoryPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/agents/trp/resultado/:id"
                 element={
@@ -104,18 +119,37 @@ function AppShell() {
                 }
               />
 
+              {/* TRP aliases */}
+              <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
+              <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
+              <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
+
+              {/* ===================== TRD ===================== */}
+              {/* ✅ HOME do TRD (mostra os 10 últimos) */}
               <Route
-                path="/agents/trp/historico"
+                path="/agents/trd"
                 element={
                   <ProtectedRoute>
                     <MainLayout>
-                      <TrpHistoryPage />
+                      <TrdPage />
                     </MainLayout>
                   </ProtectedRoute>
                 }
               />
 
-              {/* ✅ NOVO: TRD resultado */}
+              {/* ✅ Histórico completo do TRD */}
+              <Route
+                path="/agents/trd/historico"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TrdHistoryPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* ✅ Resultado do TRD */}
               <Route
                 path="/agents/trd/resultado/:id"
                 element={
@@ -127,19 +161,12 @@ function AppShell() {
                 }
               />
 
-              <Route
-                path="/agents/trp/novo"
-                element={<Navigate to="/agents/trp" replace />}
-              />
-              <Route
-                path="/agents/trp/lista"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
-              <Route
-                path="/agents/trp/:id"
-                element={<Navigate to="/agents/trp/historico" replace />}
-              />
+              {/* TRD aliases (opcional, evita rota solta cair no lugar errado) */}
+              <Route path="/agents/trd/novo" element={<Navigate to="/agents/trd" replace />} />
+              <Route path="/agents/trd/lista" element={<Navigate to="/agents/trd/historico" replace />} />
+              <Route path="/agents/trd/:id" element={<Navigate to="/agents/trd/historico" replace />} />
 
+              {/* ===================== DFD ===================== */}
               <Route
                 path="/agents/dfd"
                 element={
@@ -150,7 +177,6 @@ function AppShell() {
                   </ProtectedRoute>
                 }
               />
-
               <Route
                 path="/agents/dfd/resultado/:id"
                 element={
@@ -162,6 +188,7 @@ function AppShell() {
                 }
               />
 
+              {/* Fallback */}
               <Route path="*" element={<Navigate to="/agents" replace />} />
             </Routes>
           </BrowserRouter>

@@ -1,3 +1,4 @@
+// src/layout/MainLayout.tsx
 import { useMemo, useState, ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -33,6 +34,9 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
 
+// ✅ NOVO: TRD
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+
 // Ícones do avatar (para refletir user_metadata)
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
@@ -63,6 +67,8 @@ const navItems: NavItem[] = [
   { text: "Dashboard", icon: <DashboardIcon />, path: "/agents" },
   { text: "Agente DFD", icon: <AssessmentIcon />, path: "/agents/dfd" },
   { text: "Agente TRP", icon: <DescriptionIcon />, path: "/agents/trp" },
+  // ✅ NOVO: Agente TRD na sidebar
+  { text: "Agente TRD", icon: <AssignmentTurnedInIcon />, path: "/agents/trd" },
 ];
 
 // ---- Avatar helpers (user_metadata) ----
@@ -158,12 +164,14 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       : "ICON";
 
   const avatarColorKey: AvatarColorKey =
-    (meta.avatar_color as AvatarColorKey) && COLOR_HEX[meta.avatar_color as AvatarColorKey]
+    (meta.avatar_color as AvatarColorKey) &&
+    COLOR_HEX[meta.avatar_color as AvatarColorKey]
       ? (meta.avatar_color as AvatarColorKey)
       : "blue";
 
   const avatarIconKey: AvatarIconKey =
-    (meta.avatar_icon as AvatarIconKey) && ICON_NODE[meta.avatar_icon as AvatarIconKey]
+    (meta.avatar_icon as AvatarIconKey) &&
+    ICON_NODE[meta.avatar_icon as AvatarIconKey]
       ? (meta.avatar_icon as AvatarIconKey)
       : "user";
 
@@ -173,8 +181,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     avatarPrimary === "INITIALS" ? (
       getInitials(user?.email)
     ) : (
-      // Ícone centralizado dentro do Avatar
-      <Box sx={{ display: "grid", placeItems: "center" }}>{ICON_NODE[avatarIconKey]}</Box>
+      <Box sx={{ display: "grid", placeItems: "center" }}>
+        {ICON_NODE[avatarIconKey]}
+      </Box>
     );
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -200,8 +209,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   };
 
   const isActive = (path: string) => {
+    // ✅ ativo também em subrotas (resultado/historico/etc)
     if (path === "/agents") return location.pathname === "/agents";
-    return location.pathname === path;
+    return location.pathname === path || location.pathname.startsWith(path + "/");
   };
 
   const handleNavClick = (path: string) => {
@@ -265,7 +275,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 px: 2,
                 py: 1.25,
                 position: "relative",
-                background: active ? alpha(theme.palette.primary.main, 0.08) : "transparent",
+                background: active
+                  ? alpha(theme.palette.primary.main, 0.08)
+                  : "transparent",
                 color: active ? "primary.main" : "text.secondary",
                 "&:hover": {
                   background: active
@@ -307,7 +319,12 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         })}
       </List>
 
-      <Box sx={{ borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`, p: 1.5 }}>
+      <Box
+        sx={{
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+          p: 1.5,
+        }}
+      >
         <ListItemButton
           onClick={() => handleNavClick("/agents/settings")}
           sx={{
@@ -315,29 +332,23 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             px: 2,
             py: 1.25,
             position: "relative",
-            background:
-              location.pathname === "/agents/settings"
-                ? alpha(theme.palette.primary.main, 0.08)
-                : "transparent",
-            color:
-              location.pathname === "/agents/settings" ? "primary.main" : "text.secondary",
+            background: isActive("/agents/settings")
+              ? alpha(theme.palette.primary.main, 0.08)
+              : "transparent",
+            color: isActive("/agents/settings") ? "primary.main" : "text.secondary",
             "&:hover": {
-              background:
-                location.pathname === "/agents/settings"
-                  ? alpha(theme.palette.primary.main, 0.12)
-                  : alpha(theme.palette.action.hover, 0.04),
+              background: isActive("/agents/settings")
+                ? alpha(theme.palette.primary.main, 0.12)
+                : alpha(theme.palette.action.hover, 0.04),
             },
             "& .MuiListItemIcon-root": {
-              color:
-                location.pathname === "/agents/settings"
-                  ? "primary.main"
-                  : "text.secondary",
+              color: isActive("/agents/settings") ? "primary.main" : "text.secondary",
               minWidth: 40,
             },
             transition: "all 0.2s ease",
           }}
         >
-          {location.pathname === "/agents/settings" && (
+          {isActive("/agents/settings") && (
             <Box
               sx={{
                 position: "absolute",
@@ -358,7 +369,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             primary="Configurações"
             primaryTypographyProps={{
               fontSize: "0.875rem",
-              fontWeight: location.pathname === "/agents/settings" ? 600 : 500,
+              fontWeight: isActive("/agents/settings") ? 600 : 500,
               letterSpacing: "-0.01em",
             }}
           />
@@ -368,7 +379,13 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", backgroundColor: "background.default" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        backgroundColor: "background.default",
+      }}
+    >
       <Box
         component="nav"
         sx={{
@@ -414,7 +431,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           bgcolor: "background.default",
           background: `linear-gradient(180deg, ${theme.palette.background.default} 0%, ${alpha(
             theme.palette.background.default,
-            0.98
+            0.98,
           )} 100%)`,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: "100vh",
@@ -478,7 +495,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   sx={{
                     p: 1,
                     color: "text.secondary",
-                    "&:hover": { color: "primary.main", bgcolor: "transparent" },
+                    "&:hover": {
+                      color: "primary.main",
+                      bgcolor: "transparent",
+                    },
                   }}
                   aria-label="search"
                 >
@@ -600,7 +620,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                       px: 2.5,
                       py: 1.25,
                       fontSize: "0.9375rem",
-                      "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                      "&:hover": {
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      },
                     },
                   },
                 }}
@@ -612,7 +634,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   }}
                 >
                   <ListItemIcon>
-                    <AccountCircleIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+                    <AccountCircleIcon
+                      sx={{ fontSize: 20, color: "text.secondary" }}
+                    />
                   </ListItemIcon>
                   <Typography variant="body2">Meu Perfil</Typography>
                 </MenuItem>

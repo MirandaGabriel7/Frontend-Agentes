@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// src/pages/AgentsPage.tsx
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Chip,
@@ -13,17 +14,23 @@ import {
   Button,
   IconButton,
   Stack,
-} from '@mui/material';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import DescriptionIcon from '@mui/icons-material/Description';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import HistoryIcon from '@mui/icons-material/History';
+} from "@mui/material";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import DescriptionIcon from "@mui/icons-material/Description";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import HistoryIcon from "@mui/icons-material/History";
+
+// ✅ NOVO: TRD icon
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 
 export const AgentsPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const [activeTab, setActiveTab] = useState('dfd');
+
+  // ✅ inclui TRD como aba
+  const [activeTab, setActiveTab] = useState("dfd");
+
   const [inset, setInset] = useState<number>(50);
   const [onMouseDown, setOnMouseDown] = useState<boolean>(false);
 
@@ -33,9 +40,9 @@ export const AgentsPage = () => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     let x = 0;
 
-    if ('touches' in e && e.touches.length > 0) {
+    if ("touches" in e && e.touches.length > 0) {
       x = e.touches[0].clientX - rect.left;
-    } else if ('clientX' in e) {
+    } else if ("clientX" in e) {
       x = (e as React.MouseEvent).clientX - rect.left;
     }
 
@@ -54,29 +61,43 @@ export const AgentsPage = () => {
 
   const tabsData = [
     {
-      value: 'dfd',
+      value: "dfd",
       icon: <AssessmentIcon sx={{ fontSize: 20 }} />,
-      label: 'Agente DFD',
+      label: "Agente DFD",
       content: {
-        badge: 'Auditoria Automatizada',
-        title: 'Análise Inteligente de Documentos de Formalização da Demanda',
-        description: 'O Agente DFD analisa automaticamente o Documento de Formalização da Demanda, aplica as regras da Lei 14.133 e identifica falhas, riscos e pontos de melhoria no planejamento. Ele gera um parecer técnico claro, destacando o que está correto, o que precisa ser ajustado e quais ações o setor deve tomar antes de seguir com o planejamento da contratação.',
-        buttonText: 'Iniciar Análise',
-        route: '/agents/dfd',
-        icon: <AssessmentIcon />,
+        badge: "Auditoria Automatizada",
+        title: "Análise Inteligente de Documentos de Formalização da Demanda",
+        description:
+          "O Agente DFD analisa automaticamente o Documento de Formalização da Demanda, aplica as regras da Lei 14.133 e identifica falhas, riscos e pontos de melhoria no planejamento. Ele gera um parecer técnico claro, destacando o que está correto, o que precisa ser ajustado e quais ações o setor deve tomar antes de seguir com o planejamento da contratação.",
+        buttonText: "Iniciar Análise",
+        route: "/agents/dfd",
       },
     },
     {
-      value: 'trp',
+      value: "trp",
       icon: <DescriptionIcon sx={{ fontSize: 20 }} />,
-      label: 'Agente TRP',
+      label: "Agente TRP",
       content: {
-        badge: 'Geração Automática',
-        title: 'Termos de Recebimento Provisório com IA',
-        description: 'O Agente TRP é um agente de IA especializado na leitura, interpretação e geração automática do Termo de Recebimento Provisório. Ele analisa de forma integrada a Ficha de Contratualização, a Nota Fiscal, a Ordem de Fornecimento e as informações registradas pelo fiscal, consolidando tudo em um documento oficial completo, padronizado e pronto para assinatura.',
-        buttonText: 'Gerar TRP',
-        route: '/agents/trp',
-        icon: <DescriptionIcon />,
+        badge: "Geração Automática",
+        title: "Termos de Recebimento Provisório com IA",
+        description:
+          "O Agente TRP é um agente de IA especializado na leitura, interpretação e geração automática do Termo de Recebimento Provisório. Ele analisa de forma integrada a Ficha de Contratualização, a Nota Fiscal, a Ordem de Fornecimento e as informações registradas pelo fiscal, consolidando tudo em um documento oficial completo, padronizado e pronto para assinatura.",
+        buttonText: "Gerar TRP",
+        route: "/agents/trp",
+      },
+    },
+    // ✅ NOVO: TRD
+    {
+      value: "trd",
+      icon: <AssignmentTurnedInIcon sx={{ fontSize: 20 }} />,
+      label: "Agente TRD",
+      content: {
+        badge: "Histórico e Emissão",
+        title: "Termos de Recebimento Definitivo vinculados ao TRP",
+        description:
+          "O Agente TRD organiza e permite emitir Termos de Recebimento Definitivo a partir de TRPs já gerados. Aqui você acompanha o histórico completo dos TRDs, acessa os resultados, baixa PDF/DOCX e mantém rastreabilidade do recebimento definitivo vinculado ao recebimento provisório.",
+        buttonText: "Abrir TRD",
+        route: "/agents/trd",
       },
     },
   ];
@@ -87,36 +108,36 @@ export const AgentsPage = () => {
       sx={{
         flexGrow: 1,
         bgcolor: (theme) => theme.palette.background.default,
-        minHeight: '100vh',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        minHeight: "100vh",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <Container
         maxWidth="lg"
         sx={{
-          width: '100%',
-          maxWidth: { xs: '100%', sm: '1200px', md: '1400px', lg: '1600px' },
-          mx: 'auto',
+          width: "100%",
+          maxWidth: { xs: "100%", sm: "1200px", md: "1400px", lg: "1600px" },
+          mx: "auto",
           px: { xs: 3, sm: 4, md: 5, lg: 6 },
           py: { xs: 4, sm: 5, md: 6 },
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
         }}
       >
         {/* Agents Section with Tabs */}
         <Box>
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               gap: 3,
-              textAlign: 'center',
+              textAlign: "center",
               mb: { xs: 8, md: 10 },
-              position: 'relative',
+              position: "relative",
             }}
           >
             {/* Título principal com logo */}
@@ -145,38 +166,44 @@ export const AgentsPage = () => {
                 sx={{
                   fontWeight: 800,
                   background: `linear-gradient(135deg, ${theme.palette.text.primary} 0%, ${alpha(theme.palette.primary.main, 0.8)} 100%)`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  fontSize: { xs: '2rem', sm: '2.75rem', md: '3.5rem', lg: '4rem' },
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontSize: {
+                    xs: "2rem",
+                    sm: "2.75rem",
+                    md: "3.5rem",
+                    lg: "4rem",
+                  },
                   lineHeight: 1.1,
-                  letterSpacing: '-0.02em',
+                  letterSpacing: "-0.02em",
                 }}
               >
                 Planco AI
               </Typography>
             </Stack>
-            
-            {/* Subtítulo com melhor espaçamento */}
+
+            {/* Subtítulo */}
             <Typography
               variant="h6"
               sx={{
                 color: theme.palette.text.secondary,
-                maxWidth: '700px',
-                fontSize: { xs: '1rem', sm: '1.125rem', md: '1.25rem' },
+                maxWidth: "700px",
+                fontSize: { xs: "1rem", sm: "1.125rem", md: "1.25rem" },
                 lineHeight: 1.7,
                 fontWeight: 400,
                 opacity: 0.85,
               }}
             >
-              Plataforma avançada de inteligência artificial para automação de processos governamentais e análise documental.
+              Plataforma avançada de inteligência artificial para automação de
+              processos governamentais e análise documental.
             </Typography>
           </Box>
 
           <Box
             sx={{
-              maxWidth: '1400px',
-              mx: 'auto',
+              maxWidth: "1400px",
+              mx: "auto",
             }}
           >
             <Tabs
@@ -184,31 +211,31 @@ export const AgentsPage = () => {
               onChange={(_, newValue) => setActiveTab(newValue)}
               sx={{
                 mb: 4,
-                '& .MuiTabs-flexContainer': {
-                  justifyContent: 'center',
+                "& .MuiTabs-flexContainer": {
+                  justifyContent: "center",
                   gap: { xs: 1, sm: 2, md: 3 },
-                  flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                  flexWrap: { xs: "wrap", sm: "nowrap" },
                 },
-                '& .MuiTab-root': {
-                  textTransform: 'none',
+                "& .MuiTab-root": {
+                  textTransform: "none",
                   fontWeight: 600,
-                  fontSize: { xs: '0.875rem', md: '0.9375rem' },
+                  fontSize: { xs: "0.875rem", md: "0.9375rem" },
                   minHeight: 48,
                   px: { xs: 2, sm: 3, md: 4 },
                   borderRadius: 3,
                   color: theme.palette.text.secondary,
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
+                  transition: "all 0.2s ease",
+                  "&:hover": {
                     color: theme.palette.primary.main,
                     bgcolor: alpha(theme.palette.primary.main, 0.06),
                   },
-                  '&.Mui-selected': {
+                  "&.Mui-selected": {
                     color: theme.palette.primary.main,
                     bgcolor: alpha(theme.palette.primary.main, 0.1),
                   },
                 },
-                '& .MuiTabs-indicator': {
-                  display: 'none',
+                "& .MuiTabs-indicator": {
+                  display: "none",
                 },
               }}
             >
@@ -228,35 +255,35 @@ export const AgentsPage = () => {
               sx={{
                 borderRadius: 4,
                 bgcolor: alpha(theme.palette.background.paper, 0.7),
-                backdropFilter: 'blur(10px)',
+                backdropFilter: "blur(10px)",
                 p: { xs: 4, sm: 6, md: 8 },
                 border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-                position: 'relative',
+                position: "relative",
                 zIndex: 1,
-                overflow: 'visible',
+                overflow: "visible",
               }}
             >
               {tabsData.map((tab) => (
                 <Box
                   key={tab.value}
                   sx={{
-                    display: activeTab === tab.value ? 'grid' : 'none',
-                    gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+                    display: activeTab === tab.value ? "grid" : "none",
+                    gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
                     gap: { xs: 6, lg: 8 },
-                    alignItems: 'center',
+                    alignItems: "center",
                   }}
                 >
                   {/* Left: Content */}
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <Chip
                       label={tab.content.badge}
                       variant="outlined"
                       sx={{
-                        width: 'fit-content',
+                        width: "fit-content",
                         borderColor: alpha(theme.palette.primary.main, 0.3),
                         color: theme.palette.primary.main,
                         fontWeight: 600,
-                        fontSize: '0.75rem',
+                        fontSize: "0.75rem",
                         height: 28,
                         px: 1.5,
                         bgcolor: theme.palette.background.paper,
@@ -267,7 +294,7 @@ export const AgentsPage = () => {
                       sx={{
                         fontWeight: 600,
                         color: theme.palette.text.primary,
-                        fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' },
+                        fontSize: { xs: "1.75rem", sm: "2.25rem", md: "3rem" },
                         lineHeight: 1.2,
                       }}
                     >
@@ -277,58 +304,71 @@ export const AgentsPage = () => {
                       variant="body1"
                       sx={{
                         color: theme.palette.text.secondary,
-                        fontSize: { xs: '0.9375rem', md: '1.125rem' },
+                        fontSize: { xs: "0.9375rem", md: "1.125rem" },
                         lineHeight: 1.7,
                       }}
                     >
                       {tab.content.description}
                     </Typography>
-                    <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: 'wrap' }}>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={() => navigate(tab.content.route)}
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '0.9375rem',
-                        px: 3,
-                        py: 1.5,
-                        borderRadius: 2,
-                        bgcolor: theme.palette.primary.main,
-                        boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
-                        '&:hover': {
-                          bgcolor: theme.palette.primary.dark,
-                          boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-                          transform: 'translateY(-2px)',
-                        },
-                        transition: 'all 0.2s ease-out',
-                      }}
+
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      sx={{ mt: 1, flexWrap: "wrap" }}
                     >
-                      {tab.content.buttonText}
-                    </Button>
-                      {tab.value === 'trp' && (
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => navigate(tab.content.route)}
+                        endIcon={<ArrowForwardIcon />}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 600,
+                          fontSize: "0.9375rem",
+                          px: 3,
+                          py: 1.5,
+                          borderRadius: 2,
+                          bgcolor: theme.palette.primary.main,
+                          boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
+                          "&:hover": {
+                            bgcolor: theme.palette.primary.dark,
+                            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+                            transform: "translateY(-2px)",
+                          },
+                          transition: "all 0.2s ease-out",
+                        }}
+                      >
+                        {tab.content.buttonText}
+                      </Button>
+
+                      {/* ✅ botão de histórico igual TRP/TRD */}
+                      {(tab.value === "trp" || tab.value === "trd") && (
                         <Button
                           variant="outlined"
                           size="large"
-                          onClick={() => navigate('/agents/trp/historico')}
+                          onClick={() =>
+                            navigate(
+                              tab.value === "trp"
+                                ? "/agents/trp/historico"
+                                : "/agents/trd/historico"
+                            )
+                          }
                           startIcon={<HistoryIcon />}
                           sx={{
-                            textTransform: 'none',
+                            textTransform: "none",
                             fontWeight: 600,
-                            fontSize: '0.9375rem',
+                            fontSize: "0.9375rem",
                             px: 3,
                             py: 1.5,
                             borderRadius: 2,
                             borderColor: alpha(theme.palette.divider, 0.3),
                             color: theme.palette.text.primary,
-                            '&:hover': {
+                            "&:hover": {
                               borderColor: theme.palette.primary.main,
                               bgcolor: alpha(theme.palette.primary.main, 0.04),
-                              transform: 'translateY(-2px)',
+                              transform: "translateY(-2px)",
                             },
-                            transition: 'all 0.2s ease-out',
+                            transition: "all 0.2s ease-out",
                           }}
                         >
                           Histórico
@@ -337,22 +377,22 @@ export const AgentsPage = () => {
                     </Stack>
                   </Box>
 
-                  {/* Right: Image/Visual - Before/After Slider */}
+                  {/* Right: Image/Visual - Before/After Slider (mantido igual) */}
                   <Box
                     sx={{
-                      position: 'relative',
+                      position: "relative",
                       borderRadius: 3,
-                      overflow: 'visible',
-                      bgcolor: 'transparent',
-                      minHeight: { xs: '400px', md: '550px' },
-                      height: 'auto',
-                      userSelect: 'none',
-                      cursor: onMouseDown ? 'ew-resize' : 'default',
+                      overflow: "visible",
+                      bgcolor: "transparent",
+                      minHeight: { xs: "400px", md: "550px" },
+                      height: "auto",
+                      userSelect: "none",
+                      cursor: onMouseDown ? "ew-resize" : "default",
                       zIndex: 10,
                       p: 3,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -363,15 +403,15 @@ export const AgentsPage = () => {
                     {/* Slider Line */}
                     <Box
                       sx={{
-                        position: 'absolute',
+                        position: "absolute",
                         top: 0,
                         bottom: 0,
-                        width: '2px',
+                        width: "2px",
                         bgcolor: theme.palette.background.paper,
                         zIndex: 30,
                         left: `${inset}%`,
-                        ml: '-1px',
-                        boxShadow: `0 0 8px ${alpha('#000', 0.2)}`,
+                        ml: "-1px",
+                        boxShadow: `0 0 8px ${alpha("#000", 0.2)}`,
                       }}
                     >
                       {/* Slider Handle */}
@@ -379,49 +419,50 @@ export const AgentsPage = () => {
                         onMouseDown={handleMouseDown}
                         onTouchStart={handleMouseDown}
                         sx={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
                           bgcolor: theme.palette.background.paper,
                           border: `2px solid ${alpha(theme.palette.divider, 0.2)}`,
                           width: 40,
                           height: 40,
                           borderRadius: 2,
                           zIndex: 40,
-                          cursor: 'ew-resize',
-                          boxShadow: `0 2px 8px ${alpha('#000', 0.15)}`,
-                          '&:hover': {
-                            transform: 'translate(-50%, -50%) scale(1.1)',
-                            boxShadow: `0 4px 12px ${alpha('#000', 0.25)}`,
+                          cursor: "ew-resize",
+                          boxShadow: `0 2px 8px ${alpha("#000", 0.15)}`,
+                          "&:hover": {
+                            transform: "translate(-50%, -50%) scale(1.1)",
+                            boxShadow: `0 4px 12px ${alpha("#000", 0.25)}`,
                           },
-                          transition: onMouseDown ? 'none' : 'all 0.2s ease',
+                          transition: onMouseDown ? "none" : "all 0.2s ease",
                         }}
                       >
                         <DragIndicatorIcon
                           sx={{
                             fontSize: 20,
                             color: theme.palette.text.secondary,
-                            transform: 'rotate(90deg)',
+                            transform: "rotate(90deg)",
                           }}
                         />
                       </IconButton>
                     </Box>
 
-                    {/* Before: Documento com erros */}
+                    {/* ✅ Mantém seus SVGs exatamente como estavam */}
+                    {/* Before */}
                     <Box
                       sx={{
-                        position: 'absolute',
+                        position: "absolute",
                         top: 0,
                         left: 0,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         clipPath: `inset(0 ${100 - inset}% 0 0)`,
                         zIndex: 15,
-                        overflow: 'visible',
+                        overflow: "visible",
                         padding: 0,
                       }}
                     >
@@ -430,15 +471,14 @@ export const AgentsPage = () => {
                         viewBox="0 0 400 550"
                         preserveAspectRatio="xMidYMid meet"
                         sx={{
-                          width: '100%',
-                          height: '100%',
-                          maxWidth: { xs: '280px', md: '380px' },
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                          filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.1))',
+                          width: "100%",
+                          height: "100%",
+                          maxWidth: { xs: "280px", md: "380px" },
+                          maxHeight: "100%",
+                          objectFit: "contain",
+                          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.1))",
                         }}
                       >
-                        {/* Documento base */}
                         <rect
                           x="20"
                           y="20"
@@ -449,8 +489,6 @@ export const AgentsPage = () => {
                           stroke="#ff4444"
                           strokeWidth="2"
                         />
-                        
-                        {/* Linhas de texto simuladas */}
                         <line x1="40" y1="80" x2="360" y2="80" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="120" x2="340" y2="120" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="160" x2="370" y2="160" stroke="#d0d0d0" strokeWidth="1.5" />
@@ -462,43 +500,31 @@ export const AgentsPage = () => {
                         <line x1="40" y1="400" x2="370" y2="400" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="440" x2="320" y2="440" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="480" x2="350" y2="480" stroke="#d0d0d0" strokeWidth="1.5" />
-                        
-                        {/* X vermelho 1 */}
                         <g transform="translate(300, 100)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                           <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                         </g>
-                        
-                        {/* X vermelho 2 */}
                         <g transform="translate(360, 180)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                           <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                         </g>
-                        
-                        {/* X vermelho 3 */}
                         <g transform="translate(280, 260)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                           <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                         </g>
-                        
-                        {/* X vermelho 4 */}
                         <g transform="translate(340, 340)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                           <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                         </g>
-                        
-                        {/* X vermelho 5 */}
                         <g transform="translate(300, 420)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                           <line x1="8" y1="-8" x2="-8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
                         </g>
-                        
-                        {/* X vermelho 6 */}
                         <g transform="translate(360, 500)">
                           <circle cx="0" cy="0" r="12" fill="#ff4444" opacity="0.15" />
                           <line x1="-8" y1="-8" x2="8" y2="8" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
@@ -507,20 +533,20 @@ export const AgentsPage = () => {
                       </Box>
                     </Box>
 
-                    {/* After: Documento correto com logo PLANCO */}
+                    {/* After */}
                     <Box
                       sx={{
-                        position: 'absolute',
+                        position: "absolute",
                         top: 0,
                         left: 0,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         clipPath: `inset(0 0 0 ${inset}%)`,
                         zIndex: 12,
-                        overflow: 'visible',
+                        overflow: "visible",
                         padding: 0,
                       }}
                     >
@@ -529,15 +555,14 @@ export const AgentsPage = () => {
                         viewBox="0 0 400 550"
                         preserveAspectRatio="xMidYMid meet"
                         sx={{
-                          width: '100%',
-                          height: '100%',
-                          maxWidth: { xs: '280px', md: '380px' },
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                          filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.1))',
+                          width: "100%",
+                          height: "100%",
+                          maxWidth: { xs: "280px", md: "380px" },
+                          maxHeight: "100%",
+                          objectFit: "contain",
+                          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.1))",
                         }}
                       >
-                        {/* Documento base */}
                         <rect
                           x="20"
                           y="20"
@@ -548,30 +573,15 @@ export const AgentsPage = () => {
                           stroke="#4caf50"
                           strokeWidth="2"
                         />
-                        
-                        {/* Logo PLANCO SVG no topo direito do documento */}
+                        {/* mantém seu logo svg e checks */}
                         <g transform="translate(350, 50) scale(0.05)">
                           <g transform="translate(-369.785, -458.76)">
-                            <path
-                              fill="#105bbe"
-                              d="M725.52,581.65l-321.83,321.81c-18.73,18.75-49.09,18.75-67.82,0L14.04,581.65c-18.73-18.75-18.73-49.09,0-67.84l21.51-21.48,33.56-33.56,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,33.56,33.56,21.51,21.48c18.73,18.75,18.73,49.09,0,67.84Z"
-                            />
-                            <path
-                              fill="#1b439b"
-                              d="M704.02,492.32l-300.32,300.32c-18.73,18.73-49.09,18.73-67.82,0L35.55,492.32l33.56-33.56,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,33.56,33.56Z"
-                            />
-                            <path
-                              fill="#1877f2"
-                              d="M725.52,335.87L403.69,14.04c-18.73-18.73-49.09-18.73-67.82,0L14.04,335.87c-18.62,18.62-18.73,48.73-.33,67.47.11.11.22.24.33.35l55.07,55.07,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,55.07-55.07c.11-.11.22-.24.33-.35,18.4-18.75,18.29-48.86-.33-67.47ZM340.8,570.07c-5.89,5.91-13.56,8.99-21.29,9.25-.89.07-1.8.07-2.69,0-7.73-.26-15.4-3.35-21.29-9.25l-133.79-133.79c-12.4-12.4-12.4-32.52,0-44.95l25.24-25.22c12.4-12.43,32.54-12.43,44.95,0l86.24,86.24,189.51-189.51c12.4-12.4,32.52-12.4,44.92,0l25.24,25.24c12.4,12.4,12.4,32.52,0,44.92l-16.57,16.57-220.47,220.49Z"
-                            />
-                            <path
-                              fill="#fdf8fb"
-                              d="M577.85,333.01l-16.57,16.57-220.47,220.49c-5.89,5.91-13.56,8.99-21.29,9.25-.89.07-1.8.07-2.69,0-7.73-.26-15.4-3.35-21.29-9.25l-133.79-133.79c-12.4-12.4-12.4-32.52,0-44.95l25.24-25.22c12.4-12.43,32.54-12.43,44.95,0l86.24,86.24,189.51-189.51c12.4-12.4,32.52-12.4,44.92,0l25.24,25.24c12.4,12.4,12.4,32.52,0,44.92Z"
-                            />
+                            <path fill="#105bbe" d="M725.52,581.65l-321.83,321.81c-18.73,18.75-49.09,18.75-67.82,0L14.04,581.65c-18.73-18.75-18.73-49.09,0-67.84l21.51-21.48,33.56-33.56,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,33.56,33.56,21.51,21.48c18.73,18.75,18.73,49.09,0,67.84Z" />
+                            <path fill="#1b439b" d="M704.02,492.32l-300.32,300.32c-18.73,18.73-49.09,18.73-67.82,0L35.55,492.32l33.56-33.56,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,33.56,33.56Z" />
+                            <path fill="#1877f2" d="M725.52,335.87L403.69,14.04c-18.73-18.73-49.09-18.73-67.82,0L14.04,335.87c-18.62,18.62-18.73,48.73-.33,67.47.11.11.22.24.33.35l55.07,55.07,266.76,266.76c18.73,18.73,49.09,18.73,67.82,0l266.76-266.76,55.07-55.07c.11-.11.22-.24.33-.35,18.4-18.75,18.29-48.86-.33-67.47ZM340.8,570.07c-5.89,5.91-13.56,8.99-21.29,9.25-.89.07-1.8.07-2.69,0-7.73-.26-15.4-3.35-21.29-9.25l-133.79-133.79c-12.4-12.4-12.4-32.52,0-44.95l25.24-25.22c12.4-12.43,32.54-12.43,44.95,0l86.24,86.24,189.51-189.51c12.4-12.4,32.52-12.4,44.92,0l25.24,25.24c12.4,12.4,12.4,32.52,0,44.92l-16.57,16.57-220.47,220.49Z" />
+                            <path fill="#fdf8fb" d="M577.85,333.01l-16.57,16.57-220.47,220.49c-5.89,5.91-13.56,8.99-21.29,9.25-.89.07-1.8.07-2.69,0-7.73-.26-15.4-3.35-21.29-9.25l-133.79-133.79c-12.4-12.4-12.4-32.52,0-44.95l25.24-25.22c12.4-12.43,32.54-12.43,44.95,0l86.24,86.24,189.51-189.51c12.4-12.4,32.52-12.4,44.92,0l25.24,25.24c12.4,12.4,12.4,32.52,0,44.92Z" />
                           </g>
                         </g>
-                        
-                        {/* Linhas de texto simuladas */}
                         <line x1="40" y1="100" x2="360" y2="100" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="140" x2="340" y2="140" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="180" x2="370" y2="180" stroke="#d0d0d0" strokeWidth="1.5" />
@@ -583,33 +593,26 @@ export const AgentsPage = () => {
                         <line x1="40" y1="420" x2="370" y2="420" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="460" x2="320" y2="460" stroke="#d0d0d0" strokeWidth="1.5" />
                         <line x1="40" y1="500" x2="350" y2="500" stroke="#d0d0d0" strokeWidth="1.5" />
-                        
-                        {/* Checkmarks verdes */}
                         <g transform="translate(300, 120)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         </g>
-                        
                         <g transform="translate(360, 200)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         </g>
-                        
                         <g transform="translate(280, 280)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         </g>
-                        
                         <g transform="translate(340, 360)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         </g>
-                        
                         <g transform="translate(300, 440)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         </g>
-                        
                         <g transform="translate(360, 520)">
                           <circle cx="0" cy="0" r="12" fill="#4caf50" opacity="0.15" />
                           <path d="M-6 -2 L-2 2 L6 -6" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
