@@ -13,20 +13,20 @@ export function createTrdViewModel(run: TrdRunData): TrdViewModel {
   const documento_markdown =
     typeof run.documento_markdown_final === "string" && run.documento_markdown_final.trim()
       ? run.documento_markdown_final
-      : typeof run.documento_markdown_prime === "string"
-        ? run.documento_markdown_prime
+      : typeof (run as any).documento_markdown_prime === "string"
+        ? String((run as any).documento_markdown_prime)
         : "";
 
   const campos =
     run.campos_trd_normalizados && typeof run.campos_trd_normalizados === "object"
       ? (run.campos_trd_normalizados as Record<string, unknown>)
-      : ({} as Record<string, unknown>);
+      : {};
 
   return {
     documento_markdown,
     campos,
-    runId: run.runId,
-    createdAt: run.createdAt,
-    updatedAt: run.updatedAt,
+    runId: (run as any).runId,
+    createdAt: (run as any).createdAt,
+    updatedAt: (run as any).updatedAt,
   };
 }
