@@ -1,7 +1,8 @@
 // src/App.tsx
+import { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline } from "@mui/material";
+import { CssBaseline, Box, CircularProgress, Typography } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
@@ -21,12 +22,31 @@ import { TrpPage } from "./modules/trp/pages/TrpPage";
 import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
 import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
 
-// ✅ TRD
 import { TrdPage } from "./modules/trd/pages/TrdPage";
 import { TrdHistoryPage } from "./modules/trd/pages/TrdHistoryPage";
 import { TrdResultPage } from "./modules/trd/pages/TrdResultPage";
 
 import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
+
+function AppBootFallback() {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        p: 3,
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <CircularProgress size={22} />
+        <Typography variant="body2" color="text.secondary">
+          Carregando aplicação…
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
 
 function AppShell() {
   const { muiTheme } = useUiSettings();
@@ -36,162 +56,164 @@ function AppShell() {
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <AuthProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public */}
-              <Route path="/login" element={<LoginPage />} />
+          {/* Suspense evita tela branca caso algum chunk/provider demore */}
+          <Suspense fallback={<AppBootFallback />}>
+            {/* basename fica seguro pra ambientes com base path */}
+            <BrowserRouter basename={import.meta.env.BASE_URL ?? "/"}>
+              <Routes>
+                {/* Debug: se isso abrir, router + deploy estão OK */}
+                <Route
+                  path="/health"
+                  element={
+                    <Box sx={{ p: 3 }}>
+                      <Typography variant="h6">OK</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Router funcionando.
+                      </Typography>
+                    </Box>
+                  }
+                />
 
-              {/* Root */}
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <Navigate to="/agents" replace />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* Public */}
+                <Route path="/login" element={<LoginPage />} />
 
-              {/* Dashboard / Agents */}
-              <Route
-                path="/agents"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <AgentsPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* Root: deixa explícito pra evitar "nada" */}
+                <Route path="/" element={<Navigate to="/agents" replace />} />
 
-              {/* Settings/Profile */}
-              <Route
-                path="/agents/settings"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <SettingsPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agents/profile"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <ProfilePage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* ===================== PROTECTED GROUP ===================== */}
+                <Route
+                  path="/agents"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <AgentsPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ===================== TRP ===================== */}
-              <Route
-                path="/agents/trp"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrpPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agents/trp/historico"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrpHistoryPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agents/trp/resultado/:id"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrpResultPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/agents/settings"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <SettingsPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/profile"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <ProfilePage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* TRP aliases */}
-              <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
-              <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
-              <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
+                {/* ===================== TRP ===================== */}
+                <Route
+                  path="/agents/trp"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrpPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/trp/historico"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrpHistoryPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/trp/resultado/:id"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrpResultPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ===================== TRD ===================== */}
-              {/* ✅ HOME do TRD (mostra os 10 últimos) */}
-              <Route
-                path="/agents/trd"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrdPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* TRP aliases */}
+                <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
+                <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
+                <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
 
-              {/* ✅ Histórico completo do TRD */}
-              <Route
-                path="/agents/trd/historico"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrdHistoryPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* ===================== TRD ===================== */}
+                <Route
+                  path="/agents/trd"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrdPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/trd/historico"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrdHistoryPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/trd/resultado/:id"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <TrdResultPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ✅ Resultado do TRD */}
-              <Route
-                path="/agents/trd/resultado/:id"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <TrdResultPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* TRD aliases */}
+                <Route path="/agents/trd/novo" element={<Navigate to="/agents/trd" replace />} />
+                <Route path="/agents/trd/lista" element={<Navigate to="/agents/trd/historico" replace />} />
+                <Route path="/agents/trd/:id" element={<Navigate to="/agents/trd/historico" replace />} />
 
-              {/* TRD aliases (opcional, evita rota solta cair no lugar errado) */}
-              <Route path="/agents/trd/novo" element={<Navigate to="/agents/trd" replace />} />
-              <Route path="/agents/trd/lista" element={<Navigate to="/agents/trd/historico" replace />} />
-              <Route path="/agents/trd/:id" element={<Navigate to="/agents/trd/historico" replace />} />
+                {/* ===================== DFD ===================== */}
+                <Route
+                  path="/agents/dfd"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <DfdAgentPage />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents/dfd/resultado/:id"
+                  element={
+                    <ProtectedRoute>
+                      <MainLayout>
+                        <AgenteDfdResultado />
+                      </MainLayout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ===================== DFD ===================== */}
-              <Route
-                path="/agents/dfd"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <DfdAgentPage />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agents/dfd/resultado/:id"
-                element={
-                  <ProtectedRoute>
-                    <MainLayout>
-                      <AgenteDfdResultado />
-                    </MainLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/agents" replace />} />
-            </Routes>
-          </BrowserRouter>
+                {/* Fallback: manda pro login primeiro pra evitar loop com auth */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </Suspense>
         </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>
