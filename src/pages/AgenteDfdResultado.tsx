@@ -2,11 +2,8 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Box,
-  CircularProgress,
   Alert,
   Skeleton,
-  alpha,
-  useTheme,
 } from '@mui/material';
 import { useMockDfdAnalysis } from '../modules/dfd/hooks/useMockDfdAnalysis';
 import { DfdResultHeader } from '../modules/dfd/components/DfdResultHeader';
@@ -17,7 +14,6 @@ import { DfdGlobalSummary } from '../modules/dfd/components/DfdGlobalSummary';
 import { DfdMetaBar } from '../modules/dfd/components/DfdMetaBar';
 
 export const AgenteDfdResultado: React.FC = () => {
-  const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const { analysis, isLoading, hasError } = useMockDfdAnalysis(id);
 

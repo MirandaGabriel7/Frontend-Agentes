@@ -99,7 +99,7 @@ export const TrpUploadCard: React.FC<TrpUploadCardProps> = ({
     label: string,
     description: string,
     file: File | null,
-    inputRef: React.RefObject<HTMLInputElement>,
+    inputRef: React.RefObject<HTMLInputElement | null>,
     error?: string
   ) => {
     const handleClick = () => {

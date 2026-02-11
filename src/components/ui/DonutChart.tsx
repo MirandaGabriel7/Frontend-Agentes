@@ -25,7 +25,6 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   totalValue: propTotalValue,
   size = 200,
   strokeWidth = 20,
-  animationDuration = 1,
   highlightOnHover = true,
   centerContent,
   onSegmentHover,

@@ -9,7 +9,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Grid,
   alpha,
   useTheme,
 } from '@mui/material';

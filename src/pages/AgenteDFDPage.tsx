@@ -335,9 +335,10 @@ const ResultadosTabs: React.FC<ResultadosTabsProps> = ({
   analiseResult,
   activeTab,
   onTabChange,
-  onCopyJson,
 }) => {
   const theme = useTheme();
+
+  const [_copySuccess, setCopySuccess] = useState(false);
 
   return (
     <Paper
