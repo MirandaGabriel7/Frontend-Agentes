@@ -1,59 +1,47 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// src/lib/supabaseClient.ts
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) ?? "";
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ?? "";
 
-const isDev = (import.meta.env?.MODE === 'development') || (import.meta.env?.DEV === true);
-const isProduction = import.meta.env?.MODE === 'production';
+const MODE = (import.meta.env.MODE as string) ?? "development";
+const isDev = MODE === "development";
 
-// Validação de envs
-export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+// Validação de envs (fail-fast sempre — melhor do que supabase null)
+const missing: string[] = [];
+if (!SUPABASE_URL) missing.push("VITE_SUPABASE_URL");
+if (!SUPABASE_ANON_KEY) missing.push("VITE_SUPABASE_ANON_KEY");
 
-// Fail-fast em produção se faltar envs
-if (isProduction && !isSupabaseConfigured) {
-  const missing: string[] = [];
-  if (!SUPABASE_URL) missing.push('VITE_SUPABASE_URL');
-  if (!SUPABASE_ANON_KEY) missing.push('VITE_SUPABASE_ANON_KEY');
-  
-  throw new Error(
-    `[Supabase] Configuração obrigatória faltando em produção: ${missing.join(', ')}. ` +
-    `Configure as variáveis de ambiente antes de fazer build.`
-  );
+if (missing.length > 0) {
+  const msg =
+    `[Supabase] Variáveis de ambiente ausentes: ${missing.join(", ")}. ` +
+    `Configure no .env (local) e/ou no Netlify (Environment variables).`;
+
+  // Em dev: erro explícito logo ao iniciar (evita debug infinito)
+  // Em prod: também deve quebrar o build/deploy se faltar
+  throw new Error(msg);
 }
 
-// Logs em dev
+// Logs úteis em dev (sem vazar segredo)
 if (isDev) {
-  if (!SUPABASE_URL) {
-    console.error(
-      '[Supabase] ❌ VITE_SUPABASE_URL não está definida. Configure no arquivo .env'
-    );
-  }
-  if (!SUPABASE_ANON_KEY) {
-    console.error(
-      '[Supabase] ❌ VITE_SUPABASE_ANON_KEY não está definida. Configure no arquivo .env'
-    );
-  }
-  if (isSupabaseConfigured) {
-    console.debug('[Supabase] ✅ Configuração carregada:', {
-      url: SUPABASE_URL.substring(0, 30) + '...',
-      hasAnonKey: !!SUPABASE_ANON_KEY,
-    });
-  } else {
-    console.warn(
-      '[Supabase] ⚠️ Cliente não será criado. Configure as variáveis de ambiente.'
-    );
-  }
+  // não loga a key, só se existe
+  console.debug("[Supabase] ✅ Configuração carregada:", {
+    mode: MODE,
+    urlPreview: SUPABASE_URL.slice(0, 30) + "...",
+    hasAnonKey: !!SUPABASE_ANON_KEY,
+  });
 }
 
-// Criar cliente apenas se envs estiverem configuradas
-// Em dev, pode ser null se faltar envs (para não quebrar desenvolvimento)
-// Em produção, já lançou erro acima se faltar
-export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : null;
+// Cliente Supabase (sempre definido)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // necessário para reset-password via link
+    flowType: "pkce",
+    storageKey: "planco.supabase.auth", // troque se quiser outro nome
+  },
+});
+
+// Tipos opcionais para ajudar no TS (se quiser)
+// export type SupabaseClientType = typeof supabase;

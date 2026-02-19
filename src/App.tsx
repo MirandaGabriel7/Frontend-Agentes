@@ -1,4 +1,5 @@
 // src/App.tsx
+
 import { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
@@ -11,6 +12,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MainLayout } from "./layout/MainLayout";
 
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage"; // ✅ NOVO
+
 import { AgentsPage } from "./pages/AgentsPage";
 import { DfdAgentPage } from "./pages/DfdAgentPage";
 import AgenteDfdResultado from "./pages/AgenteDfdResultado";
@@ -74,8 +77,14 @@ function AppShell() {
                   }
                 />
 
-                {/* Public */}
+                {/* ===================== PUBLIC ===================== */}
                 <Route path="/login" element={<LoginPage />} />
+
+                {/* ✅ NOVO: Reset de senha via link do Supabase */}
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+                {/* ✅ Opcional (recomendado): callback para links de email (confirm/magic/etc) */}
+                <Route path="/auth/callback" element={<Navigate to="/login" replace />} />
 
                 {/* Root: deixa explícito pra evitar "nada" */}
                 <Route path="/" element={<Navigate to="/agents" replace />} />
