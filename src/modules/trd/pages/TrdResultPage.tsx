@@ -1,5 +1,5 @@
 // src/modules/trd/pages/TrdResultPage.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -157,20 +157,6 @@ export const TrdResultPage: React.FC = () => {
       setError(null);
 
       const run = await fetchTrdRun(runId);
-      console.log("[TRD][DEBUG] keys do run:", Object.keys(run as any));
-      console.log(
-        "[TRD][DEBUG] snapshot?",
-        (run as any).campos_trp_normalizados_snapshot,
-      );
-
-      console.log(
-        "[TRD][DEBUG] keys de campos disponíveis:",
-        Object.keys(
-          (run as any).campos_trd_normalizados ??
-            (run as any).campos_trp_normalizados_snapshot ??
-            {},
-        ),
-      );
 
       if (run.runId !== runId) {
         const errorMsg = `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`;
@@ -180,24 +166,37 @@ export const TrdResultPage: React.FC = () => {
         return;
       }
 
+      setRunData(run);
+
+      // Mantém viewModel (cards e painel estruturado), mas a visualização do documento
+      // deve priorizar SEMPRE o markdown final do backend (o mesmo usado pelo PDF/DOCX).
+      const vm = createTrdViewModel(run);
+      setViewModel(vm);
+
+      // Debug útil (dev)
       const isDev =
         import.meta.env?.MODE === "development" ||
         import.meta.env?.DEV === true;
 
       if (isDev) {
-        console.debug("[TrdResultPage] Run carregado:", {
+        console.debug("[TRD][DEBUG] Run carregado:", {
           runId: run.runId,
           status: run.status,
-          hasDocumentoMarkdownFinal: !!run.documento_markdown_final,
-          documentoMarkdownFinalLength: run.documento_markdown_final?.length,
+          hasDocumentoMarkdownFinal: !!(run as any)?.documento_markdown_final,
+          documentoMarkdownFinalLength: (run as any)?.documento_markdown_final?.length,
+          hasCamposTrd: !!(run as any)?.campos_trd_normalizados,
           hasCamposSnapshot: !!(run as any)?.campos_trp_normalizados_snapshot,
         });
+
+        console.debug(
+          "[TRD][DEBUG] keys de campos disponíveis:",
+          Object.keys(
+            (run as any).campos_trd_normalizados ??
+              (run as any).campos_trp_normalizados_snapshot ??
+              {},
+          ),
+        );
       }
-
-      setRunData(run);
-
-      const vm = createTrdViewModel(run);
-      setViewModel(vm);
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -211,7 +210,7 @@ export const TrdResultPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
@@ -377,7 +376,6 @@ export const TrdResultPage: React.FC = () => {
 
     return (
       <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
-        {runData.status === "PENDING" && "O TRD está aguardando processamento."}
         <Alert severity={runData.status === "FAILED" ? "error" : "info"}>
           <Typography variant="h6" gutterBottom>
             Status: {statusLabels[runData.status] || runData.status}
@@ -403,7 +401,7 @@ export const TrdResultPage: React.FC = () => {
     );
   }
 
-  if (!viewModel || !runData) {
+  if (!runData) {
     return (
       <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
         <Alert severity="warning">
@@ -413,17 +411,49 @@ export const TrdResultPage: React.FC = () => {
     );
   }
 
-  const termoNome = pickTrdFileName(runData, viewModel.runId || null);
+  // ✅✅✅ FIX PRINCIPAL:
+  // A visualização do documento deve usar SEMPRE o markdown final do backend
+  // (mesmo usado para PDF/DOCX), pois o viewModel pode não conter todas as seções.
+  const markdownFromBackend =
+    typeof (runData as any)?.documento_markdown_final === "string"
+      ? String((runData as any).documento_markdown_final)
+      : "";
+
+  const markdownFromVm =
+    typeof viewModel?.documento_markdown === "string"
+      ? String(viewModel.documento_markdown)
+      : "";
+
+  const rawMarkdown = markdownFromBackend.trim()
+    ? markdownFromBackend
+    : markdownFromVm;
+
+  // Campos: prioriza campos_trd_normalizados; depois snapshot; depois vm.campos
+  const camposPreferidos = useMemo(() => {
+    const c1 = (runData as any)?.campos_trd_normalizados;
+    if (c1 && typeof c1 === "object") return c1 as Record<string, unknown>;
+
+    const c2 = (runData as any)?.campos_trp_normalizados_snapshot;
+    if (c2 && typeof c2 === "object") return c2 as Record<string, unknown>;
+
+    const c3 = (viewModel as any)?.campos;
+    if (c3 && typeof c3 === "object") return c3 as Record<string, unknown>;
+
+    return {} as Record<string, unknown>;
+  }, [runData, viewModel]);
+
+  const termoNome = pickTrdFileName(runData, runId || null);
+
   const markdownUi = stripTrdInfoSection(
-    normalizeIdentificacaoObjetoMarkdown(viewModel.documento_markdown),
+    normalizeIdentificacaoObjetoMarkdown(rawMarkdown),
   );
 
   const data = {
     documento_markdown: markdownUi,
-    campos: viewModel.campos,
+    campos: camposPreferidos,
     meta: {
       fileName: termoNome,
-      hash_tdr: viewModel.runId || "",
+      hash_tdr: runId || "",
     },
   };
 
@@ -764,10 +794,7 @@ export const TrdResultPage: React.FC = () => {
               </Tooltip>
             </Box>
 
-            <TrpMarkdownView
-              content={data.documento_markdown}
-              showTitle={false}
-            />
+            <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
           </Box>
         </TabPanel>
 
