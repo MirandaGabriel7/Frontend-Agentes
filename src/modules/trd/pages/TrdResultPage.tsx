@@ -1,5 +1,5 @@
 // src/modules/trd/pages/TrdResultPage.tsx
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -126,20 +126,20 @@ export const TrdResultPage: React.FC = () => {
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  function pickTrdFileName(
-    run: TrdRunData | null,
-    fallbackId?: string | null,
-  ): string {
-    const s =
-      typeof (run as any)?.fileName === "string"
-        ? String((run as any).fileName).trim()
-        : "";
-    if (s) return s;
+  const pickTrdFileName = useCallback(
+    (run: TrdRunData | null, fallbackId?: string | null): string => {
+      const s =
+        typeof (run as any)?.fileName === "string"
+          ? String((run as any).fileName).trim()
+          : "";
+      if (s) return s;
 
-    return fallbackId ? `TRD_${fallbackId}` : "TRD_Gerado";
-  }
+      return fallbackId ? `TRD_${fallbackId}` : "TRD_Gerado";
+    },
+    [],
+  );
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!runId) {
       setError("ID do TRD não fornecido na URL");
       setLoading(false);
@@ -158,7 +158,7 @@ export const TrdResultPage: React.FC = () => {
 
       const run = await fetchTrdRun(runId);
 
-      if (run.runId !== runId) {
+      if ((run as any)?.runId && run.runId !== runId) {
         const errorMsg = `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`;
         console.error("[TrdResultPage]", errorMsg);
         setError("Erro ao carregar TRD: inconsistência de dados");
@@ -173,17 +173,17 @@ export const TrdResultPage: React.FC = () => {
       const vm = createTrdViewModel(run);
       setViewModel(vm);
 
-      // Debug útil (dev)
       const isDev =
         import.meta.env?.MODE === "development" ||
-        import.meta.env?.DEV === true;
+        (import.meta.env as any)?.DEV === true;
 
       if (isDev) {
         console.debug("[TRD][DEBUG] Run carregado:", {
-          runId: run.runId,
-          status: run.status,
+          runId: (run as any)?.runId,
+          status: (run as any)?.status,
           hasDocumentoMarkdownFinal: !!(run as any)?.documento_markdown_final,
-          documentoMarkdownFinalLength: (run as any)?.documento_markdown_final?.length,
+          documentoMarkdownFinalLength: (run as any)?.documento_markdown_final
+            ?.length,
           hasCamposTrd: !!(run as any)?.campos_trd_normalizados,
           hasCamposSnapshot: !!(run as any)?.campos_trp_normalizados_snapshot,
         });
@@ -207,12 +207,11 @@ export const TrdResultPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId]);
 
   useEffect(() => {
     void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId]);
+  }, [loadData]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -225,110 +224,174 @@ export const TrdResultPage: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleScrollToTop = () => {
+  const handleScrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, []);
 
-  const handleDownload = async (format: "pdf" | "docx") => {
-    if (!runId) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRD não encontrado na URL",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!isUuid(runId)) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRD inválido",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (runData && runData.runId !== runId) {
-      setSnackbar({
-        open: true,
-        message:
-          "Inconsistência: o documento carregado não corresponde ao ID da URL",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (runData?.status !== "COMPLETED") {
-      setSnackbar({
-        open: true,
-        message:
-          "Documento ainda não concluído. Aguarde a finalização do processamento.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    const setDownloading =
-      format === "pdf" ? setDownloadingPdf : setDownloadingDocx;
-
-    try {
-      setDownloading(true);
-      await downloadTrdRun(runId, format);
-      setSnackbar({
-        open: true,
-        message: `Exportando documento oficial do TRD em ${format.toUpperCase()}...`,
-        severity: "success",
-      });
-    } catch (err: any) {
-      const errorMessage = err.message || "Erro ao baixar arquivo";
-      const status = err.status;
-
-      if (status === 401 || status === 403) {
+  const handleDownload = useCallback(
+    async (format: "pdf" | "docx") => {
+      if (!runId) {
         setSnackbar({
           open: true,
-          message: "Sessão expirada / sem permissão",
+          message: "ID do TRD não encontrado na URL",
           severity: "error",
-        });
-        await signOut();
-        navigate("/login", {
-          replace: true,
-          state: { message: "Sua sessão expirou. Faça login novamente." },
         });
         return;
       }
 
-      if (status === 404) {
+      if (!isUuid(runId)) {
         setSnackbar({
           open: true,
-          message: "Documento não encontrado",
+          message: "ID do TRD inválido",
           severity: "error",
         });
-      } else if (status === 409) {
-        setSnackbar({
-          open: true,
-          message: "Documento ainda não finalizado",
-          severity: "warning",
-        });
-      } else if (status === 429) {
-        setSnackbar({
-          open: true,
-          message: "Aguarde antes de gerar novamente",
-          severity: "warning",
-        });
-      } else {
-        setSnackbar({ open: true, message: errorMessage, severity: "error" });
+        return;
       }
-    } finally {
-      setDownloading(false);
-    }
-  };
 
-  const handleDownloadPdf = () => handleDownload("pdf");
-  const handleDownloadWord = () => handleDownload("docx");
+      if (runData && runData.runId !== runId) {
+        setSnackbar({
+          open: true,
+          message:
+            "Inconsistência: o documento carregado não corresponde ao ID da URL",
+          severity: "error",
+        });
+        return;
+      }
 
-  const handleCloseSnackbar = () => {
+      if (runData?.status !== "COMPLETED") {
+        setSnackbar({
+          open: true,
+          message:
+            "Documento ainda não concluído. Aguarde a finalização do processamento.",
+          severity: "warning",
+        });
+        return;
+      }
+
+      const setDownloading =
+        format === "pdf" ? setDownloadingPdf : setDownloadingDocx;
+
+      try {
+        setDownloading(true);
+        await downloadTrdRun(runId, format);
+        setSnackbar({
+          open: true,
+          message: `Exportando documento oficial do TRD em ${format.toUpperCase()}...`,
+          severity: "success",
+        });
+      } catch (err: any) {
+        const errorMessage = err?.message || "Erro ao baixar arquivo";
+        const status = err?.status;
+
+        if (status === 401 || status === 403) {
+          setSnackbar({
+            open: true,
+            message: "Sessão expirada / sem permissão",
+            severity: "error",
+          });
+          await signOut();
+          navigate("/login", {
+            replace: true,
+            state: { message: "Sua sessão expirou. Faça login novamente." },
+          });
+          return;
+        }
+
+        if (status === 404) {
+          setSnackbar({
+            open: true,
+            message: "Documento não encontrado",
+            severity: "error",
+          });
+        } else if (status === 409) {
+          setSnackbar({
+            open: true,
+            message: "Documento ainda não finalizado",
+            severity: "warning",
+          });
+        } else if (status === 429) {
+          setSnackbar({
+            open: true,
+            message: "Aguarde antes de gerar novamente",
+            severity: "warning",
+          });
+        } else {
+          setSnackbar({ open: true, message: errorMessage, severity: "error" });
+        }
+      } finally {
+        setDownloading(false);
+      }
+    },
+    [navigate, runData, runId, signOut],
+  );
+
+  const handleDownloadPdf = useCallback(() => {
+    void handleDownload("pdf");
+  }, [handleDownload]);
+
+  const handleDownloadWord = useCallback(() => {
+    void handleDownload("docx");
+  }, [handleDownload]);
+
+  const handleCloseSnackbar = useCallback(() => {
     setSnackbar((prev) => ({ ...prev, open: false }));
-  };
+  }, []);
+
+  // ✅✅✅ FIX (Hooks sempre no topo, sem violar regras)
+  // Documento: prioriza SEMPRE o markdown final do backend.
+  const markdownFromBackend = useMemo(() => {
+    const s =
+      typeof (runData as any)?.documento_markdown_final === "string"
+        ? String((runData as any).documento_markdown_final)
+        : "";
+    return s;
+  }, [runData]);
+
+  const markdownFromVm = useMemo(() => {
+    const s =
+      typeof viewModel?.documento_markdown === "string"
+        ? String(viewModel.documento_markdown)
+        : "";
+    return s;
+  }, [viewModel]);
+
+  const rawMarkdown = useMemo(() => {
+    return markdownFromBackend.trim() ? markdownFromBackend : markdownFromVm;
+  }, [markdownFromBackend, markdownFromVm]);
+
+  // Campos: prioriza campos_trd_normalizados; depois snapshot; depois vm.campos
+  const camposPreferidos = useMemo(() => {
+    const c1 = (runData as any)?.campos_trd_normalizados;
+    if (c1 && typeof c1 === "object") return c1 as Record<string, unknown>;
+
+    const c2 = (runData as any)?.campos_trp_normalizados_snapshot;
+    if (c2 && typeof c2 === "object") return c2 as Record<string, unknown>;
+
+    const c3 = (viewModel as any)?.campos;
+    if (c3 && typeof c3 === "object") return c3 as Record<string, unknown>;
+
+    return {} as Record<string, unknown>;
+  }, [runData, viewModel]);
+
+  const termoNome = useMemo(() => {
+    return pickTrdFileName(runData, runId || null);
+  }, [pickTrdFileName, runData, runId]);
+
+  const markdownUi = useMemo(() => {
+    const normalized = normalizeIdentificacaoObjetoMarkdown(rawMarkdown);
+    return stripTrdInfoSection(normalized);
+  }, [rawMarkdown]);
+
+  const data = useMemo(() => {
+    return {
+      documento_markdown: markdownUi,
+      campos: camposPreferidos,
+      meta: {
+        fileName: termoNome,
+        hash_tdr: runId || "",
+      },
+    };
+  }, [camposPreferidos, markdownUi, termoNome, runId]);
 
   if (loading) {
     return (
@@ -410,52 +473,6 @@ export const TrdResultPage: React.FC = () => {
       </Box>
     );
   }
-
-  // ✅✅✅ FIX PRINCIPAL:
-  // A visualização do documento deve usar SEMPRE o markdown final do backend
-  // (mesmo usado para PDF/DOCX), pois o viewModel pode não conter todas as seções.
-  const markdownFromBackend =
-    typeof (runData as any)?.documento_markdown_final === "string"
-      ? String((runData as any).documento_markdown_final)
-      : "";
-
-  const markdownFromVm =
-    typeof viewModel?.documento_markdown === "string"
-      ? String(viewModel.documento_markdown)
-      : "";
-
-  const rawMarkdown = markdownFromBackend.trim()
-    ? markdownFromBackend
-    : markdownFromVm;
-
-  // Campos: prioriza campos_trd_normalizados; depois snapshot; depois vm.campos
-  const camposPreferidos = useMemo(() => {
-    const c1 = (runData as any)?.campos_trd_normalizados;
-    if (c1 && typeof c1 === "object") return c1 as Record<string, unknown>;
-
-    const c2 = (runData as any)?.campos_trp_normalizados_snapshot;
-    if (c2 && typeof c2 === "object") return c2 as Record<string, unknown>;
-
-    const c3 = (viewModel as any)?.campos;
-    if (c3 && typeof c3 === "object") return c3 as Record<string, unknown>;
-
-    return {} as Record<string, unknown>;
-  }, [runData, viewModel]);
-
-  const termoNome = pickTrdFileName(runData, runId || null);
-
-  const markdownUi = stripTrdInfoSection(
-    normalizeIdentificacaoObjetoMarkdown(rawMarkdown),
-  );
-
-  const data = {
-    documento_markdown: markdownUi,
-    campos: camposPreferidos,
-    meta: {
-      fileName: termoNome,
-      hash_tdr: runId || "",
-    },
-  };
 
   return (
     <Box
@@ -615,7 +632,10 @@ export const TrdResultPage: React.FC = () => {
           borderRadius: 4,
           border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
           background: theme.palette.background.paper,
-          boxShadow: `0 1px 3px ${alpha("#000", 0.04)}, 0 8px 24px ${alpha("#000", 0.04)}`,
+          boxShadow: `0 1px 3px ${alpha("#000", 0.04)}, 0 8px 24px ${alpha(
+            "#000",
+            0.04,
+          )}`,
           overflow: "hidden",
         }}
       >
@@ -729,9 +749,15 @@ export const TrdResultPage: React.FC = () => {
                       px: 2.5,
                       py: 1.25,
                       borderRadius: 999,
-                      boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.18)}`,
+                      boxShadow: `0 8px 20px ${alpha(
+                        theme.palette.primary.main,
+                        0.18,
+                      )}`,
                       "&:hover": {
-                        boxShadow: `0 10px 24px ${alpha(theme.palette.primary.main, 0.26)}`,
+                        boxShadow: `0 10px 24px ${alpha(
+                          theme.palette.primary.main,
+                          0.26,
+                        )}`,
                       },
                     }}
                   >
