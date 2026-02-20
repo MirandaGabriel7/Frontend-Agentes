@@ -88,7 +88,7 @@ function AppShell() {
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
                 {/* Root: deixa explícito pra evitar "nada" */}
-                <Route path="/" element={<Navigate to="/agents" replace />} />
+                <Route path="/" element={<Navigate to="/login" replace />} />
 
                 {/* ===================== PROTECTED GROUP ===================== */}
                 <Route

@@ -1,31 +1,23 @@
-// src/lib/supabaseClient.ts
+// src/infra/supabaseClient.ts
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) ?? "";
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ?? "";
 
-const MODE = import.meta.env.MODE ?? "development";
+const MODE = (import.meta.env.MODE as string) ?? "development";
 const isDev = MODE === "development";
 
-// ===============================
-// 🔒 Validação de variáveis (fail-fast)
-// ===============================
+// Fail-fast
 const missing: string[] = [];
-
 if (!SUPABASE_URL) missing.push("VITE_SUPABASE_URL");
 if (!SUPABASE_ANON_KEY) missing.push("VITE_SUPABASE_ANON_KEY");
-
 if (missing.length > 0) {
   throw new Error(
-    `[Supabase] Variáveis ausentes: ${missing.join(
-      ", "
-    )}. Configure no .env e no Netlify (Environment variables).`
+    `[Supabase] Variáveis de ambiente ausentes: ${missing.join(", ")}. ` +
+      `Configure no .env (local) e/ou no Netlify (Environment variables).`,
   );
 }
 
-// ===============================
-// 🧠 Logs úteis em desenvolvimento
-// ===============================
 if (isDev) {
   console.debug("[Supabase] ✅ Configuração carregada:", {
     mode: MODE,
@@ -34,38 +26,15 @@ if (isDev) {
   });
 }
 
-// ===============================
-// 🚀 Cliente Supabase
-// ===============================
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
 
-    /**
-     * ESSENCIAL para:
-     * - magic link
-     * - reset password
-     * - PKCE flow
-     */
-    detectSessionInUrl: true,
+    // ✅ IMPORTANTE: nós mesmos processamos o callback PKCE em /auth/callback
+    detectSessionInUrl: false,
 
-    /**
-     * PKCE é o padrão seguro para SPA
-     * Mantém compatível com exchangeCodeForSession
-     */
     flowType: "pkce",
-
-    /**
-     * Nome isolado para evitar conflito
-     * com outros projetos Supabase no mesmo domínio
-     */
-    storageKey: "agentesgov.supabase.auth",
-
-    /**
-     * (opcional mas recomendado)
-     * Garante que sessão fique no localStorage
-     */
-    storage: window.localStorage,
+    storageKey: "planco.supabase.auth",
   },
 });
