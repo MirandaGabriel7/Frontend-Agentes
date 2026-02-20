@@ -19,12 +19,15 @@ interface AuthContextType {
   authLoading: boolean;
   orgLoading: boolean;
 
-  signIn: (email: string, password: string) => Promise<{ error: Error | null; hasOrg?: boolean }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: Error | null; hasOrg?: boolean }>;
 
   signUp: (
     fullName: string,
     email: string,
-    password: string
+    password: string,
   ) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
 
   signOut: () => Promise<void>;
@@ -52,12 +55,16 @@ function normalizeBaseUrl(url: string): string {
  * - Cai para window.location.origin se não existir (dev/local/staging)
  */
 function getAppUrl(): string {
-  const envUrl = normalizeBaseUrl((import.meta.env.VITE_APP_URL as string) ?? "");
+  const envUrl = normalizeBaseUrl(
+    (import.meta.env.VITE_APP_URL as string) ?? "",
+  );
   const origin = normalizeBaseUrl(window.location.origin);
   return envUrl || origin;
 }
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -67,8 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [orgLoading, setOrgLoading] = useState(true);
 
   const isDev = useMemo(
-    () => import.meta.env?.MODE === "development" || import.meta.env?.DEV === true,
-    []
+    () =>
+      import.meta.env?.MODE === "development" || import.meta.env?.DEV === true,
+    [],
   );
 
   // =========================================================
@@ -98,34 +106,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .limit(1);
 
         if (error) {
-          if (isDev) console.warn("[AuthContext] Erro ao buscar org do usuário:", error);
+          if (isDev)
+            console.warn("[AuthContext] Erro ao buscar org do usuário:", error);
           // Mesmo que dê erro no select (policy/permissão), tenta RPC
         } else if (data && data.length > 0 && data[0]?.org_id) {
           const orgId = String(data[0].org_id);
-          if (isDev) console.debug("[AuthContext] Org encontrada:", { orgId, role: data[0].role });
+          if (isDev)
+            console.debug("[AuthContext] Org encontrada:", {
+              orgId,
+              role: data[0].role,
+            });
           return orgId;
         }
 
         // 2) não tinha org (ou select falhou): cria/garante via RPC
-        const { data: orgId, error: rpcError } = await supabase.rpc("ensure_org_for_user");
+        const { data: orgId, error: rpcError } = await supabase.rpc(
+          "ensure_org_for_user",
+        );
         if (rpcError) {
-          if (isDev) console.warn("[AuthContext] Erro ao executar ensure_org_for_user:", rpcError);
+          if (isDev)
+            console.warn(
+              "[AuthContext] Erro ao executar ensure_org_for_user:",
+              rpcError,
+            );
           return null;
         }
 
         if (orgId) {
           const finalOrgId = String(orgId);
-          if (isDev) console.debug("[AuthContext] ✅ Org garantida/criada via RPC:", finalOrgId);
+          if (isDev)
+            console.debug(
+              "[AuthContext] ✅ Org garantida/criada via RPC:",
+              finalOrgId,
+            );
           return finalOrgId;
         }
 
         return null;
       } catch (err) {
-        if (isDev) console.error("[AuthContext] Erro inesperado ao buscar/criar org:", err);
+        if (isDev)
+          console.error(
+            "[AuthContext] Erro inesperado ao buscar/criar org:",
+            err,
+          );
         return null;
       }
     },
-    [isDev]
+    [isDev],
   );
 
   // =========================================================
@@ -144,10 +171,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(data.user);
         setUserId(data.user.id);
         setSession((prev) => (prev ? { ...prev, user: data.user } : prev));
-        if (isDev) console.debug("[AuthContext] ✅ user atualizado via refreshUser");
+        if (isDev)
+          console.debug("[AuthContext] ✅ user atualizado via refreshUser");
       }
     } catch (err) {
-      if (isDev) console.error("[AuthContext] Erro inesperado no refreshUser:", err);
+      if (isDev)
+        console.error("[AuthContext] Erro inesperado no refreshUser:", err);
     }
   }, [isDev]);
 
@@ -200,12 +229,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         return { error: null, hasOrg: false };
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro desconhecido ao fazer login");
+        const error =
+          err instanceof Error
+            ? err
+            : new Error("Erro desconhecido ao fazer login");
         if (isDev) console.error("[AuthContext] Erro ao fazer login:", err);
         return { error, hasOrg: false };
       }
     },
-    [isDev, ensureAndFetchUserOrg]
+    [isDev, ensureAndFetchUserOrg],
   );
 
   const signUp = useCallback(
@@ -246,12 +278,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         return { error: null, needsEmailConfirmation };
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro desconhecido ao criar conta");
+        const error =
+          err instanceof Error
+            ? err
+            : new Error("Erro desconhecido ao criar conta");
         if (isDev) console.error("[AuthContext] Erro ao criar conta:", err);
         return { error };
       }
     },
-    [isDev, ensureAndFetchUserOrg]
+    [isDev, ensureAndFetchUserOrg],
   );
 
   /**
@@ -263,38 +298,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const resetPassword = useCallback(
     async (email: string) => {
       try {
-        
         // ✅ manda pro callback primeiro (PKCE), e depois vai pro reset-password
         const redirectTo = `${import.meta.env.VITE_APP_URL}/auth/callback?next=/reset-password`;
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo,
-        });
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          email.trim(),
+          {
+            redirectTo,
+          },
+        );
 
         if (error) {
-          if (isDev) console.error("[AuthContext] Erro no resetPassword:", error);
+          if (isDev)
+            console.error("[AuthContext] Erro no resetPassword:", error);
           return { error: error as unknown as Error };
         }
 
-        if (isDev) console.debug("[AuthContext] resetPassword enviado com redirectTo:", redirectTo);
+        if (isDev)
+          console.debug(
+            "[AuthContext] resetPassword enviado com redirectTo:",
+            redirectTo,
+          );
         return { error: null };
       } catch (err) {
         const error =
-          err instanceof Error ? err : new Error("Erro desconhecido ao enviar recuperação");
-        if (isDev) console.error("[AuthContext] Erro inesperado no resetPassword:", err);
+          err instanceof Error
+            ? err
+            : new Error("Erro desconhecido ao enviar recuperação");
+        if (isDev)
+          console.error("[AuthContext] Erro inesperado no resetPassword:", err);
         return { error };
       }
     },
-    [isDev]
+    [isDev],
   );
 
   const updatePassword = useCallback(
     async (newPassword: string) => {
       try {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        const { error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
 
         if (error) {
-          if (isDev) console.error("[AuthContext] Erro ao updatePassword:", error);
+          if (isDev)
+            console.error("[AuthContext] Erro ao updatePassword:", error);
           return { error: error as unknown as Error };
         }
 
@@ -303,12 +351,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { error: null };
       } catch (err) {
         const error =
-          err instanceof Error ? err : new Error("Erro desconhecido ao atualizar senha");
-        if (isDev) console.error("[AuthContext] Erro inesperado no updatePassword:", err);
+          err instanceof Error
+            ? err
+            : new Error("Erro desconhecido ao atualizar senha");
+        if (isDev)
+          console.error(
+            "[AuthContext] Erro inesperado no updatePassword:",
+            err,
+          );
         return { error };
       }
     },
-    [isDev, refreshUser]
+    [isDev, refreshUser],
   );
 
   const signOut = useCallback(async () => {
@@ -382,34 +436,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     })();
 
-    const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (isDev) console.debug("[AuthContext] Auth state changed:", event);
+    const { data } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        if (isDev) console.debug("[AuthContext] Auth state changed:", event);
 
-      if (newSession?.user) {
-        setSession(newSession);
-        setUser(newSession.user);
-        setUserId(newSession.user.id);
+        // ✅ IMPORTANTÍSSIMO: recovery não deve travar o app buscando org
+        if (event === "PASSWORD_RECOVERY") {
+          setSession(newSession ?? null);
+          setUser(newSession?.user ?? null);
+          setUserId(newSession?.user?.id ?? null);
 
-        // cache rápido, depois valida
-        const cached = getOrgCache();
-        if (cached) setOrgIdAtiva(cached);
+          setAuthLoading(false);
+          setOrgLoading(false);
+          return;
+        }
 
-        setOrgLoading(true);
-        const orgId = await ensureAndFetchUserOrg(newSession.user.id);
-        setOrgIdAtiva(orgId);
-        setOrgCache(orgId);
-        setOrgLoading(false);
-      } else {
-        setSession(null);
-        setUser(null);
-        setUserId(null);
-        setOrgIdAtiva(null);
-        setOrgCache(null);
-        setOrgLoading(false);
-      }
+        if (newSession?.user) {
+          setSession(newSession);
+          setUser(newSession.user);
+          setUserId(newSession.user.id);
 
-      setAuthLoading(false);
-    });
+          const cached = getOrgCache();
+          if (cached) setOrgIdAtiva(cached);
+
+          setOrgLoading(true);
+          try {
+            const orgId = await ensureAndFetchUserOrg(newSession.user.id);
+            setOrgIdAtiva(orgId);
+            setOrgCache(orgId);
+          } finally {
+            setOrgLoading(false);
+          }
+        } else {
+          setSession(null);
+          setUser(null);
+          setUserId(null);
+          setOrgIdAtiva(null);
+          setOrgCache(null);
+          setOrgLoading(false);
+        }
+
+        setAuthLoading(false);
+      },
+    );
 
     return () => {
       mounted = false;
@@ -438,6 +507,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined)
+    throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };

@@ -12,8 +12,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MainLayout } from "./layout/MainLayout";
 
 import { LoginPage } from "./pages/LoginPage";
-import { ResetPasswordPage } from "./pages/ResetPasswordPage";
-import { AuthCallbackPage } from "./pages/AuthCallbackPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 
 import { AgentsPage } from "./pages/AgentsPage";
 import { DfdAgentPage } from "./pages/DfdAgentPage";

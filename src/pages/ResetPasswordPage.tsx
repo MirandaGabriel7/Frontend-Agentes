@@ -1,6 +1,6 @@
 // src/pages/ResetPasswordPage.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -13,14 +13,49 @@ import {
   useTheme,
   CircularProgress,
 } from "@mui/material";
-import { supabase } from "../infra/supabaseClient"; // ✅ ajuste o path se necessário
+import { supabase } from "../infra/supabaseClient";
 
-export const ResetPasswordPage: React.FC = () => {
+/**
+ * ResetPasswordPage "à prova de loop"
+ *
+ * Proteções:
+ * - Não depende de params na URL (o callback já troca code por session).
+ * - Verifica sessão com timeout (evita "checking" infinito).
+ * - Se não houver sessão => redireciona pro /login (sem reprocessar).
+ * - Bloqueia duplo-submit.
+ * - Limpa URL (remove qualquer lixo de callback) pra não re-triggerar fluxo.
+ * - Mostra feedback e finaliza com signOut + redirect login.
+ */
+
+function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = window.setTimeout(() => reject(new Error("Timeout validando sessão.")), ms);
+    promise
+      .then((v) => {
+        window.clearTimeout(id);
+        resolve(v);
+      })
+      .catch((e) => {
+        window.clearTimeout(id);
+        reject(e);
+      });
+  });
+}
+
+function isStrongEnough(pw: string) {
+  // regra simples (você pode fortalecer depois)
+  return pw.length >= 8;
+}
+
+export default function ResetPasswordPage() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const submitLockRef = useRef(false);
+
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -30,74 +65,111 @@ export const ResetPasswordPage: React.FC = () => {
   const canSubmit = useMemo(() => {
     if (!password || !password2) return false;
     if (password !== password2) return false;
-    if (password.length < 8) return false;
+    if (!isStrongEnough(password)) return false;
     return true;
   }, [password, password2]);
 
-  // ✅ Garante que existe sessão de recovery (já trocada pelo callback)
+  // ✅ 1) Bootstrap: garante sessão válida (recovery já trocado no callback)
   useEffect(() => {
     let mounted = true;
 
+    // limpeza da URL: se alguém cair aqui com querystring, remove pra não reprocessar nada
+    // (mantém o path atual)
+    if (location.search) {
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+
     async function check() {
       try {
-        const { data } = await supabase.auth.getSession();
+        setChecking(true);
+
+        const { data } = await withTimeout(supabase.auth.getSession(), 8000);
         const hasSession = !!data?.session;
 
         if (!hasSession) {
-          // Sem sessão, não dá pra trocar senha.
+          // Sem sessão => não existe fluxo de recovery válido
           navigate("/login", {
             replace: true,
-            state: { message: "Link de redefinição inválido/expirado. Solicite novamente." },
+            state: { message: "Link de redefinição inválido ou expirado. Solicite novamente." },
           });
           return;
         }
 
-        if (mounted) setChecking(false);
+        // opcional: se quiser garantir que é um usuário logado
+        // const { data: u } = await supabase.auth.getUser();
+        // if (!u?.user) ...
+
+        if (!mounted) return;
+        setChecking(false);
       } catch (e: any) {
         if (!mounted) return;
-        setError("Não foi possível validar sua sessão. Tente novamente.");
+        setError(e?.message || "Não foi possível validar sua sessão. Tente novamente.");
         setChecking(false);
+
+        // Se deu erro ao validar sessão, manda pro login para não prender usuário
+        navigate("/login", {
+          replace: true,
+          state: { message: "Sessão inválida. Solicite um novo link de redefinição." },
+        });
       }
     }
 
     check();
+
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, location.pathname, location.search]);
 
+  // ✅ 2) Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setOk(null);
 
+    if (submitLockRef.current) return;
     if (!canSubmit) {
-      if (password.length < 8) {
-        setError("A senha deve ter pelo menos 8 caracteres.");
-      } else if (password !== password2) {
-        setError("As senhas não coincidem.");
-      } else {
-        setError("Preencha os campos corretamente.");
-      }
+      if (!isStrongEnough(password)) setError("A senha deve ter pelo menos 8 caracteres.");
+      else if (password !== password2) setError("As senhas não coincidem.");
+      else setError("Preencha os campos corretamente.");
       return;
     }
 
+    submitLockRef.current = true;
     setLoading(true);
+
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      // revalida sessão antes de atualizar (evita update sem sessão)
+      const { data } = await withTimeout(supabase.auth.getSession(), 8000);
+      if (!data?.session) {
+        navigate("/login", {
+          replace: true,
+          state: { message: "Sessão inválida. Solicite um novo link de redefinição." },
+        });
+        return;
+      }
+
+      const { error: updateError } = await withTimeout(
+        supabase.auth.updateUser({ password }),
+        12000
+      );
+
       if (updateError) throw updateError;
 
-      setOk("Senha alterada com sucesso. Você já pode entrar com a nova senha.");
+      setOk("Senha alterada com sucesso. Faça login com a nova senha.");
 
-      // opcional: desloga e manda pro login
+      // Importante: encerra a sessão de recovery para não afetar outras abas
       await supabase.auth.signOut();
-      setTimeout(() => {
+
+      // redireciona rápido, sem loop
+      window.setTimeout(() => {
         navigate("/login", { replace: true });
-      }, 900);
+      }, 700);
     } catch (e: any) {
       setError(e?.message || "Erro ao alterar senha. Tente novamente.");
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -107,7 +179,7 @@ export const ResetPasswordPage: React.FC = () => {
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <CircularProgress size={22} />
           <Typography variant="body2" color="text.secondary">
-            Carregando…
+            Validando sessão…
           </Typography>
         </Box>
       </Box>
@@ -166,6 +238,7 @@ export const ResetPasswordPage: React.FC = () => {
               margin="normal"
               disabled={loading}
               helperText="Mínimo de 8 caracteres."
+              autoComplete="new-password"
             />
 
             <TextField
@@ -176,6 +249,7 @@ export const ResetPasswordPage: React.FC = () => {
               onChange={(e) => setPassword2(e.target.value)}
               margin="normal"
               disabled={loading}
+              autoComplete="new-password"
             />
 
             <Button
@@ -203,4 +277,4 @@ export const ResetPasswordPage: React.FC = () => {
       </Box>
     </Container>
   );
-};
+}
