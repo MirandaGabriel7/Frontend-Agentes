@@ -12,7 +12,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MainLayout } from "./layout/MainLayout";
 
 import { LoginPage } from "./pages/LoginPage";
-import { ResetPasswordPage } from "./pages/ResetPasswordPage"; // ✅ NOVO
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 
 import { AgentsPage } from "./pages/AgentsPage";
 import { DfdAgentPage } from "./pages/DfdAgentPage";
@@ -80,11 +81,11 @@ function AppShell() {
                 {/* ===================== PUBLIC ===================== */}
                 <Route path="/login" element={<LoginPage />} />
 
-                {/* ✅ NOVO: Reset de senha via link do Supabase */}
+                {/* ✅ Reset de senha via link do Supabase */}
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-                {/* ✅ Opcional (recomendado): callback para links de email (confirm/magic/etc) */}
-                <Route path="/auth/callback" element={<Navigate to="/login" replace />} />
+                {/* ✅ Callback para links do Supabase (confirm/magic/recovery/code) */}
+                <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
                 {/* Root: deixa explícito pra evitar "nada" */}
                 <Route path="/" element={<Navigate to="/agents" replace />} />
@@ -111,6 +112,7 @@ function AppShell() {
                     </ProtectedRoute>
                   }
                 />
+
                 <Route
                   path="/agents/profile"
                   element={
@@ -155,9 +157,18 @@ function AppShell() {
                 />
 
                 {/* TRP aliases */}
-                <Route path="/agents/trp/novo" element={<Navigate to="/agents/trp" replace />} />
-                <Route path="/agents/trp/lista" element={<Navigate to="/agents/trp/historico" replace />} />
-                <Route path="/agents/trp/:id" element={<Navigate to="/agents/trp/historico" replace />} />
+                <Route
+                  path="/agents/trp/novo"
+                  element={<Navigate to="/agents/trp" replace />}
+                />
+                <Route
+                  path="/agents/trp/lista"
+                  element={<Navigate to="/agents/trp/historico" replace />}
+                />
+                <Route
+                  path="/agents/trp/:id"
+                  element={<Navigate to="/agents/trp/historico" replace />}
+                />
 
                 {/* ===================== TRD ===================== */}
                 <Route
@@ -192,9 +203,18 @@ function AppShell() {
                 />
 
                 {/* TRD aliases */}
-                <Route path="/agents/trd/novo" element={<Navigate to="/agents/trd" replace />} />
-                <Route path="/agents/trd/lista" element={<Navigate to="/agents/trd/historico" replace />} />
-                <Route path="/agents/trd/:id" element={<Navigate to="/agents/trd/historico" replace />} />
+                <Route
+                  path="/agents/trd/novo"
+                  element={<Navigate to="/agents/trd" replace />}
+                />
+                <Route
+                  path="/agents/trd/lista"
+                  element={<Navigate to="/agents/trd/historico" replace />}
+                />
+                <Route
+                  path="/agents/trd/:id"
+                  element={<Navigate to="/agents/trd/historico" replace />}
+                />
 
                 {/* ===================== DFD ===================== */}
                 <Route

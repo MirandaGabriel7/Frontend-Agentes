@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -12,55 +12,120 @@ import {
   alpha,
   useTheme,
 } from "@mui/material";
-import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../infra/supabaseClient";
+
+function getHashParams() {
+  const hash = window.location.hash?.replace(/^#/, "") ?? "";
+  const params = new URLSearchParams(hash);
+  return {
+    access_token: params.get("access_token"),
+    refresh_token: params.get("refresh_token"),
+    type: params.get("type"), // "recovery"
+  };
+}
 
 export const ResetPasswordPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { updatePassword, authLoading } = useAuth();
 
-  const [p1, setP1] = useState("");
-  const [p2, setP2] = useState("");
-  const [loading, setLoading] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const hasClient = useMemo(() => !!supabase, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function bootstrap() {
+      setError(null);
+      setOk(null);
+
+      if (!hasClient || !supabase) {
+        setError("Supabase não configurado no frontend.");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Suporta o formato antigo (hash com tokens)
+      const { access_token, refresh_token, type } = getHashParams();
+
+      try {
+        // Se veio token de recovery no hash, setamos a sessão
+        if (type === "recovery" && access_token && refresh_token) {
+          const { error: setSessionError } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (setSessionError) {
+            throw setSessionError;
+          }
+        }
+
+        // Se já existe sessão (ou acabou de setar), segue
+        const { data } = await supabase.auth.getSession();
+
+        if (!data.session) {
+          // Sem sessão => usuário clicou num link inválido/expirado, ou caiu aqui direto
+          setError("Link de recuperação inválido ou expirado. Solicite novamente.");
+        }
+      } catch (e: any) {
+        setError(e?.message ?? "Não foi possível validar o link de recuperação.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    bootstrap();
+    return () => {
+      mounted = false;
+    };
+  }, [hasClient]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setOk(null);
 
-    if (p1.length < 8) {
+    if (!supabase) {
+      setError("Supabase não configurado.");
+      return;
+    }
+
+    if (password.length < 8) {
       setError("A senha deve ter pelo menos 8 caracteres.");
       return;
     }
 
-    if (p1 !== p2) {
-      setError("As senhas não conferem.");
+    if (password !== confirm) {
+      setError("As senhas não coincidem.");
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
     try {
-      const { error } = await updatePassword(p1);
-      if (error) {
-        setError(error.message || "Erro ao atualizar senha.");
-        return;
-      }
+      const { error: updError } = await supabase.auth.updateUser({ password });
+      if (updError) throw updError;
 
-      setOk("Senha atualizada com sucesso! Você já pode entrar.");
-      setTimeout(() => navigate("/login", { replace: true }), 900);
-    } catch {
-      setError("Erro inesperado ao atualizar senha. Tente novamente.");
+      setOk("Senha alterada com sucesso. Você já pode entrar com a nova senha.");
+      // opcional: desloga por segurança e manda pro login
+      await supabase.auth.signOut();
+      setTimeout(() => navigate("/login", { replace: true }), 800);
+    } catch (e: any) {
+      setError(e?.message ?? "Erro ao alterar senha.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (authLoading) {
+  if (loading) {
     return (
-      <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
         <CircularProgress />
       </Box>
     );
@@ -80,11 +145,11 @@ export const ResetPasswordPage: React.FC = () => {
           }}
         >
           <Box sx={{ mb: 3, textAlign: "center" }}>
-            <Typography variant="h5" component="h1" sx={{ fontWeight: 800, mb: 1, color: theme.palette.text.primary }}>
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>
               Redefinir senha
             </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-              Digite sua nova senha abaixo.
+            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mt: 0.5 }}>
+              Crie uma nova senha para sua conta
             </Typography>
           </Box>
 
@@ -100,30 +165,27 @@ export const ResetPasswordPage: React.FC = () => {
             </Alert>
           )}
 
-          <form onSubmit={onSubmit}>
+          <form onSubmit={handleSave}>
             <TextField
               label="Nova senha"
               type="password"
               fullWidth
               required
-              autoComplete="new-password"
-              value={p1}
-              onChange={(e) => setP1(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               margin="normal"
-              disabled={loading}
+              disabled={saving}
               autoFocus
             />
-
             <TextField
               label="Confirmar nova senha"
               type="password"
               fullWidth
               required
-              autoComplete="new-password"
-              value={p2}
-              onChange={(e) => setP2(e.target.value)}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
               margin="normal"
-              disabled={loading}
+              disabled={saving}
             />
 
             <Button
@@ -131,16 +193,15 @@ export const ResetPasswordPage: React.FC = () => {
               variant="contained"
               fullWidth
               size="large"
-              disabled={loading}
-              sx={{ mt: 3, py: 1.5, textTransform: "none", fontWeight: 700 }}
+              disabled={saving}
+              sx={{ mt: 2.5, py: 1.4, textTransform: "none", fontWeight: 700 }}
             >
-              {loading ? "Salvando..." : "Salvar nova senha"}
+              {saving ? "Salvando..." : "Salvar nova senha"}
             </Button>
 
             <Button
               type="button"
               fullWidth
-              disabled={loading}
               onClick={() => navigate("/login")}
               sx={{ mt: 1, textTransform: "none" }}
             >
