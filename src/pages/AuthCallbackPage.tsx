@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography, Alert } from "@mui/material";
-import { supabase } from "../infra/supabaseClient"; // ✅ ajuste o path se necessário
+import { supabase } from "../infra/supabaseClient";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -14,28 +14,30 @@ export function AuthCallbackPage() {
 
     async function run() {
       try {
-        // PKCE flow: Supabase volta com ?code=...
         const params = new URLSearchParams(location.search);
         const code = params.get("code");
         const next = params.get("next") || "/agents";
 
+        console.log("Callback params:", Object.fromEntries(params.entries()));
+
         if (!code) {
-          navigate("/login", {
-            replace: true,
-            state: { message: "Link inválido ou expirado. Tente novamente." },
-          });
-          return;
+          throw new Error("Código de autenticação não encontrado.");
         }
 
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-        if (exchangeError) throw exchangeError;
+        if (error) throw error;
+
+        console.log("Session criada:", data);
 
         const goTo = next.startsWith("/") ? next : `/${next}`;
-        if (mounted) navigate(goTo, { replace: true });
+        navigate(goTo, { replace: true });
+
       } catch (e: any) {
-        if (!mounted) return;
-        setError(e?.message || "Falha ao validar o link. Tente novamente.");
+        console.error("Erro no callback:", e);
+        if (mounted) {
+          setError(e?.message || "Erro ao validar o link.");
+        }
       }
     }
 
@@ -47,14 +49,7 @@ export function AuthCallbackPage() {
   }, [location.search, navigate]);
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        p: 3,
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3 }}>
       <Box sx={{ width: "100%", maxWidth: 420 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
           Validando link…
