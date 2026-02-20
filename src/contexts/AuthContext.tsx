@@ -263,10 +263,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const resetPassword = useCallback(
     async (email: string) => {
       try {
-        const appUrl = getAppUrl();
-
+        
         // ✅ manda pro callback primeiro (PKCE), e depois vai pro reset-password
-        const redirectTo = `${appUrl}/auth/callback?next=/reset-password`;
+        const redirectTo = `${import.meta.env.VITE_APP_URL}/auth/callback?next=/reset-password`;
 
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo,

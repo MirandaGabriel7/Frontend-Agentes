@@ -1,7 +1,7 @@
 // src/pages/AuthCallbackPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Box, CircularProgress, Typography, Alert } from "@mui/material";
+import { Box, CircularProgress, Typography, Alert, Button } from "@mui/material";
 import { supabase } from "../infra/supabaseClient";
 
 export function AuthCallbackPage() {
@@ -15,29 +15,40 @@ export function AuthCallbackPage() {
     async function run() {
       try {
         const params = new URLSearchParams(location.search);
-        const code = params.get("code");
+
+        // ✅ Se o Supabase devolveu erro no link (ex: otp_expired)
+        const err = params.get("error");
+        const errCode = params.get("error_code");
+        const errDesc = params.get("error_description");
+
         const next = params.get("next") || "/agents";
+        const code = params.get("code");
 
         console.log("Callback params:", Object.fromEntries(params.entries()));
 
-        if (!code) {
-          throw new Error("Código de autenticação não encontrado.");
+        if (err) {
+          // otp_expired / access_denied etc.
+          const msg =
+            errCode === "otp_expired"
+              ? "Esse link de recuperação expirou. Volte ao login e solicite novamente."
+              : decodeURIComponent(errDesc || "Não foi possível validar o link.");
+
+          throw new Error(msg);
         }
 
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!code) {
+          throw new Error("Código de autenticação não encontrado. Solicite um novo link.");
+        }
 
-        if (error) throw error;
-
-        console.log("Session criada:", data);
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) throw exchangeError;
 
         const goTo = next.startsWith("/") ? next : `/${next}`;
         navigate(goTo, { replace: true });
-
       } catch (e: any) {
         console.error("Erro no callback:", e);
-        if (mounted) {
-          setError(e?.message || "Erro ao validar o link.");
-        }
+        if (!mounted) return;
+        setError(e?.message || "Falha ao validar o link.");
       }
     }
 
@@ -50,13 +61,24 @@ export function AuthCallbackPage() {
 
   return (
     <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3 }}>
-      <Box sx={{ width: "100%", maxWidth: 420 }}>
-        <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+      <Box sx={{ width: "100%", maxWidth: 460 }}>
+        <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>
           Validando link…
         </Typography>
 
         {error ? (
-          <Alert severity="error">{error}</Alert>
+          <>
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+            <Button
+              variant="contained"
+              onClick={() => navigate("/login", { replace: true })}
+              fullWidth
+            >
+              Voltar ao login
+            </Button>
+          </>
         ) : (
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
             <CircularProgress size={22} />
