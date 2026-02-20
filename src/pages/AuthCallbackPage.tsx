@@ -1,7 +1,7 @@
 // src/pages/AuthCallbackPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Alert, Box, CircularProgress, Typography } from "@mui/material";
+import { Alert, Box, CircularProgress, Typography, Button } from "@mui/material";
 import { supabase } from "../infra/supabaseClient";
 
 function safeNext(next: string | null | undefined) {
@@ -11,10 +11,27 @@ function safeNext(next: string | null | undefined) {
   return `/${n}`;
 }
 
+function buildGuardKey(locationSearch: string) {
+  // 🔒 Evita guardar token completo no key (reduz tamanho e exposição).
+  // Usa só os params relevantes, mantendo unicidade suficiente.
+  try {
+    const qs = new URLSearchParams(locationSearch);
+    const code = qs.get("code") || "";
+    const type = qs.get("type") || "";
+    const next = qs.get("next") || "";
+    const error = qs.get("error") || "";
+    const errorCode = qs.get("error_code") || "";
+    return `authcb:v2:${code.slice(0, 12)}:${type}:${next}:${error}:${errorCode}`;
+  } catch {
+    return `authcb:v2:${locationSearch.slice(0, 64)}`;
+  }
+}
+
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(true);
 
   const qs = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
@@ -22,6 +39,9 @@ export default function AuthCallbackPage() {
     let alive = true;
 
     async function run() {
+      setProcessing(true);
+      setError(null);
+
       try {
         const code = qs.get("code");
         const next = safeNext(qs.get("next"));
@@ -37,21 +57,23 @@ export default function AuthCallbackPage() {
               : errDesc || "Falha ao validar o link. Tente novamente.";
           if (!alive) return;
           setError(msg);
+          setProcessing(false);
           return;
         }
 
-        // ✅ Trava anti-loop: cada URL (code) só pode ser processada 1 vez neste navegador
-        // (evita refresh/re-render/dupla troca de code por sessão)
-        const guardKey = `authcb:${location.search}`;
+        // ✅ Trava anti-loop: cada URL (code) só pode ser processada 1 vez neste navegador.
+        // - Evita dupla troca de code por sessão por re-render, refresh, back/forward, etc.
+        const guardKey = buildGuardKey(location.search);
+
         if (sessionStorage.getItem(guardKey) === "1") {
-          // Já processado → só navega
+          // Já processado → só navega pro destino (não tenta trocar de novo)
           navigate(next, { replace: true });
           return;
         }
         sessionStorage.setItem(guardKey, "1");
 
         if (!code) {
-          // Sem code = não tem como trocar por sessão (PKCE)
+          // Sem code = não tem como trocar por sessão (PKCE).
           navigate("/login", {
             replace: true,
             state: { message: "Link inválido ou expirado. Solicite novamente." },
@@ -60,17 +82,25 @@ export default function AuthCallbackPage() {
         }
 
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) throw exchangeError;
+
+        if (exchangeError) {
+          // Se falhou, libera o guard pra permitir retry com o mesmo link (caso necessário)
+          sessionStorage.removeItem(guardKey);
+          throw exchangeError;
+        }
 
         // ✅ Agora sim vai pro destino (reset-password / agents etc.)
         navigate(next, { replace: true });
       } catch (e: any) {
         if (!alive) return;
-        setError(e?.message || "Falha ao validar o link. Solicite novamente.");
+        const msg = e?.message || "Falha ao validar o link. Solicite novamente.";
+        setError(msg);
+        setProcessing(false);
       }
     }
 
     run();
+
     return () => {
       alive = false;
     };
@@ -84,26 +114,38 @@ export default function AuthCallbackPage() {
         </Typography>
 
         {error ? (
-          <Alert
-            severity="error"
-            sx={{ mt: 2 }}
-            action={
-              <Typography
-                component="button"
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <Typography variant="body2">{error}</Typography>
+
+            <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap" }}>
+              <Button
+                variant="contained"
                 onClick={() => navigate("/login", { replace: true })}
-                style={{ background: "transparent", border: 0, cursor: "pointer" }}
+                sx={{ textTransform: "none", fontWeight: 700 }}
               >
                 Ir para login
-              </Typography>
-            }
-          >
-            {error}
+              </Button>
+
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  // Tenta "limpar" a URL problemática e voltar ao fluxo normal
+                  navigate("/login", {
+                    replace: true,
+                    state: { message: "Solicite um novo link e tente novamente." },
+                  });
+                }}
+                sx={{ textTransform: "none" }}
+              >
+                Solicitar novo link
+              </Button>
+            </Box>
           </Alert>
         ) : (
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
             <CircularProgress size={22} />
             <Typography variant="body2" color="text.secondary">
-              Aguarde um instante.
+              {processing ? "Aguarde um instante." : "Redirecionando…"}
             </Typography>
           </Box>
         )}
