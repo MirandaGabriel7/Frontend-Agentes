@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.tsx
 import React, {
   createContext,
   useContext,
@@ -19,6 +20,7 @@ interface AuthContextType {
   orgLoading: boolean;
 
   signIn: (email: string, password: string) => Promise<{ error: Error | null; hasOrg?: boolean }>;
+
   signUp: (
     fullName: string,
     email: string,
@@ -37,6 +39,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY_ORG_ID = "planco_active_org_id";
+
+function normalizeBaseUrl(url: string): string {
+  const trimmed = (url || "").trim();
+  if (!trimmed) return "";
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+/**
+ * ✅ Fonte de verdade do "URL do app":
+ * - Usa VITE_APP_URL se existir (prod/Netlify)
+ * - Cai para window.location.origin se não existir (dev/local/staging)
+ */
+function getAppUrl(): string {
+  const envUrl = normalizeBaseUrl((import.meta.env.VITE_APP_URL as string) ?? "");
+  const origin = normalizeBaseUrl(window.location.origin);
+  return envUrl || origin;
+}
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -192,13 +211,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = useCallback(
     async (fullName: string, email: string, password: string) => {
       try {
-        const redirectTo = `${import.meta.env.VITE_APP_URL}/auth/callback`;
+        const appUrl = getAppUrl();
+        const emailRedirectTo = `${appUrl}/auth/callback`;
 
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: redirectTo,
+            emailRedirectTo,
             data: {
               full_name: fullName.trim(),
             },
@@ -234,10 +254,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [isDev, ensureAndFetchUserOrg]
   );
 
+  /**
+   * ✅ Reset de senha (profissional) com PKCE:
+   * - o email volta com ?code=...
+   * - /auth/callback troca code por sessão
+   * - e manda para /reset-password
+   */
   const resetPassword = useCallback(
     async (email: string) => {
       try {
-        const redirectTo = `${import.meta.env.VITE_APP_URL}/reset-password`;
+        const appUrl = getAppUrl();
+
+        // ✅ manda pro callback primeiro (PKCE), e depois vai pro reset-password
+        const redirectTo = `${appUrl}/auth/callback?next=/reset-password`;
 
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo,
@@ -248,9 +277,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return { error: error as unknown as Error };
         }
 
+        if (isDev) console.debug("[AuthContext] resetPassword enviado com redirectTo:", redirectTo);
         return { error: null };
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro desconhecido ao enviar recuperação");
+        const error =
+          err instanceof Error ? err : new Error("Erro desconhecido ao enviar recuperação");
         if (isDev) console.error("[AuthContext] Erro inesperado no resetPassword:", err);
         return { error };
       }
@@ -272,7 +303,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await refreshUser();
         return { error: null };
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro desconhecido ao atualizar senha");
+        const error =
+          err instanceof Error ? err : new Error("Erro desconhecido ao atualizar senha");
         if (isDev) console.error("[AuthContext] Erro inesperado no updatePassword:", err);
         return { error };
       }

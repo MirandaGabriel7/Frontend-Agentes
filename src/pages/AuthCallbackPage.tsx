@@ -1,63 +1,78 @@
-import React, { useEffect, useState } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../infra/supabaseClient";
+// src/pages/AuthCallbackPage.tsx
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Box, CircularProgress, Typography, Alert } from "@mui/material";
+import { supabase } from "../infra/supabaseClient"; // ✅ ajuste o path se necessário
 
-export const AuthCallbackPage: React.FC = () => {
+export function AuthCallbackPage() {
   const navigate = useNavigate();
-  const [msg, setMsg] = useState("Processando autenticação…");
+  const location = useLocation();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function run() {
       try {
-        if (!supabase) {
-          navigate("/login", { replace: true });
+        // PKCE flow: Supabase volta com ?code=...
+        const params = new URLSearchParams(location.search);
+        const code = params.get("code");
+        const next = params.get("next") || "/agents";
+
+        if (!code) {
+          navigate("/login", {
+            replace: true,
+            state: { message: "Link inválido ou expirado. Tente novamente." },
+          });
           return;
         }
 
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-        // Se veio ?code=..., troca por sessão
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-        }
+        if (exchangeError) throw exchangeError;
 
-        // Se for recovery, manda pro reset
-        // (Em muitos casos o Supabase já manda pra /reset-password direto,
-        // mas esse fallback garante)
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          setMsg("Sessão confirmada. Redirecionando…");
-          navigate("/reset-password", { replace: true });
-          return;
-        }
-
-        navigate("/login", { replace: true });
+        const goTo = next.startsWith("/") ? next : `/${next}`;
+        if (mounted) navigate(goTo, { replace: true });
       } catch (e: any) {
         if (!mounted) return;
-        setMsg(e?.message ?? "Falha no callback. Volte para o login.");
-        setTimeout(() => navigate("/login", { replace: true }), 1200);
+        setError(e?.message || "Falha ao validar o link. Tente novamente.");
       }
     }
 
     run();
+
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [location.search, navigate]);
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <CircularProgress size={22} />
-        <Typography variant="body2" color="text.secondary">
-          {msg}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        p: 3,
+      }}
+    >
+      <Box sx={{ width: "100%", maxWidth: 420 }}>
+        <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+          Validando link…
         </Typography>
+
+        {error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
+            <CircularProgress size={22} />
+            <Typography variant="body2" color="text.secondary">
+              Aguarde um instante.
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );
-};
+}
+
+export default AuthCallbackPage;
