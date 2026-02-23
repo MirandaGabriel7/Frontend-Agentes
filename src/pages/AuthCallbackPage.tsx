@@ -21,9 +21,9 @@ function buildGuardKey(locationSearch: string) {
     const next = qs.get("next") || "";
     const error = qs.get("error") || "";
     const errorCode = qs.get("error_code") || "";
-    return `authcb:v2:${code.slice(0, 12)}:${type}:${next}:${error}:${errorCode}`;
+    return `authcb:v3:${code.slice(0, 12)}:${type}:${next}:${error}:${errorCode}`;
   } catch {
-    return `authcb:v2:${locationSearch.slice(0, 64)}`;
+    return `authcb:v3:${locationSearch.slice(0, 64)}`;
   }
 }
 
@@ -33,7 +33,10 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(true);
 
-  const qs = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const qs = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -44,7 +47,10 @@ export default function AuthCallbackPage() {
 
       try {
         const code = qs.get("code");
-        const next = safeNext(qs.get("next"));
+
+        // Supabase manda type=recovery no reset de senha
+        const type = (qs.get("type") || "").toLowerCase();
+
         const err = qs.get("error");
         const errDesc = qs.get("error_description");
         const errCode = qs.get("error_code");
@@ -61,12 +67,16 @@ export default function AuthCallbackPage() {
           return;
         }
 
+        // ✅ Destino PROFISSIONAL:
+        // - recovery SEMPRE vai para /reset-password (não depende de next)
+        // - outros casos respeitam next
+        const next =
+          type === "recovery" ? "/reset-password" : safeNext(qs.get("next"));
+
         // ✅ Trava anti-loop: cada URL (code) só pode ser processada 1 vez neste navegador.
-        // - Evita dupla troca de code por sessão por re-render, refresh, back/forward, etc.
         const guardKey = buildGuardKey(location.search);
 
         if (sessionStorage.getItem(guardKey) === "1") {
-          // Já processado → só navega pro destino (não tenta trocar de novo)
           navigate(next, { replace: true });
           return;
         }
@@ -81,7 +91,8 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        const { error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
           // Se falhou, libera o guard pra permitir retry com o mesmo link (caso necessário)
@@ -107,7 +118,14 @@ export default function AuthCallbackPage() {
   }, [navigate, location.search, qs]);
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3 }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        p: 3,
+      }}
+    >
       <Box sx={{ width: "100%", maxWidth: 520 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>
           Validando link…
@@ -129,7 +147,6 @@ export default function AuthCallbackPage() {
               <Button
                 variant="outlined"
                 onClick={() => {
-                  // Tenta "limpar" a URL problemática e voltar ao fluxo normal
                   navigate("/login", {
                     replace: true,
                     state: { message: "Solicite um novo link e tente novamente." },
