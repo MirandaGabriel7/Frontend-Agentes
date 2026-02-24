@@ -573,7 +573,7 @@ export const TrpPage: React.FC = () => {
               }}
             >
               Esse nome será usado para identificar o arquivo gerado (ex: “TRP –
-              Planco AI”).
+              Agentes Gov AI”).
             </Typography>
 
             <TextField
@@ -586,7 +586,7 @@ export const TrpPage: React.FC = () => {
               }}
               fullWidth
               variant="outlined"
-              placeholder="Ex: TRP – Planco AI"
+              placeholder="Ex: TRP – Agentes Gov AI"
               disabled={isLoading}
               InputLabelProps={{ shrink: false }}
               label=""

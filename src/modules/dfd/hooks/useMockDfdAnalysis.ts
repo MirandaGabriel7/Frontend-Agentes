@@ -152,7 +152,7 @@ export const useMockDfdAnalysis = (analysisId?: string) => {
             },
           ],
           meta: {
-            gerado_por: 'PLANCODFD â€“ PRIME_SCORE + OUTPUT_FORMATTER',
+            gerado_por: 'Agentes Gov DFD – PRIME_SCORE + OUTPUT_FORMATTER',
             versao_motor: '1.0.0',
             timestamp_geracao: new Date().toISOString(),
           },

@@ -242,7 +242,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         <Box
           component="img"
           src="/assets/logo-icon.svg"
-          alt="PLANCO"
+          alt="Agentes Gov"
           sx={{
             height: 28,
             width: "auto",
@@ -258,7 +258,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             letterSpacing: "-0.015em",
           }}
         >
-          PLANCO
+          Agentes Gov
         </Typography>
       </Box>
 

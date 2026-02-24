@@ -60,7 +60,7 @@ const shimmer = keyframes`
 `;
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
-  message = 'Aguarde... a Planco AI está analisando os documentos',
+  message = 'Aguarde... a Agentes Gov AI está analisando os documentos',
 }) => {
   const theme = useTheme();
   const text = 'Gerando';

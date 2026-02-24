@@ -153,7 +153,7 @@ export const AgentsPage = () => {
               <Box
                 component="img"
                 src="/assets/logo-icon.svg"
-                alt="PLANCO"
+                alt="Agentes Gov"
                 sx={{
                   width: { xs: 48, sm: 56, md: 64 },
                   height: { xs: 48, sm: 56, md: 64 },
@@ -179,7 +179,7 @@ export const AgentsPage = () => {
                   letterSpacing: "-0.02em",
                 }}
               >
-                Planco AI
+                Agentes Gov AI
               </Typography>
             </Stack>
 
