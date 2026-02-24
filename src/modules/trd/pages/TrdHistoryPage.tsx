@@ -1,52 +1,45 @@
 // src/modules/trd/pages/TrdHistoryPage.tsx
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  InputAdornment,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Button,
-  Chip,
-  CircularProgress,
   Alert,
   alpha,
-  useTheme,
-  Skeleton,
+  Box,
+  Button,
   Card,
   CardContent,
-  Snackbar,
+  Chip,
+  CircularProgress,
+  FormControl,
   IconButton,
-  Tooltip,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
   Pagination,
+  Paper,
+  Select,
+  Skeleton,
+  Snackbar,
+  TextField,
+  Tooltip,
+  Typography,
+  useTheme,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import {
-  Search as SearchIcon,
   CheckCircle,
+  Clear as ClearIcon,
+  Close as CloseIcon,
+  Description as WordIcon,
   Error as ErrorIcon,
-  Sync,
-  Schedule,
   History as HistoryIcon,
   PictureAsPdf as PdfIcon,
-  Description as WordIcon,
-  Close as CloseIcon,
-  Clear as ClearIcon,
+  Schedule,
+  Search as SearchIcon,
+  Sync,
 } from "@mui/icons-material";
-import {
-  fetchTrdRuns,
-  fetchTrdRunsSummary,
-  downloadTrdRun,
-} from "../../../services/api";
-import type {
-  TrdRunListItem,
-  FetchTrdRunsParams,
-} from "../../../services/api";
+import { downloadTrdRun, fetchTrdRuns, fetchTrdRunsSummary } from "../../../services/api";
+import type { FetchTrdRunsParams, TrdRunListItem } from "../../../services/api";
 import { useAuth } from "../../../contexts/AuthContext";
 import { isUuid } from "../../../utils/uuid";
 import dayjs from "dayjs";
@@ -66,12 +59,30 @@ const STATUS_OPTIONS = [
 
 const PER_PAGE_OPTIONS = [5, 10, 15, 20] as const;
 
+type SnackbarState = { open: boolean; message: string; severity?: "error" | "success" | "warning" };
+type DownloadingState = Record<string, "pdf" | "docx" | null>;
+type ApiErrorLike = { status?: number; message?: string };
+
+const normalize = (v: unknown) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+
+const formatDate = (dateString: string) => dayjs(dateString).format("DD/MM/YYYY [às] HH:mm");
+
+const getDisplayFileName = (run: TrdRunListItem) => {
+  const raw = (run as any)?.fileName;
+  const name = typeof raw === "string" ? raw.trim() : "";
+  const fallback = `TRD_${String(run.runId || "").slice(0, 8)}.pdf`;
+  return name || fallback;
+};
+
 const getStatusChip = (status: TrdRunListItem["status"]) => {
   switch (status) {
     case "COMPLETED":
-      return (
-        <Chip icon={<CheckCircle />} label="Concluído" color="success" size="small" />
-      );
+      return <Chip icon={<CheckCircle />} label="Concluído" color="success" size="small" />;
     case "FAILED":
       return <Chip icon={<ErrorIcon />} label="Falhou" color="error" size="small" />;
     case "PROCESSING":
@@ -83,37 +94,18 @@ const getStatusChip = (status: TrdRunListItem["status"]) => {
   }
 };
 
-const formatDate = (dateString: string) => {
-  return dayjs(dateString).format("DD/MM/YYYY [às] HH:mm");
+const getApiError = (err: unknown): ApiErrorLike => {
+  if (typeof err === "object" && err !== null) return err as ApiErrorLike;
+  return {};
 };
-
-const getDisplayFileName = (run: TrdRunListItem) => {
-  const raw = (run as any)?.fileName;
-  const name = typeof raw === "string" ? raw.trim() : "";
-  const fallback = `TRD_${String(run.runId || "").slice(0, 8)}.pdf`;
-  return name || fallback;
-};
-
-const normalize = (v: unknown) =>
-  String(v ?? "")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
 
 export const TrdHistoryPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity?: "error" | "success" | "warning";
-  }>({ open: false, message: "" });
-
-  const [downloading, setDownloading] = useState<{ [runId: string]: "pdf" | "docx" | null }>({});
-
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: "" });
+  const [downloading, setDownloading] = useState<DownloadingState>({});
   const [baseRuns, setBaseRuns] = useState<TrdRunListItem[]>([]);
   const [runs, setRuns] = useState<TrdRunListItem[]>([]);
 
@@ -129,8 +121,7 @@ export const TrdHistoryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const [statusFilter, setStatusFilter] =
-    useState<FetchTrdRunsParams["status"]>("ALL");
+  const [statusFilter, setStatusFilter] = useState<FetchTrdRunsParams["status"]>("ALL");
 
   const [perPage, setPerPage] = useState<(typeof PER_PAGE_OPTIONS)[number]>(10);
   const [page, setPage] = useState(1);
@@ -140,10 +131,8 @@ export const TrdHistoryPage: React.FC = () => {
   const lastFetchAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 350);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(() => setDebouncedQuery(searchQuery), 350);
+    return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
   const derivedSummary = useMemo(() => {
@@ -155,13 +144,13 @@ export const TrdHistoryPage: React.FC = () => {
     if (!summary) return { total_runs, total_completed, total_failed };
 
     const sTotal = typeof summary.total_runs === "number" ? summary.total_runs : 0;
-    const sCompleted =
-      typeof summary.total_completed === "number" ? summary.total_completed : 0;
+    const sCompleted = typeof summary.total_completed === "number" ? summary.total_completed : 0;
     const sFailed = typeof summary.total_failed === "number" ? summary.total_failed : 0;
 
     if ((sTotal === 0 && total_runs > 0) || (sCompleted === 0 && total_completed > 0)) {
       return { total_runs, total_completed, total_failed };
     }
+
     return { total_runs: sTotal, total_completed: sCompleted, total_failed: sFailed };
   }, [baseRuns, summary]);
 
@@ -172,10 +161,9 @@ export const TrdHistoryPage: React.FC = () => {
     try {
       const data = await fetchTrdRunsSummary();
       setSummary({
-        total_runs: typeof data.total_runs === "number" ? data.total_runs : 0,
-        total_completed:
-          typeof data.total_completed === "number" ? data.total_completed : 0,
-        total_failed: typeof data.total_failed === "number" ? data.total_failed : 0,
+        total_runs: typeof (data as any)?.total_runs === "number" ? (data as any).total_runs : 0,
+        total_completed: typeof (data as any)?.total_completed === "number" ? (data as any).total_completed : 0,
+        total_failed: typeof (data as any)?.total_failed === "number" ? (data as any).total_failed : 0,
       });
     } catch (err) {
       console.warn("[TrdHistoryPage] Erro ao carregar resumo:", err);
@@ -185,7 +173,6 @@ export const TrdHistoryPage: React.FC = () => {
 
   const loadRuns = useCallback(async () => {
     const now = Date.now();
-
     if (lastFetchAt.current !== null && now - lastFetchAt.current < 10000) {
       setLoading(false);
       return;
@@ -202,14 +189,11 @@ export const TrdHistoryPage: React.FC = () => {
       };
 
       const result = await fetchTrdRuns(params);
-      const items = Array.isArray(result.items) ? result.items : [];
-
+      const items = Array.isArray((result as any)?.items) ? (result as any).items : [];
       setBaseRuns(items);
       lastFetchAt.current = Date.now();
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Erro ao carregar histórico de TRDs";
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : "Erro ao carregar histórico de TRDs");
       setBaseRuns([]);
     } finally {
       setLoading(false);
@@ -217,14 +201,14 @@ export const TrdHistoryPage: React.FC = () => {
   }, [statusFilter]);
 
   useEffect(() => {
-    loadSummary();
-    loadRuns();
+    void loadSummary();
+    void loadRuns();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setPage(1);
     lastFetchAt.current = null;
-    loadRuns();
+    void loadRuns();
   }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -234,9 +218,9 @@ export const TrdHistoryPage: React.FC = () => {
   const handleRetry = () => {
     setError(null);
     didFetchSummary.current = false;
-    loadSummary();
+    void loadSummary();
     lastFetchAt.current = null;
-    loadRuns();
+    void loadRuns();
   };
 
   const filteredRuns = useMemo(() => {
@@ -256,9 +240,8 @@ export const TrdHistoryPage: React.FC = () => {
           run.runId,
         ]
           .filter(Boolean)
-          .join(" "),
+          .join(" ")
       );
-
       return hay.includes(q);
     });
   }, [baseRuns, debouncedQuery]);
@@ -276,6 +259,15 @@ export const TrdHistoryPage: React.FC = () => {
     setRuns(pagedRuns);
   }, [pagedRuns]);
 
+  const handleAuthError = useCallback(async () => {
+    setSnackbar({ open: true, message: "Sessão expirada / sem permissão", severity: "error" });
+    await signOut();
+    navigate("/login", {
+      replace: true,
+      state: { message: "Sua sessão expirou. Faça login novamente." },
+    });
+  }, [navigate, signOut]);
+
   const handleDownload = async (runId: string, format: "pdf" | "docx") => {
     if (!runId) {
       setSnackbar({ open: true, message: "ID do TRD não encontrado", severity: "error" });
@@ -287,9 +279,7 @@ export const TrdHistoryPage: React.FC = () => {
       return;
     }
 
-    const runsArray = Array.isArray(baseRuns) ? baseRuns : [];
-    const run = runsArray.find((r) => r && r.runId === runId);
-
+    const run = (Array.isArray(baseRuns) ? baseRuns : []).find((r) => r && r.runId === runId);
     if (!run) {
       setSnackbar({ open: true, message: "TRD não encontrado na lista", severity: "error" });
       return;
@@ -307,23 +297,18 @@ export const TrdHistoryPage: React.FC = () => {
     try {
       setDownloading((prev) => ({ ...prev, [runId]: format }));
       await downloadTrdRun(runId, format);
-
       setSnackbar({
         open: true,
         message: `Exportando documento oficial do TRD em ${format.toUpperCase()}...`,
         severity: "success",
       });
-    } catch (err: any) {
-      const errorMessage = err.message || "Erro ao baixar arquivo";
-      const status = err.status;
+    } catch (err) {
+      const apiErr = getApiError(err);
+      const status = apiErr.status;
+      const errorMessage = apiErr.message || "Erro ao baixar arquivo";
 
       if (status === 401 || status === 403) {
-        setSnackbar({ open: true, message: "Sessão expirada / sem permissão", severity: "error" });
-        await signOut();
-        navigate("/login", {
-          replace: true,
-          state: { message: "Sua sessão expirou. Faça login novamente." },
-        });
+        await handleAuthError();
         return;
       }
 
@@ -339,22 +324,12 @@ export const TrdHistoryPage: React.FC = () => {
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
+  const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
       <Box sx={{ mb: 4, textAlign: "center" }}>
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 2,
-            mb: 1,
-            justifyContent: "center",
-          }}
-        >
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 2, mb: 1, justifyContent: "center" }}>
           <HistoryIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
           <Box sx={{ textAlign: "left" }}>
             <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
@@ -373,7 +348,7 @@ export const TrdHistoryPage: React.FC = () => {
             sx={{
               background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(
                 theme.palette.primary.main,
-                0.05,
+                0.05
               )} 100%)`,
               border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}
@@ -394,7 +369,7 @@ export const TrdHistoryPage: React.FC = () => {
             sx={{
               background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(
                 theme.palette.success.main,
-                0.05,
+                0.05
               )} 100%)`,
               border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
             }}
@@ -415,7 +390,7 @@ export const TrdHistoryPage: React.FC = () => {
             sx={{
               background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.1)} 0%, ${alpha(
                 theme.palette.error.main,
-                0.05,
+                0.05
               )} 100%)`,
               border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
             }}
@@ -544,7 +519,6 @@ export const TrdHistoryPage: React.FC = () => {
             <Box sx={{ p: 0 }}>
               {runs.map((run) => {
                 const displayFileName = getDisplayFileName(run);
-
                 const trpRef = (run as any)?.trp_run_id;
                 const trpDate = (run as any)?.trp_created_at;
                 const houveRessalvas = (run as any)?.houve_ressalvas === true;
@@ -559,15 +533,7 @@ export const TrdHistoryPage: React.FC = () => {
                       "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.02) },
                     }}
                   >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        flexWrap: "wrap",
-                        gap: 2,
-                      }}
-                    >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2 }}>
                       <Box sx={{ flex: 1, minWidth: 220 }}>
                         <Box sx={{ display: "flex", gap: 2, alignItems: "center", mb: 1, flexWrap: "wrap" }}>
                           {getStatusChip(run.status)}
@@ -629,9 +595,7 @@ export const TrdHistoryPage: React.FC = () => {
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  startIcon={
-                                    downloading[run.runId] === "pdf" ? <CircularProgress size={16} /> : <PdfIcon />
-                                  }
+                                  startIcon={downloading[run.runId] === "pdf" ? <CircularProgress size={16} /> : <PdfIcon />}
                                   onClick={() => handleDownload(run.runId, "pdf")}
                                   disabled={!!downloading[run.runId]}
                                   sx={{
@@ -659,9 +623,7 @@ export const TrdHistoryPage: React.FC = () => {
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  startIcon={
-                                    downloading[run.runId] === "docx" ? <CircularProgress size={16} /> : <WordIcon />
-                                  }
+                                  startIcon={downloading[run.runId] === "docx" ? <CircularProgress size={16} /> : <WordIcon />}
                                   onClick={() => handleDownload(run.runId, "docx")}
                                   disabled={!!downloading[run.runId]}
                                   sx={{
@@ -726,7 +688,8 @@ export const TrdHistoryPage: React.FC = () => {
               }}
             >
               <Typography variant="body2" color="text.secondary">
-                Exibindo <b>{Math.min((page - 1) * perPage + 1, totalCount)}-{Math.min(page * perPage, totalCount)}</b> de <b>{totalCount}</b>
+                Exibindo <b>{Math.min((page - 1) * perPage + 1, totalCount)}-{Math.min(page * perPage, totalCount)}</b> de{" "}
+                <b>{totalCount}</b>
               </Typography>
 
               <Pagination
