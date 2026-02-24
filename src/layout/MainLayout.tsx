@@ -53,6 +53,9 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 const drawerWidth = 280;
 
+// 🔕 Feature flag: notificações desativadas por enquanto (reabilitar depois = true)
+const ENABLE_NOTIFICATIONS = false;
+
 interface MainLayoutProps {
   children: ReactNode;
 }
@@ -211,7 +214,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const isActive = (path: string) => {
     // ✅ ativo também em subrotas (resultado/historico/etc)
     if (path === "/agents") return location.pathname === "/agents";
-    return location.pathname === path || location.pathname.startsWith(path + "/");
+    return (
+      location.pathname === path || location.pathname.startsWith(path + "/")
+    );
   };
 
   const handleNavClick = (path: string) => {
@@ -335,14 +340,18 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             background: isActive("/agents/settings")
               ? alpha(theme.palette.primary.main, 0.08)
               : "transparent",
-            color: isActive("/agents/settings") ? "primary.main" : "text.secondary",
+            color: isActive("/agents/settings")
+              ? "primary.main"
+              : "text.secondary",
             "&:hover": {
               background: isActive("/agents/settings")
                 ? alpha(theme.palette.primary.main, 0.12)
                 : alpha(theme.palette.action.hover, 0.04),
             },
             "& .MuiListItemIcon-root": {
-              color: isActive("/agents/settings") ? "primary.main" : "text.secondary",
+              color: isActive("/agents/settings")
+                ? "primary.main"
+                : "text.secondary",
               minWidth: 40,
             },
             transition: "all 0.2s ease",
@@ -486,7 +495,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   "&:focus-within": {
                     borderColor: theme.palette.primary.main,
                     background: theme.palette.background.paper,
-                    boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.08)}`,
+                    boxShadow: `0 0 0 3px ${alpha(
+                      theme.palette.primary.main,
+                      0.08,
+                    )}`,
                   },
                 }}
               >
@@ -528,36 +540,38 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             {/* Right Section - Notifications & Avatar */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
               {/* Notifications */}
-              <IconButton
-                sx={{
-                  position: "relative",
-                  width: 40,
-                  height: 40,
-                  borderRadius: 2,
-                  color: "text.secondary",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    background: alpha(theme.palette.action.hover, 0.04),
-                    color: "text.primary",
-                  },
-                }}
-              >
-                <Badge
-                  badgeContent={3}
-                  color="error"
+              {ENABLE_NOTIFICATIONS && (
+                <IconButton
                   sx={{
-                    "& .MuiBadge-badge": {
-                      fontSize: "0.6875rem",
-                      fontWeight: 600,
-                      minWidth: 18,
-                      height: 18,
-                      padding: "0 4px",
+                    position: "relative",
+                    width: 40,
+                    height: 40,
+                    borderRadius: 2,
+                    color: "text.secondary",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      background: alpha(theme.palette.action.hover, 0.04),
+                      color: "text.primary",
                     },
                   }}
                 >
-                  <NotificationsIcon sx={{ fontSize: 20 }} />
-                </Badge>
-              </IconButton>
+                  <Badge
+                    badgeContent={3}
+                    color="error"
+                    sx={{
+                      "& .MuiBadge-badge": {
+                        fontSize: "0.6875rem",
+                        fontWeight: 600,
+                        minWidth: 18,
+                        height: 18,
+                        padding: "0 4px",
+                      },
+                    }}
+                  >
+                    <NotificationsIcon sx={{ fontSize: 20 }} />
+                  </Badge>
+                </IconButton>
+              )}
 
               {/* Avatar with Menu */}
               <Box
@@ -659,7 +673,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   onClick={handleLogout}
                   sx={{
                     color: "error.main",
-                    "&:hover": { bgcolor: alpha(theme.palette.error.main, 0.08) },
+                    "&:hover": {
+                      bgcolor: alpha(theme.palette.error.main, 0.08),
+                    },
                   }}
                 >
                   <ListItemIcon>

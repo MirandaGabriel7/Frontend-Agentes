@@ -147,7 +147,7 @@ export const AgentsPage = () => {
               justifyContent="center"
               spacing={2}
               sx={{
-                mb: 1,
+                mb: 2, // ✅ aumentei um pouco o espaço até o subtítulo
               }}
             >
               <Box
@@ -165,7 +165,10 @@ export const AgentsPage = () => {
                 component="h1"
                 sx={{
                   fontWeight: 800,
-                  background: `linear-gradient(135deg, ${theme.palette.text.primary} 0%, ${alpha(theme.palette.primary.main, 0.8)} 100%)`,
+                  background: `linear-gradient(135deg, ${theme.palette.text.primary} 0%, ${alpha(
+                    theme.palette.primary.main,
+                    0.8
+                  )} 100%)`,
                   backgroundClip: "text",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -175,8 +178,9 @@ export const AgentsPage = () => {
                     md: "3.5rem",
                     lg: "4rem",
                   },
-                  lineHeight: 1.1,
+                  lineHeight: 1.12, // ✅ levemente maior pra evitar “corte” do G
                   letterSpacing: "-0.02em",
+                  pb: 0.25, // ✅ folguinha extra embaixo do texto
                 }}
               >
                 Agentes Gov AI
