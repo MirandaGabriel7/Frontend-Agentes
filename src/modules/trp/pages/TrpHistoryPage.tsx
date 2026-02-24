@@ -1,61 +1,55 @@
 // src/modules/trp/pages/TrpHistoryPage.tsx
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  InputAdornment,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Button,
-  Chip,
-  CircularProgress,
   Alert,
   alpha,
-  useTheme,
-  Skeleton,
+  Box,
+  Button,
   Card,
   CardContent,
-  Snackbar,
+  Chip,
+  CircularProgress,
+  FormControl,
   IconButton,
-  Tooltip,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
   Pagination,
+  Paper,
+  Select,
+  Skeleton,
+  Snackbar,
+  TextField,
+  Tooltip,
+  Typography,
+  useTheme,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import {
-  Search as SearchIcon,
   CheckCircle,
+  Clear as ClearIcon,
+  Close as CloseIcon,
+  Description as WordIcon,
   Error as ErrorIcon,
-  Sync,
-  Schedule,
   History as HistoryIcon,
   PictureAsPdf as PdfIcon,
-  Description as WordIcon,
-  Close as CloseIcon,
-  Clear as ClearIcon,
+  Schedule,
+  Search as SearchIcon,
+  Sync,
 } from "@mui/icons-material";
-import {
-  fetchTrpRuns,
-  fetchTrpRunsSummary,
-  TrpRunListItem,
-  FetchTrpRunsParams,
-  downloadTrpRun,
-} from "../../../services/api";
-import { useAuth } from "../../../contexts/AuthContext";
-import { isUuid } from "../../../utils/uuid";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
 import relativeTime from "dayjs/plugin/relativeTime";
+import {
+  downloadTrpRun,
+  fetchTrpRuns,
+  fetchTrpRunsSummary,
+  FetchTrpRunsParams,
+  TrpRunListItem,
+} from "../../../services/api";
+import { useAuth } from "../../../contexts/AuthContext";
+import { isUuid } from "../../../utils/uuid";
 
 dayjs.extend(relativeTime);
 dayjs.locale("pt-br");
@@ -70,47 +64,24 @@ const STATUS_OPTIONS = [
 
 const PER_PAGE_OPTIONS = [5, 10, 15, 20] as const;
 
-const getStatusChip = (status: TrpRunListItem["status"]) => {
-  switch (status) {
-    case "COMPLETED":
-      return (
-        <Chip
-          icon={<CheckCircle />}
-          label="Concluído"
-          color="success"
-          size="small"
-        />
-      );
-    case "FAILED":
-      return (
-        <Chip icon={<ErrorIcon />} label="Falhou" color="error" size="small" />
-      );
-    case "RUNNING":
-      return (
-        <Chip icon={<Sync />} label="Processando" color="info" size="small" />
-      );
-    case "PENDING":
-      return (
-        <Chip
-          icon={<Schedule />}
-          label="Pendente"
-          color="warning"
-          size="small"
-        />
-      );
-    default:
-      return <Chip label={status} size="small" />;
-  }
+type SnackbarState = {
+  open: boolean;
+  message: string;
+  severity?: "error" | "success" | "warning";
 };
 
-const formatDate = (dateString: string) => {
-  return dayjs(dateString).format("DD/MM/YYYY [às] HH:mm");
+type ApiErrorLike = {
+  status?: number;
+  message?: string;
 };
 
-/**
- * ✅ Nome amigável do TRP no histórico (prioriza fileName vindo do backend).
- * Fallback seguro: "TRP_<8 primeiros do runId>.pdf"
- */
+const getApiError = (err: unknown): ApiErrorLike => {
+  if (typeof err === "object" && err !== null) return err as ApiErrorLike;
+  return {};
+};
+
+const formatDate = (dateString: string) => dayjs(dateString).format("DD/MM/YYYY [às] HH:mm");
+
 const getDisplayFileName = (run: TrpRunListItem) => {
   const raw = (run as any)?.fileName;
   const name = typeof raw === "string" ? raw.trim() : "";
@@ -118,7 +89,6 @@ const getDisplayFileName = (run: TrpRunListItem) => {
   return name || fallback;
 };
 
-// ✅ normalize robusto para busca (remove acentos + lowercase + trim)
 const normalize = (v: unknown) =>
   String(v ?? "")
     .normalize("NFD")
@@ -126,35 +96,34 @@ const normalize = (v: unknown) =>
     .toLowerCase()
     .trim();
 
+const renderStatusChip = (status: TrpRunListItem["status"]) => {
+  switch (status) {
+    case "COMPLETED":
+      return <Chip icon={<CheckCircle />} label="Concluído" color="success" size="small" />;
+    case "FAILED":
+      return <Chip icon={<ErrorIcon />} label="Falhou" color="error" size="small" />;
+    case "RUNNING":
+      return <Chip icon={<Sync />} label="Processando" color="info" size="small" />;
+    case "PENDING":
+      return <Chip icon={<Schedule />} label="Pendente" color="warning" size="small" />;
+    default:
+      return <Chip label={status} size="small" />;
+  }
+};
+
 export const TrpHistoryPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { signOut } = useAuth();
 
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity?: "error" | "success" | "warning";
-  }>({
-    open: false,
-    message: "",
-  });
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: "" });
 
-  const [downloading, setDownloading] = useState<{
-    [runId: string]: "pdf" | "docx" | null;
-  }>({});
+  const [downloading, setDownloading] = useState<Record<string, "pdf" | "docx" | null>>({});
 
-  // ✅ baseRuns = lista “bruta” vinda do backend (sem depender da busca)
   const [baseRuns, setBaseRuns] = useState<TrpRunListItem[]>([]);
-
-  // ✅ runs = lista renderizada (após filtro + paginação)
   const [runs, setRuns] = useState<TrpRunListItem[]>([]);
 
-  const [summary, setSummary] = useState<{
-    total: number;
-    completed: number;
-    failed: number;
-  } | null>(null);
+  const [summary, setSummary] = useState<{ total: number; completed: number; failed: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,25 +131,31 @@ export const TrpHistoryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const [statusFilter, setStatusFilter] =
-    useState<FetchTrpRunsParams["status"]>("ALL");
+  const [statusFilter, setStatusFilter] = useState<FetchTrpRunsParams["status"]>("ALL");
 
   const [perPage, setPerPage] = useState<(typeof PER_PAGE_OPTIONS)[number]>(10);
-  const [page, setPage] = useState(1); // 1-based
+  const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const didFetchSummary = useRef(false);
   const lastFetchAt = useRef<number | null>(null);
 
-  // ✅ Debounce: busca “padrão OpenAI/Enter AI” (mantém o que achou e não refaz fetch)
+  const notify = (next: SnackbarState) => setSnackbar(next);
+
+  const handleAuthError = useCallback(async () => {
+    notify({ open: true, message: "Sessão expirada / sem permissão", severity: "error" });
+    await signOut();
+    navigate("/login", {
+      replace: true,
+      state: { message: "Sua sessão expirou. Faça login novamente." },
+    });
+  }, [navigate, signOut]);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 350);
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // ✅ Resumo com fallback (não depende da busca)
   const derivedSummary = useMemo(() => {
     const arr = Array.isArray(baseRuns) ? baseRuns : [];
     const total = arr.length;
@@ -190,18 +165,15 @@ export const TrpHistoryPage: React.FC = () => {
     if (!summary) return { total, completed, failed };
 
     const sTotal = typeof summary.total === "number" ? summary.total : 0;
-    const sCompleted =
-      typeof summary.completed === "number" ? summary.completed : 0;
+    const sCompleted = typeof summary.completed === "number" ? summary.completed : 0;
     const sFailed = typeof summary.failed === "number" ? summary.failed : 0;
 
-    // se summary veio “vazio” e temos dados carregados, usa fallback
     if ((sTotal === 0 && total > 0) || (sCompleted === 0 && completed > 0)) {
       return { total, completed, failed };
     }
     return { total: sTotal, completed: sCompleted, failed: sFailed };
   }, [baseRuns, summary]);
 
-  // Carregar resumo (sem lastExecution)
   const loadSummary = useCallback(async () => {
     if (didFetchSummary.current) return;
     didFetchSummary.current = true;
@@ -210,9 +182,9 @@ export const TrpHistoryPage: React.FC = () => {
       const data = await fetchTrpRunsSummary();
       if (data && typeof data === "object") {
         setSummary({
-          total: typeof data.total === "number" ? data.total : 0,
-          completed: typeof data.completed === "number" ? data.completed : 0,
-          failed: typeof data.failed === "number" ? data.failed : 0,
+          total: typeof (data as any).total === "number" ? (data as any).total : 0,
+          completed: typeof (data as any).completed === "number" ? (data as any).completed : 0,
+          failed: typeof (data as any).failed === "number" ? (data as any).failed : 0,
         });
       } else {
         setSummary({ total: 0, completed: 0, failed: 0 });
@@ -223,12 +195,9 @@ export const TrpHistoryPage: React.FC = () => {
     }
   }, []);
 
-  // ✅ Carrega dados do backend SEM depender do campo de busca
-  // (isso garante que a busca “mantenha” e “filtre” sempre de forma estável)
   const loadRuns = useCallback(async () => {
     const now = Date.now();
 
-    // Cache 10s para evitar bater no backend sem necessidade
     if (lastFetchAt.current !== null && now - lastFetchAt.current < 10000) {
       setLoading(false);
       return;
@@ -239,44 +208,35 @@ export const TrpHistoryPage: React.FC = () => {
 
     try {
       const params: FetchTrpRunsParams = {
-        limit: 250, // lote maior p/ filtrar bem (nome/contrato/nf/valor)
+        limit: 250,
         cursor: undefined,
         status: statusFilter,
-        // ✅ IMPORTANTÍSSIMO: NÃO mandar "q" aqui.
-        // A busca é 100% local para não “voltar” e nem “perder” resultados.
       };
 
       const result = await fetchTrpRuns(params);
-      const items = Array.isArray(result.items) ? result.items : [];
-
-      setBaseRuns(items);
+      setBaseRuns(Array.isArray(result.items) ? result.items : []);
       lastFetchAt.current = Date.now();
     } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Erro ao carregar histórico de TRPs";
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : "Erro ao carregar histórico de TRPs");
       setBaseRuns([]);
     } finally {
       setLoading(false);
     }
   }, [statusFilter]);
 
-  // Inicial
   useEffect(() => {
-    loadSummary();
-    loadRuns();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadSummary();
+    void loadRuns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Recarrega quando Status muda (busca NÃO recarrega)
   useEffect(() => {
     setPage(1);
     lastFetchAt.current = null;
-    loadRuns();
-  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadRuns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
-  // ✅ Sempre que mudar a busca, volta pra página 1 (mas NÃO recarrega o backend)
   useEffect(() => {
     setPage(1);
   }, [debouncedQuery]);
@@ -284,21 +244,11 @@ export const TrpHistoryPage: React.FC = () => {
   const handleRetry = () => {
     setError(null);
     didFetchSummary.current = false;
-    loadSummary();
+    void loadSummary();
     lastFetchAt.current = null;
-    loadRuns();
+    void loadRuns();
   };
 
-  /**
-   * ✅ Busca local REAL, com os campos pedidos:
-   * - Nome (fileName / fallback)
-   * - Número do contrato
-   * - NF
-   * - Valor (formatado e numérico)
-   * - (bônus) runId
-   *
-   * E mantém o resultado (não refaz fetch, não “some”).
-   */
   const filteredRuns = useMemo(() => {
     const arr = Array.isArray(baseRuns) ? baseRuns : [];
     const q = normalize(debouncedQuery);
@@ -307,11 +257,8 @@ export const TrpHistoryPage: React.FC = () => {
     return arr.filter((run) => {
       const displayName = getDisplayFileName(run);
 
-      const valorFormatado =
-        (run as any)?.valor_efetivo_formatado ?? run.valor_efetivo_formatado;
-      const valorNumero =
-        (run as any)?.valor_efetivo_numero ??
-        (run as any)?.valor_efetivo_numero;
+      const valorFormatado = (run as any)?.valor_efetivo_formatado ?? run.valor_efetivo_formatado;
+      const valorNumero = (run as any)?.valor_efetivo_numero ?? (run as any)?.valor_efetivo_numero;
 
       const hay = normalize(
         [
@@ -331,58 +278,42 @@ export const TrpHistoryPage: React.FC = () => {
     });
   }, [baseRuns, debouncedQuery]);
 
-  // ✅ Atualiza totalCount com base no filtro atual
   useEffect(() => {
     setTotalCount(filteredRuns.length);
   }, [filteredRuns.length]);
 
-  // ✅ Fatiamento paginado
   const pagedRuns = useMemo(() => {
     const start = (page - 1) * perPage;
     return filteredRuns.slice(start, start + perPage);
   }, [filteredRuns, page, perPage]);
 
-  // ✅ runs renderizados = pagedRuns (mantém estrutura do seu código)
   useEffect(() => {
     setRuns(pagedRuns);
   }, [pagedRuns]);
 
   const handleDownload = async (runId: string, format: "pdf" | "docx") => {
     if (!runId) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRP não encontrado",
-        severity: "error",
-      });
+      notify({ open: true, message: "ID do TRP não encontrado", severity: "error" });
       return;
     }
 
     if (!isUuid(runId)) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRP inválido",
-        severity: "error",
-      });
+      notify({ open: true, message: "ID do TRP inválido", severity: "error" });
       return;
     }
 
     const runsArray = Array.isArray(baseRuns) ? baseRuns : [];
-
     const run = runsArray.find((r) => r && r.runId === runId);
+
     if (!run) {
-      setSnackbar({
-        open: true,
-        message: "TRP não encontrado na lista",
-        severity: "error",
-      });
+      notify({ open: true, message: "TRP não encontrado na lista", severity: "error" });
       return;
     }
 
     if (run.status !== "COMPLETED") {
-      setSnackbar({
+      notify({
         open: true,
-        message:
-          "Documento ainda não concluído. Aguarde a finalização do processamento.",
+        message: "Documento ainda não concluído. Aguarde a finalização do processamento.",
         severity: "warning",
       });
       return;
@@ -390,82 +321,45 @@ export const TrpHistoryPage: React.FC = () => {
 
     try {
       setDownloading((prev) => ({ ...prev, [runId]: format }));
-
       await downloadTrpRun(runId, format);
-      setSnackbar({
+      notify({
         open: true,
         message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`,
         severity: "success",
       });
-    } catch (err: any) {
-      const errorMessage = err.message || "Erro ao baixar arquivo";
-      const status = err.status;
+    } catch (err) {
+      const apiErr = getApiError(err);
+      const status = apiErr.status;
+      const errorMessage = apiErr.message || "Erro ao baixar arquivo";
 
       if (status === 401 || status === 403) {
-        setSnackbar({
-          open: true,
-          message: "Sessão expirada / sem permissão",
-          severity: "error",
-        });
-        await signOut();
-        navigate("/login", {
-          replace: true,
-          state: { message: "Sua sessão expirou. Faça login novamente." },
-        });
+        await handleAuthError();
         return;
       }
 
       if (status === 404) {
-        setSnackbar({
-          open: true,
-          message: "Documento não encontrado",
-          severity: "error",
-        });
+        notify({ open: true, message: "Documento não encontrado", severity: "error" });
       } else if (status === 409) {
-        setSnackbar({
-          open: true,
-          message: "Documento ainda não finalizado",
-          severity: "warning",
-        });
+        notify({ open: true, message: "Documento ainda não finalizado", severity: "warning" });
       } else if (status === 429) {
-        setSnackbar({
-          open: true,
-          message: "Aguarde antes de gerar novamente",
-          severity: "warning",
-        });
+        notify({ open: true, message: "Aguarde antes de gerar novamente", severity: "warning" });
       } else {
-        setSnackbar({ open: true, message: errorMessage, severity: "error" });
+        notify({ open: true, message: errorMessage, severity: "error" });
       }
     } finally {
       setDownloading((prev) => ({ ...prev, [runId]: null }));
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
+  const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-      {/* Header */}
       <Box sx={{ mb: 4, textAlign: "center" }}>
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 2,
-            mb: 1,
-            justifyContent: "center",
-          }}
-        >
-          <HistoryIcon
-            sx={{ fontSize: 32, color: theme.palette.primary.main }}
-          />
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 2, mb: 1, justifyContent: "center" }}>
+          <HistoryIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
           <Box sx={{ textAlign: "left" }}>
-            <Typography
-              variant="h4"
-              sx={{ fontWeight: 700, color: theme.palette.text.primary }}
-            >
+            <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
               Histórico de TRPs
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -475,23 +369,19 @@ export const TrpHistoryPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Resumo (sem "Última execução") */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid size={{ xs: 6, sm: 4 }}>
           <Card
             sx={{
-              background: `linear-gradient(135deg, ${alpha(
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(
                 theme.palette.primary.main,
-                0.1
-              )} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+                0.05
+              )} 100%)`,
               border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}
           >
             <CardContent>
-              <Typography
-                variant="h4"
-                sx={{ fontWeight: 700, color: theme.palette.primary.main }}
-              >
+              <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
                 {derivedSummary.total}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -504,18 +394,15 @@ export const TrpHistoryPage: React.FC = () => {
         <Grid size={{ xs: 6, sm: 4 }}>
           <Card
             sx={{
-              background: `linear-gradient(135deg, ${alpha(
+              background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(
                 theme.palette.success.main,
-                0.1
-              )} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
+                0.05
+              )} 100%)`,
               border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
             }}
           >
             <CardContent>
-              <Typography
-                variant="h4"
-                sx={{ fontWeight: 700, color: theme.palette.success.main }}
-              >
+              <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.success.main }}>
                 {derivedSummary.completed}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -528,18 +415,15 @@ export const TrpHistoryPage: React.FC = () => {
         <Grid size={{ xs: 6, sm: 4 }}>
           <Card
             sx={{
-              background: `linear-gradient(135deg, ${alpha(
+              background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.1)} 0%, ${alpha(
                 theme.palette.error.main,
-                0.1
-              )} 0%, ${alpha(theme.palette.error.main, 0.05)} 100%)`,
+                0.05
+              )} 100%)`,
               border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
             }}
           >
             <CardContent>
-              <Typography
-                variant="h4"
-                sx={{ fontWeight: 700, color: theme.palette.error.main }}
-              >
+              <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.error.main }}>
                 {derivedSummary.failed}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -550,15 +434,9 @@ export const TrpHistoryPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Filtros */}
       <Paper
         elevation={0}
-        sx={{
-          p: 3,
-          mb: 3,
-          borderRadius: 3,
-          border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-        }}
+        sx={{ p: 3, mb: 3, borderRadius: 3, border: `1px solid ${alpha(theme.palette.divider, 0.08)}` }}
       >
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
           <TextField
@@ -575,12 +453,7 @@ export const TrpHistoryPage: React.FC = () => {
               ),
               endAdornment: searchQuery ? (
                 <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    aria-label="Limpar busca"
-                    onClick={() => setSearchQuery("")}
-                    edge="end"
-                  >
+                  <IconButton size="small" aria-label="Limpar busca" onClick={() => setSearchQuery("")} edge="end">
                     <ClearIcon fontSize="small" />
                   </IconButton>
                 </InputAdornment>
@@ -593,9 +466,7 @@ export const TrpHistoryPage: React.FC = () => {
             <Select
               value={statusFilter}
               label="Status"
-              onChange={(e) =>
-                setStatusFilter(e.target.value as FetchTrpRunsParams["status"])
-              }
+              onChange={(e) => setStatusFilter(e.target.value as FetchTrpRunsParams["status"])}
             >
               {STATUS_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
@@ -611,9 +482,7 @@ export const TrpHistoryPage: React.FC = () => {
               value={perPage}
               label="Por página"
               onChange={(e) => {
-                const next = Number(
-                  e.target.value
-                ) as (typeof PER_PAGE_OPTIONS)[number];
+                const next = Number(e.target.value) as (typeof PER_PAGE_OPTIONS)[number];
                 setPerPage(next);
                 setPage(1);
               }}
@@ -628,7 +497,6 @@ export const TrpHistoryPage: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* Erro */}
       {error && (
         <Alert
           severity="error"
@@ -643,7 +511,6 @@ export const TrpHistoryPage: React.FC = () => {
         </Alert>
       )}
 
-      {/* Lista */}
       <Paper
         elevation={0}
         sx={{
@@ -654,13 +521,9 @@ export const TrpHistoryPage: React.FC = () => {
       >
         {loading && baseRuns.length === 0 ? (
           <Box sx={{ p: 3 }}>
-            {[...Array(5)].map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <Box key={i} sx={{ mb: 2 }}>
-                <Skeleton
-                  variant="rectangular"
-                  height={80}
-                  sx={{ borderRadius: 2 }}
-                />
+                <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 2 }} />
               </Box>
             ))}
           </Box>
@@ -670,9 +533,7 @@ export const TrpHistoryPage: React.FC = () => {
               Nenhum TRP encontrado
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {debouncedQuery || statusFilter !== "ALL"
-                ? "Tente ajustar os filtros de busca"
-                : "Ainda não há TRPs gerados"}
+              {debouncedQuery || statusFilter !== "ALL" ? "Tente ajustar os filtros de busca" : "Ainda não há TRPs gerados"}
             </Typography>
           </Box>
         ) : (
@@ -686,17 +547,9 @@ export const TrpHistoryPage: React.FC = () => {
                     key={run.runId}
                     sx={{
                       p: 3,
-                      borderBottom: `1px solid ${alpha(
-                        theme.palette.divider,
-                        0.08
-                      )}`,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
                       "&:last-child": { borderBottom: "none" },
-                      "&:hover": {
-                        backgroundColor: alpha(
-                          theme.palette.primary.main,
-                          0.02
-                        ),
-                      },
+                      "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.02) },
                     }}
                   >
                     <Box
@@ -709,16 +562,8 @@ export const TrpHistoryPage: React.FC = () => {
                       }}
                     >
                       <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 2,
-                            alignItems: "center",
-                            mb: 1,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          {getStatusChip(run.status)}
+                        <Box sx={{ display: "flex", gap: 2, alignItems: "center", mb: 1, flexWrap: "wrap" }}>
+                          {renderStatusChip(run.status)}
                           <Typography variant="caption" color="text.secondary">
                             {formatDate(run.createdAt)}
                           </Typography>
@@ -737,70 +582,35 @@ export const TrpHistoryPage: React.FC = () => {
                           {displayFileName}
                         </Typography>
 
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 3,
-                            flexWrap: "wrap",
-                            mt: 1,
-                          }}
-                        >
+                        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mt: 1 }}>
                           <Box>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
+                            <Typography variant="caption" color="text.secondary" display="block">
                               Contrato
                             </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 500 }}
-                            >
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {run.numero_contrato || "Sem número"}
                             </Typography>
                           </Box>
                           <Box>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
+                            <Typography variant="caption" color="text.secondary" display="block">
                               NF
                             </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 500 }}
-                            >
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {run.numero_nf || "Sem NF"}
                             </Typography>
                           </Box>
                           <Box>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
+                            <Typography variant="caption" color="text.secondary" display="block">
                               Valor
                             </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 500 }}
-                            >
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {run.valor_efetivo_formatado || "-"}
                             </Typography>
                           </Box>
                         </Box>
                       </Box>
 
-                      <Box
-                        sx={{
-                          display: "flex",
-                          gap: 1,
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                         {run.status === "COMPLETED" ? (
                           <>
                             <Tooltip
@@ -814,47 +624,22 @@ export const TrpHistoryPage: React.FC = () => {
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  startIcon={
-                                    downloading[run.runId] === "pdf" ? (
-                                      <CircularProgress size={16} />
-                                    ) : (
-                                      <PdfIcon />
-                                    )
-                                  }
-                                  onClick={() =>
-                                    handleDownload(run.runId, "pdf")
-                                  }
+                                  startIcon={downloading[run.runId] === "pdf" ? <CircularProgress size={16} /> : <PdfIcon />}
+                                  onClick={() => void handleDownload(run.runId, "pdf")}
                                   disabled={!!downloading[run.runId]}
                                   sx={{
                                     textTransform: "none",
                                     minWidth: "auto",
                                     color: theme.palette.error.main,
-                                    borderColor: alpha(
-                                      theme.palette.error.main,
-                                      0.5
-                                    ),
-                                    "&:hover": {
-                                      borderColor: theme.palette.error.main,
-                                      bgcolor: alpha(
-                                        theme.palette.error.main,
-                                        0.08
-                                      ),
-                                    },
+                                    borderColor: alpha(theme.palette.error.main, 0.5),
+                                    "&:hover": { borderColor: theme.palette.error.main, bgcolor: alpha(theme.palette.error.main, 0.08) },
                                     "&:disabled": {
-                                      borderColor: alpha(
-                                        theme.palette.error.main,
-                                        0.3
-                                      ),
-                                      color: alpha(
-                                        theme.palette.error.main,
-                                        0.5
-                                      ),
+                                      borderColor: alpha(theme.palette.error.main, 0.3),
+                                      color: alpha(theme.palette.error.main, 0.5),
                                     },
                                   }}
                                 >
-                                  {downloading[run.runId] === "pdf"
-                                    ? "Exportando..."
-                                    : "PDF"}
+                                  {downloading[run.runId] === "pdf" ? "Exportando..." : "PDF"}
                                 </Button>
                               </span>
                             </Tooltip>
@@ -870,47 +655,22 @@ export const TrpHistoryPage: React.FC = () => {
                                 <Button
                                   variant="outlined"
                                   size="small"
-                                  startIcon={
-                                    downloading[run.runId] === "docx" ? (
-                                      <CircularProgress size={16} />
-                                    ) : (
-                                      <WordIcon />
-                                    )
-                                  }
-                                  onClick={() =>
-                                    handleDownload(run.runId, "docx")
-                                  }
+                                  startIcon={downloading[run.runId] === "docx" ? <CircularProgress size={16} /> : <WordIcon />}
+                                  onClick={() => void handleDownload(run.runId, "docx")}
                                   disabled={!!downloading[run.runId]}
                                   sx={{
                                     textTransform: "none",
                                     minWidth: "auto",
                                     color: theme.palette.info.main,
-                                    borderColor: alpha(
-                                      theme.palette.info.main,
-                                      0.5
-                                    ),
-                                    "&:hover": {
-                                      borderColor: theme.palette.info.main,
-                                      bgcolor: alpha(
-                                        theme.palette.info.main,
-                                        0.08
-                                      ),
-                                    },
+                                    borderColor: alpha(theme.palette.info.main, 0.5),
+                                    "&:hover": { borderColor: theme.palette.info.main, bgcolor: alpha(theme.palette.info.main, 0.08) },
                                     "&:disabled": {
-                                      borderColor: alpha(
-                                        theme.palette.info.main,
-                                        0.3
-                                      ),
-                                      color: alpha(
-                                        theme.palette.info.main,
-                                        0.5
-                                      ),
+                                      borderColor: alpha(theme.palette.info.main, 0.3),
+                                      color: alpha(theme.palette.info.main, 0.5),
                                     },
                                   }}
                                 >
-                                  {downloading[run.runId] === "docx"
-                                    ? "Exportando..."
-                                    : "DOCX"}
+                                  {downloading[run.runId] === "docx" ? "Exportando..." : "DOCX"}
                                 </Button>
                               </span>
                             </Tooltip>
@@ -926,10 +686,7 @@ export const TrpHistoryPage: React.FC = () => {
                                   textTransform: "none",
                                   minWidth: "auto",
                                   color: theme.palette.text.disabled,
-                                  borderColor: alpha(
-                                    theme.palette.divider,
-                                    0.2
-                                  ),
+                                  borderColor: alpha(theme.palette.divider, 0.2),
                                   cursor: "not-allowed",
                                 }}
                               >
@@ -942,9 +699,7 @@ export const TrpHistoryPage: React.FC = () => {
                         <Button
                           variant="contained"
                           size="small"
-                          onClick={() =>
-                            navigate(`/agents/trp/resultado/${run.runId}`)
-                          }
+                          onClick={() => navigate(`/agents/trp/resultado/${run.runId}`)}
                           sx={{ textTransform: "none" }}
                         >
                           Abrir
@@ -956,7 +711,6 @@ export const TrpHistoryPage: React.FC = () => {
               })}
             </Box>
 
-            {/* Paginação */}
             <Box
               sx={{
                 p: 2.5,
@@ -971,8 +725,7 @@ export const TrpHistoryPage: React.FC = () => {
               <Typography variant="body2" color="text.secondary">
                 Exibindo{" "}
                 <b>
-                  {Math.min((page - 1) * perPage + 1, totalCount)}-
-                  {Math.min(page * perPage, totalCount)}
+                  {Math.min((page - 1) * perPage + 1, totalCount)}-{Math.min(page * perPage, totalCount)}
                 </b>{" "}
                 de <b>{totalCount}</b>
               </Typography>
@@ -991,7 +744,6 @@ export const TrpHistoryPage: React.FC = () => {
         )}
       </Paper>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -999,12 +751,7 @@ export const TrpHistoryPage: React.FC = () => {
         message={snackbar.message}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         action={
-          <IconButton
-            size="small"
-            aria-label="close"
-            color="inherit"
-            onClick={handleCloseSnackbar}
-          >
+          <IconButton size="small" aria-label="close" color="inherit" onClick={handleCloseSnackbar}>
             <CloseIcon fontSize="small" />
           </IconButton>
         }
