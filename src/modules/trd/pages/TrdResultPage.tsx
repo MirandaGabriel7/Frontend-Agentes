@@ -1,39 +1,36 @@
 // src/modules/trd/pages/TrdResultPage.tsx
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  Tabs,
-  Tab,
-  CircularProgress,
   Alert,
   alpha,
-  useTheme,
-  Stack,
+  Box,
+  Button,
+  CircularProgress,
   Fab,
-  Zoom,
-  Snackbar,
-  Tooltip,
   IconButton,
+  Paper,
+  Snackbar,
+  Stack,
+  Tab,
+  Tabs,
+  Tooltip,
+  Typography,
+  useTheme,
+  Zoom,
 } from "@mui/material";
 import {
-  PictureAsPdf as PdfIcon,
-  KeyboardArrowUp as ArrowUpIcon,
-  Description as WordIcon,
   Close as CloseIcon,
+  Description as WordIcon,
+  KeyboardArrowUp as ArrowUpIcon,
+  PictureAsPdf as PdfIcon,
 } from "@mui/icons-material";
-import { fetchTrdRun, downloadTrdRun, TrdRunData } from "../../../services/api";
+import { downloadTrdRun, fetchTrdRun, TrdRunData } from "../../../services/api";
 import { useAuth } from "../../../contexts/AuthContext";
 import { isUuid } from "../../../utils/uuid";
-
-// ✅ Reutiliza componentes do TRP
-import { TrpSummaryCards } from "../../trp/components/TrpSummaryCards";
 import { TrpMarkdownView } from "../../trp/components/TrpMarkdownView";
 import { TrpStructuredDataPanel } from "../../trp/components/TrpStructuredDataPanel";
-
+import { TrpSummaryCards } from "../../trp/components/TrpSummaryCards";
 import { createTrdViewModel, TrdViewModel } from "../utils/trdViewModel";
 
 interface TabPanelProps {
@@ -42,13 +39,13 @@ interface TabPanelProps {
   value: number;
 }
 
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
-  return (
-    <div role="tabpanel" hidden={value !== index}>
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
-    </div>
-  );
-};
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
+  <div role="tabpanel" hidden={value !== index}>
+    {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+  </div>
+);
+
+const OBJETO_ROW_REGEX = /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim;
 
 function normalizeIdentificacaoObjetoMarkdown(markdown: string): string {
   if (!markdown || typeof markdown !== "string") return markdown;
@@ -56,37 +53,23 @@ function normalizeIdentificacaoObjetoMarkdown(markdown: string): string {
   const sectionRegex =
     /(\n#{2,3}\s*1\.\s*Identificação do Contrato\s*\n)([\s\S]*?)(\n#{2,3}\s*2\.\s*Objeto fornecido\/prestado\s*\n|\n#{2,3}\s*2\.\s*Objeto\s*\n|$)/i;
 
+  const cleanCell = (cell: unknown) =>
+    String(cell)
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/\s*\n\s*/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+  const replaceObjetoRow = (_all: string, p1: string, cell: string, p3: string) => `${p1}${cleanCell(cell)}${p3}`;
+
   const m = markdown.match(sectionRegex);
-  if (!m) {
-    return markdown.replace(
-      /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim,
-      (_all, p1, cell, p3) => {
-        const cleaned = String(cell)
-          .replace(/<br\s*\/?>/gi, " ")
-          .replace(/\s*\n\s*/g, " ")
-          .replace(/\s{2,}/g, " ")
-          .trim();
-        return `${p1}${cleaned}${p3}`;
-      },
-    );
-  }
+  if (!m) return markdown.replace(OBJETO_ROW_REGEX, replaceObjetoRow);
 
   const before = m[1];
   const body = m[2];
   const after = m[3];
 
-  const bodyFixed = body.replace(
-    /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim,
-    (_all, p1, cell, p3) => {
-      const cleaned = String(cell)
-        .replace(/<br\s*\/?>/gi, " ")
-        .replace(/\s*\n\s*/g, " ")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-      return `${p1}${cleaned}${p3}`;
-    },
-  );
-
+  const bodyFixed = body.replace(OBJETO_ROW_REGEX, replaceObjetoRow);
   return markdown.replace(sectionRegex, `${before}${bodyFixed}${after}`);
 }
 
@@ -99,7 +82,6 @@ function stripTrdInfoSection(markdown: string): string {
   return markdown.replace(sectionRegex, "\n");
 }
 
-// ✅ Labels “de verdade” para a UI quando vierem null no JSON
 function labelCondicaoPrazo(v: unknown): string | null {
   const s = typeof v === "string" ? v.trim().toUpperCase() : "";
   if (!s) return null;
@@ -129,14 +111,18 @@ function labelCondicaoQuantidadeOrdem(v: unknown): string | null {
 }
 
 function pickTrdFileName(run: TrdRunData | null, fallbackId?: string | null): string {
-  const s =
-    typeof (run as any)?.fileName === "string"
-      ? String((run as any).fileName).trim()
-      : "";
+  const s = typeof (run as any)?.fileName === "string" ? String((run as any).fileName).trim() : "";
   if (s) return s;
-
   return fallbackId ? `TRD_${fallbackId}` : "TRD_Gerado";
 }
+
+type SnackbarState = { open: boolean; message: string; severity?: "error" | "success" | "warning" };
+type ApiErrorLike = { status?: number; message?: string };
+
+const getApiError = (err: unknown): ApiErrorLike => {
+  if (typeof err === "object" && err !== null) return err as ApiErrorLike;
+  return {};
+};
 
 export const TrdResultPage: React.FC = () => {
   const { id: runId } = useParams<{ id: string }>();
@@ -155,16 +141,20 @@ export const TrdResultPage: React.FC = () => {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
 
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity?: "error" | "success" | "warning";
-  }>({ open: false, message: "" });
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: "" });
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const isDev =
-    import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+  const isDev = import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+  const handleAuthError = useCallback(async () => {
+    setSnackbar({ open: true, message: "Sessão expirada / sem permissão", severity: "error" });
+    await signOut();
+    navigate("/login", {
+      replace: true,
+      state: { message: "Sua sessão expirou. Faça login novamente." },
+    });
+  }, [navigate, signOut]);
 
   const loadData = useCallback(async () => {
     if (!runId) {
@@ -186,8 +176,10 @@ export const TrdResultPage: React.FC = () => {
       const run = await fetchTrdRun(runId);
 
       if (run.runId !== runId) {
-        const errorMsg = `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`;
-        console.error("[TrdResultPage]", errorMsg);
+        console.error(
+          "[TrdResultPage]",
+          `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`
+        );
         setError("Erro ao carregar TRD: inconsistência de dados");
         setLoading(false);
         return;
@@ -210,22 +202,16 @@ export const TrdResultPage: React.FC = () => {
 
         console.debug(
           "[TRD][DEBUG] keys de campos disponíveis:",
-          Object.keys(
-            (run as any).campos_trd_normalizados ??
-              (run as any).campos_trp_normalizados_snapshot ??
-              {},
-          ),
+          Object.keys((run as any).campos_trd_normalizados ?? (run as any).campos_trp_normalizados_snapshot ?? {})
         );
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Erro desconhecido ao carregar TRD";
       console.error("[TrdResultPage] Erro ao carregar TRD:", err);
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar TRD");
     } finally {
       setLoading(false);
     }
-  }, [runId, isDev]);
+  }, [isDev, runId]);
 
   useEffect(() => {
     void loadData();
@@ -241,25 +227,21 @@ export const TrdResultPage: React.FC = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleScrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const handleScrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ✅ Sempre computar campos no topo (SEM hooks condicionais)
   const camposUi = useMemo(() => {
     const base =
-      ((runData as any)?.campos_trd_normalizados && typeof (runData as any)?.campos_trd_normalizados === "object"
-        ? ((runData as any).campos_trd_normalizados as Record<string, unknown>)
-        : null) ??
-      ((runData as any)?.campos_trp_normalizados_snapshot && typeof (runData as any)?.campos_trp_normalizados_snapshot === "object"
-        ? ((runData as any).campos_trp_normalizados_snapshot as Record<string, unknown>)
-        : null) ??
-      ((viewModel as any)?.campos && typeof (viewModel as any)?.campos === "object"
-        ? ((viewModel as any).campos as Record<string, unknown>)
-        : null) ??
-      ({} as Record<string, unknown>);
+      (((runData as any)?.campos_trd_normalizados &&
+        typeof (runData as any)?.campos_trd_normalizados === "object" &&
+        ((runData as any).campos_trd_normalizados as Record<string, unknown>)) ||
+        ((runData as any)?.campos_trp_normalizados_snapshot &&
+          typeof (runData as any)?.campos_trp_normalizados_snapshot === "object" &&
+          ((runData as any).campos_trp_normalizados_snapshot as Record<string, unknown>)) ||
+        ((viewModel as any)?.campos &&
+          typeof (viewModel as any)?.campos === "object" &&
+          ((viewModel as any).campos as Record<string, unknown>)) ||
+        ({} as Record<string, unknown>)) as Record<string, unknown>;
 
-    // ✅ Enriquecimento dos labels da seção 4 (não pode sumir na UI)
     const enriched: Record<string, unknown> = { ...base };
 
     const cp = enriched.condicao_prazo;
@@ -279,18 +261,9 @@ export const TrdResultPage: React.FC = () => {
     return enriched;
   }, [runData, viewModel]);
 
-  // ✅ Sempre computar markdown no topo
   const markdownUi = useMemo(() => {
-    const mdBackend =
-      typeof (runData as any)?.documento_markdown_final === "string"
-        ? String((runData as any).documento_markdown_final)
-        : "";
-
-    const mdVm =
-      typeof (viewModel as any)?.documento_markdown === "string"
-        ? String((viewModel as any).documento_markdown)
-        : "";
-
+    const mdBackend = typeof (runData as any)?.documento_markdown_final === "string" ? String((runData as any).documento_markdown_final) : "";
+    const mdVm = typeof (viewModel as any)?.documento_markdown === "string" ? String((viewModel as any).documento_markdown) : "";
     const raw = mdBackend.trim() ? mdBackend : mdVm;
     return stripTrdInfoSection(normalizeIdentificacaoObjetoMarkdown(raw));
   }, [runData, viewModel]);
@@ -299,20 +272,12 @@ export const TrdResultPage: React.FC = () => {
 
   const handleDownload = async (format: "pdf" | "docx") => {
     if (!runId) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRD não encontrado na URL",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: "ID do TRD não encontrado na URL", severity: "error" });
       return;
     }
 
     if (!isUuid(runId)) {
-      setSnackbar({
-        open: true,
-        message: "ID do TRD inválido",
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: "ID do TRD inválido", severity: "error" });
       return;
     }
 
@@ -344,21 +309,13 @@ export const TrdResultPage: React.FC = () => {
         message: `Exportando documento oficial do TRD em ${format.toUpperCase()}...`,
         severity: "success",
       });
-    } catch (err: any) {
-      const errorMessage = err?.message || "Erro ao baixar arquivo";
-      const status = err?.status;
+    } catch (err) {
+      const apiErr = getApiError(err);
+      const status = apiErr.status;
+      const errorMessage = apiErr.message || "Erro ao baixar arquivo";
 
       if (status === 401 || status === 403) {
-        setSnackbar({
-          open: true,
-          message: "Sessão expirada / sem permissão",
-          severity: "error",
-        });
-        await signOut();
-        navigate("/login", {
-          replace: true,
-          state: { message: "Sua sessão expirou. Faça login novamente." },
-        });
+        await handleAuthError();
         return;
       }
 
@@ -378,12 +335,8 @@ export const TrdResultPage: React.FC = () => {
 
   const handleDownloadPdf = () => handleDownload("pdf");
   const handleDownloadWord = () => handleDownload("docx");
-
   const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
-  // -------------------------
-  // RENDER
-  // -------------------------
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
@@ -464,7 +417,6 @@ export const TrdResultPage: React.FC = () => {
       }}
       ref={contentRef}
     >
-      {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box
           sx={{
@@ -505,10 +457,7 @@ export const TrdResultPage: React.FC = () => {
                 Nome do TRD:
               </Typography>
 
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}
-              >
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}>
                 {data.meta.fileName}
               </Typography>
 
@@ -516,10 +465,7 @@ export const TrdResultPage: React.FC = () => {
                 ID:
               </Typography>
 
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}
-              >
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}>
                 {data.meta.hash_tdr}
               </Typography>
             </Box>
@@ -527,7 +473,6 @@ export const TrdResultPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Informational Banner */}
       <Box sx={{ mb: 4 }}>
         <Paper
           elevation={0}
@@ -554,19 +499,16 @@ export const TrdResultPage: React.FC = () => {
               Revisão do Documento
             </Typography>
             <Typography variant="body2" sx={{ color: theme.palette.text.primary, lineHeight: 1.6 }}>
-              Por favor, revise cuidadosamente todas as informações apresentadas no Termo de Recebimento Definitivo
-              antes de salvar o documento no processo. Verifique se os dados do contrato, fornecedor, nota fiscal e
-              condições de recebimento estão corretos e completos. Após a revisão, você poderá baixar o documento em
-              PDF ou Word e salvá-lo no sistema.
+              Por favor, revise cuidadosamente todas as informações apresentadas no Termo de Recebimento Definitivo antes de salvar o
+              documento no processo. Verifique se os dados do contrato, fornecedor, nota fiscal e condições de recebimento estão corretos
+              e completos. Após a revisão, você poderá baixar o documento em PDF ou Word e salvá-lo no sistema.
             </Typography>
           </Box>
         </Paper>
       </Box>
 
-      {/* Summary Cards */}
       <TrpSummaryCards campos={data.campos} />
 
-      {/* Main Content */}
       <Paper
         elevation={0}
         sx={{
@@ -597,14 +539,8 @@ export const TrdResultPage: React.FC = () => {
                 px: { xs: 2, sm: 3 },
                 color: theme.palette.text.secondary,
                 transition: "all 0.2s ease",
-                "&:hover": {
-                  color: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.04),
-                },
-                "&.Mui-selected": {
-                  color: theme.palette.primary.main,
-                  fontWeight: 700,
-                },
+                "&:hover": { color: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.04) },
+                "&.Mui-selected": { color: theme.palette.primary.main, fontWeight: 700 },
               },
               "& .MuiTabs-indicator": {
                 height: 3,
@@ -613,39 +549,23 @@ export const TrdResultPage: React.FC = () => {
               },
             }}
           >
-            <Tab
-              label="Visualização do Documento"
-              sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
-            />
-            <Tab
-              label="Dados Estruturados"
-              sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
-            />
+            <Tab label="Visualização do Documento" sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }} />
+            <Tab label="Dados Estruturados" sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }} />
           </Tabs>
         </Box>
 
-        {/* Tab 1 */}
         <TabPanel value={activeTab} index={0}>
           <Box sx={{ px: { xs: 3, sm: 4, md: 5 }, pt: { xs: 2, sm: 2.5, md: 0 }, pb: { xs: 3, sm: 4, md: 5 } }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                gap: 1.5,
-                flexWrap: "wrap",
-                mb: 1.25,
-              }}
-            >
+            <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 1.25 }}>
               <Tooltip
                 title={
                   !runId || !isUuid(runId)
                     ? "ID do TRD inválido"
                     : runData?.status !== "COMPLETED"
-                      ? "Aguarde processamento"
-                      : downloadingPdf
-                        ? "Exportando documento oficial do TRD..."
-                        : "Exportar PDF"
+                    ? "Aguarde processamento"
+                    : downloadingPdf
+                    ? "Exportando documento oficial do TRD..."
+                    : "Exportar PDF"
                 }
               >
                 <span>
@@ -662,9 +582,7 @@ export const TrdResultPage: React.FC = () => {
                       py: 1.25,
                       borderRadius: 999,
                       boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.18)}`,
-                      "&:hover": {
-                        boxShadow: `0 10px 24px ${alpha(theme.palette.primary.main, 0.26)}`,
-                      },
+                      "&:hover": { boxShadow: `0 10px 24px ${alpha(theme.palette.primary.main, 0.26)}` },
                     }}
                   >
                     {downloadingPdf ? "Exportando..." : "Baixar PDF"}
@@ -677,10 +595,10 @@ export const TrdResultPage: React.FC = () => {
                   !runId || !isUuid(runId)
                     ? "ID do TRD inválido"
                     : runData?.status !== "COMPLETED"
-                      ? "Aguarde processamento"
-                      : downloadingDocx
-                        ? "Exportando documento oficial do TRD..."
-                        : "Exportar DOCX"
+                    ? "Aguarde processamento"
+                    : downloadingDocx
+                    ? "Exportando documento oficial do TRD..."
+                    : "Exportar DOCX"
                 }
               >
                 <span>
@@ -698,14 +616,8 @@ export const TrdResultPage: React.FC = () => {
                       borderRadius: 999,
                       borderWidth: 2,
                       borderColor: alpha(theme.palette.primary.main, 0.35),
-                      "&:hover": {
-                        bgcolor: alpha(theme.palette.primary.main, 0.06),
-                        borderColor: theme.palette.primary.main,
-                      },
-                      "&:disabled": {
-                        borderColor: alpha(theme.palette.divider, 0.12),
-                        color: alpha(theme.palette.text.primary, 0.45),
-                      },
+                      "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: theme.palette.primary.main },
+                      "&:disabled": { borderColor: alpha(theme.palette.divider, 0.12), color: alpha(theme.palette.text.primary, 0.45) },
                     }}
                   >
                     {downloadingDocx ? "Exportando..." : "Baixar Word"}
@@ -718,7 +630,6 @@ export const TrdResultPage: React.FC = () => {
           </Box>
         </TabPanel>
 
-        {/* Tab 2 */}
         <TabPanel value={activeTab} index={1}>
           <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
             <TrpStructuredDataPanel campos={data.campos} />
@@ -726,7 +637,6 @@ export const TrdResultPage: React.FC = () => {
         </TabPanel>
       </Paper>
 
-      {/* Scroll Top */}
       <Zoom in={showScrollTop}>
         <Fab
           color="primary"
@@ -738,9 +648,7 @@ export const TrdResultPage: React.FC = () => {
             right: 32,
             zIndex: 1000,
             boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-            "&:hover": {
-              boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
-            },
+            "&:hover": { boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}` },
           }}
           aria-label="Voltar ao topo"
         >
@@ -748,7 +656,6 @@ export const TrdResultPage: React.FC = () => {
         </Fab>
       </Zoom>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
