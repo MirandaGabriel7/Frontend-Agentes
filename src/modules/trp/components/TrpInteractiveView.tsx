@@ -1,26 +1,81 @@
 // src/modules/trp/components/TrpInteractiveView.tsx
 //
-// Custom markdown renderer that parses {{campo:X}} tokens inside text nodes
-// and replaces them with <EditableInlineField> components.
-// Everything else renders as normal, professional markdown.
+// Renderiza o markdown com tokens {{campo:X}} de forma IDENTICA ao TrpMarkdownView,
+// substituindo cada token por um EditableInlineField.
+// Não tem Paper próprio, não tem fonte própria — herda 100% do estilo existente.
 
-import React, { useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Box, Typography } from '@mui/material';
-import { EditableInlineField } from './EditableInlineField';
-import { resolveFieldDef } from '../config/trpFieldMap';
-import { getValueByPath } from '../utils/trpTemplate';
+import React, { useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import { Box, alpha, useTheme } from "@mui/material";
+import { EditableInlineField } from "./EditableInlineField";
+import { resolveFieldDef } from "../config/trpFieldMap";
+import { getValueByPath } from "../utils/trpTemplate";
+import { normalizeTrpValue } from "../utils/formatTrpValues";
 
 interface TrpInteractiveViewProps {
-  /** Markdown string containing {{campo:fieldId}} tokens */
   markdownWithTokens: string;
-  /** Current draft campos — used to read values for each token */
   campos: Record<string, any>;
-  /** When true, fields are clickable and editable */
   editMode: boolean;
-  /** Called when a field edit is committed */
   onCommit: (fieldId: string, value: any) => void;
+}
+
+// ─── Helpers copiados do TrpMarkdownView ─────────────────────────────────────
+
+const HIDDEN_STRINGS = new Set([
+  "NAO_DECLARADO", "NÃO_DECLARADO", "NAO INFORMADO", "NÃO INFORMADO",
+  "NAO_INFORMADO", "NÃO_INFORMADO", "Não informado", "Nao informado",
+]);
+
+function extractText(node: any): string {
+  if (node === null || node === undefined) return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join(" ");
+  if (React.isValidElement(node)) return extractText((node as any).props?.children);
+  return "";
+}
+
+function isMeaningfulText(s: string): boolean {
+  const t = (s ?? "").trim();
+  if (!t) return false;
+  if (HIDDEN_STRINGS.has(t)) return false;
+  if (HIDDEN_STRINGS.has(t.toUpperCase())) return false;
+  return true;
+}
+
+function rowHasValue(cellsNormalizedText: string[]): boolean {
+  if (!cellsNormalizedText.length) return false;
+  const candidates = cellsNormalizedText.length >= 2
+    ? cellsNormalizedText.slice(1)
+    : cellsNormalizedText;
+  return candidates.some((txt) => isMeaningfulText(txt));
+}
+
+function fixBrokenTotalRowTables(md: string): string {
+  if (!md || typeof md !== "string") return "";
+  const lines = md.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i];
+    const next = lines[i + 1];
+    const curIsBlank = cur.trim() === "";
+    const nextIsTotalRow =
+      typeof next === "string" && /^\|\s*\*?\*?\s*Total\s+Geral/i.test(next.trim());
+    if (curIsBlank && nextIsTotalRow) continue;
+    if (/^\|\s*\*?\*?\s*Total\s+Geral/i.test(cur.trim())) {
+      const raw = cur.trim();
+      const parts = raw.replace(/^\|/, "").replace(/\|$/, "").split("|").map((p) => p.trim());
+      if (parts.length >= 2) {
+        const label = parts[0] || "Total Geral";
+        const last = parts[parts.length - 1] || "";
+        out.push(`| ${[label, "", "", "", last].join(" | ")} |`);
+        continue;
+      }
+    }
+    out.push(cur);
+  }
+  return out.join("\n");
 }
 
 // ─── Token parsing ────────────────────────────────────────────────────────────
@@ -28,19 +83,19 @@ interface TrpInteractiveViewProps {
 const TOKEN_SPLIT = /(\{\{campo:[^}]+\}\})/;
 const TOKEN_EXTRACT = /\{\{campo:([^}]+)\}\}/;
 
-type TextSegment = { kind: 'text'; value: string };
-type TokenSegment = { kind: 'token'; fieldId: string };
-type Segment = TextSegment | TokenSegment;
+type Segment =
+  | { kind: "text"; value: string }
+  | { kind: "token"; fieldId: string };
 
 function splitTokens(text: string): Segment[] {
   return text.split(TOKEN_SPLIT).map((part) => {
     const match = part.match(TOKEN_EXTRACT);
-    if (match) return { kind: 'token', fieldId: match[1] };
-    return { kind: 'text', value: part };
+    if (match) return { kind: "token", fieldId: match[1] };
+    return { kind: "text", value: part };
   });
 }
 
-// ─── Rich text renderer ───────────────────────────────────────────────────────
+// ─── RichText: processa uma string com tokens ─────────────────────────────────
 
 interface RichTextProps {
   children: string;
@@ -49,215 +104,62 @@ interface RichTextProps {
   onCommit: (fieldId: string, value: any) => void;
 }
 
-const RichText: React.FC<RichTextProps> = React.memo(({ children, campos, editMode, onCommit }) => {
-  const segments = useMemo(() => splitTokens(children), [children]);
+const RichText: React.FC<RichTextProps> = React.memo(
+  ({ children, campos, editMode, onCommit }) => {
+    const segments = useMemo(() => splitTokens(children), [children]);
 
-  return (
-    <>
-      {segments.map((seg, i) => {
-        if (seg.kind === 'text') {
-          return <React.Fragment key={i}>{seg.value}</React.Fragment>;
-        }
-        const { fieldId } = seg;
-        const fieldDef = resolveFieldDef(fieldId);
-        if (!fieldDef) {
-          // Unknown token — render raw as fallback (never exposes to end user in prod)
-          return <React.Fragment key={i}>{fieldId}</React.Fragment>;
-        }
-        const rawValue = getValueByPath(campos, fieldDef.path);
-        return (
-          <EditableInlineField
-            key={fieldId}
-            fieldDef={fieldDef}
-            rawValue={rawValue}
-            editMode={editMode}
-            onCommit={onCommit}
-          />
-        );
-      })}
-    </>
-  );
-});
-RichText.displayName = 'RichText';
+    return (
+      <>
+        {segments.map((seg, i) => {
+          if (seg.kind === "text") {
+            return <React.Fragment key={i}>{seg.value}</React.Fragment>;
+          }
+          const { fieldId } = seg;
+          const fieldDef = resolveFieldDef(fieldId);
+          if (!fieldDef) {
+            // token desconhecido — mostra valor resolvido (nunca mostra o token cru)
+            const raw = getValueByPath(campos, fieldId);
+            return (
+              <React.Fragment key={i}>
+                {raw !== undefined && raw !== null ? String(raw) : "—"}
+              </React.Fragment>
+            );
+          }
+          const rawValue = getValueByPath(campos, fieldDef.path);
+          return (
+            <EditableInlineField
+              key={fieldId}
+              fieldDef={fieldDef}
+              rawValue={rawValue}
+              editMode={editMode}
+              onCommit={onCommit}
+            />
+          );
+        })}
+      </>
+    );
+  },
+);
+RichText.displayName = "RichText";
 
-// ─── Child processing helper ──────────────────────────────────────────────────
+// ─── Processa children do ReactMarkdown ──────────────────────────────────────
 
-/**
- * ReactMarkdown passes children as ReactNode. We intercept raw strings
- * and run them through RichText for token detection. Non-string children pass through.
- */
 function processChildren(
   children: React.ReactNode,
-  richText: (s: string, key?: number) => React.ReactNode
+  richText: (s: string) => React.ReactNode,
 ): React.ReactNode {
-  if (typeof children === 'string') return richText(children);
+  if (typeof children === "string") return richText(children);
   if (Array.isArray(children)) {
     return children.map((child, i) =>
-      typeof child === 'string'
-        ? <React.Fragment key={i}>{richText(child, i)}</React.Fragment>
-        : child
+      typeof child === "string"
+        ? <React.Fragment key={i}>{richText(child)}</React.Fragment>
+        : child,
     );
   }
   return children;
 }
 
-// ─── Custom component factories ───────────────────────────────────────────────
-
-function makeComponents(
-  campos: Record<string, any>,
-  editMode: boolean,
-  onCommit: (fieldId: string, value: any) => void
-) {
-  const richText = (text: string) => (
-    <RichText campos={campos} editMode={editMode} onCommit={onCommit}>
-      {text}
-    </RichText>
-  );
-
-  return {
-    h1: ({ children }: any) => (
-      <Typography
-        variant="h4"
-        component="h1"
-        fontWeight={700}
-        sx={{ mt: 0, mb: 2.5, color: 'text.primary', borderBottom: '2px solid', borderColor: 'primary.main', pb: 1 }}
-      >
-        {processChildren(children, richText)}
-      </Typography>
-    ),
-
-    h2: ({ children }: any) => (
-      <Typography
-        variant="h6"
-        component="h2"
-        fontWeight={600}
-        sx={{ mt: 3, mb: 1.25, color: 'primary.dark', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.8rem' }}
-      >
-        {processChildren(children, richText)}
-      </Typography>
-    ),
-
-    p: ({ children }: any) => (
-      <Typography component="p" variant="body1" sx={{ my: 0.75, lineHeight: 1.7 }}>
-        {processChildren(children, richText)}
-      </Typography>
-    ),
-
-    strong: ({ children }: any) => (
-      <Box component="strong" sx={{ fontWeight: 700 }}>
-        {processChildren(children, richText)}
-      </Box>
-    ),
-
-    em: ({ children }: any) => (
-      <Box component="em">{processChildren(children, richText)}</Box>
-    ),
-
-    table: ({ children }: any) => (
-      <Box
-        component="table"
-        sx={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          my: 1.5,
-          fontSize: '0.9rem',
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 1,
-          overflow: 'hidden',
-        }}
-      >
-        {children}
-      </Box>
-    ),
-
-    thead: ({ children }: any) => (
-      <Box component="thead" sx={{ bgcolor: 'grey.50' }}>
-        {children}
-      </Box>
-    ),
-
-    tbody: ({ children }: any) => (
-      <Box component="tbody">{children}</Box>
-    ),
-
-    tr: ({ children }: any) => (
-      <Box
-        component="tr"
-        sx={{
-          '&:nth-of-type(even)': { bgcolor: 'grey.50' },
-          '&:hover': { bgcolor: editMode ? 'primary.50' : undefined },
-          transition: 'background 0.1s',
-        }}
-      >
-        {children}
-      </Box>
-    ),
-
-    th: ({ children }: any) => (
-      <Box
-        component="th"
-        sx={{
-          px: 2,
-          py: 1,
-          fontWeight: 600,
-          textAlign: 'left',
-          borderBottom: '2px solid',
-          borderColor: 'divider',
-          color: 'text.secondary',
-          fontSize: '0.8rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {processChildren(children, richText)}
-      </Box>
-    ),
-
-    td: ({ children }: any) => (
-      <Box
-        component="td"
-        sx={{
-          px: 2,
-          py: 0.875,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          verticalAlign: 'middle',
-        }}
-      >
-        {processChildren(children, richText)}
-      </Box>
-    ),
-
-    ul: ({ children }: any) => (
-      <Box component="ul" sx={{ pl: 3, my: 0.75 }}>
-        {children}
-      </Box>
-    ),
-
-    li: ({ children }: any) => (
-      <Box component="li" sx={{ mb: 0.25 }}>
-        {processChildren(children, richText)}
-      </Box>
-    ),
-
-    hr: () => (
-      <Box component="hr" sx={{ my: 2, border: 'none', borderTop: '1px solid', borderColor: 'divider' }} />
-    ),
-
-    blockquote: ({ children }: any) => (
-      <Box
-        component="blockquote"
-        sx={{ borderLeft: '4px solid', borderColor: 'primary.light', pl: 2, my: 1, color: 'text.secondary' }}
-      >
-        {children}
-      </Box>
-    ),
-  };
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export const TrpInteractiveView: React.FC<TrpInteractiveViewProps> = ({
   markdownWithTokens,
@@ -265,56 +167,233 @@ export const TrpInteractiveView: React.FC<TrpInteractiveViewProps> = ({
   editMode,
   onCommit,
 }) => {
-  // Only rebuild renderers when editMode or campos identity changes (not on every char)
-  const components = useMemo(
-    () => makeComponents(campos, editMode, onCommit),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [campos, editMode, onCommit]
+  const theme = useTheme();
+
+  // Aplica as mesmas sanitizações do TrpMarkdownView
+  const sanitizedContent = useMemo(() => {
+    const base = (markdownWithTokens || "")
+      .replace(/\bNAO_DECLARADO\b/gi, "")
+      .replace(/\bNÃO_DECLARADO\b/gi, "")
+      .replace(/\bNAO_INFORMADO\b/gi, "")
+      .replace(/\bNÃO_INFORMADO\b/gi, "")
+      .replace(/\bDATA_RECEBIMENTO\b/gi, "Data de Recebimento")
+      .replace(/\bSERVICO\b/gi, "Conclusão do Serviço")
+      .replace(/\bFORA_DO_PRAZO\b/gi, "Fora do prazo")
+      .replace(/\bNO_PRAZO\b/gi, "No prazo")
+      .replace(/\bTOTAL\b/gi, "Total")
+      .replace(/\bPARCIAL\b/gi, "Parcial")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return fixBrokenTotalRowTables(base);
+  }, [markdownWithTokens]);
+
+  const richText = useMemo(
+    () => (text: string) => (
+      <RichText campos={campos} editMode={editMode} onCommit={onCommit}>
+        {text}
+      </RichText>
+    ),
+    [campos, editMode, onCommit],
   );
 
+  // Componentes custom — IDÊNTICOS ao TrpMarkdownView, só com richText injetado
+  const components = useMemo(
+    () => ({
+      // Processa texto em parágrafos, strong, em, li, etc.
+      p: ({ children }: any) => (
+        <p>{processChildren(children, richText)}</p>
+      ),
+      strong: ({ children }: any) => (
+        <strong>{processChildren(children, richText)}</strong>
+      ),
+      em: ({ children }: any) => (
+        <em>{processChildren(children, richText)}</em>
+      ),
+      li: ({ children }: any) => (
+        <li>{processChildren(children, richText)}</li>
+      ),
+      h1: ({ children }: any) => (
+        <h1>{processChildren(children, richText)}</h1>
+      ),
+      h2: ({ children }: any) => (
+        <h2>{processChildren(children, richText)}</h2>
+      ),
+      h3: ({ children }: any) => (
+        <h3>{processChildren(children, richText)}</h3>
+      ),
+
+      // td e th: idênticos ao TrpMarkdownView + richText
+      td: ({ children }: any) => (
+        <td>{processChildren(children, richText)}</td>
+      ),
+      th: ({ children }: any) => (
+        <th>{processChildren(children, richText)}</th>
+      ),
+
+      // tr: lógica COPIADA do TrpMarkdownView (filtro de linhas vazias + Total Geral)
+      tr: ({ node, children, ...props }: any) => {
+        const parentTag = (node as any)?.parent?.tagName;
+        const isHeaderRow = parentTag === "thead";
+        if (isHeaderRow) return <tr {...props}>{children}</tr>;
+
+        const cells = React.Children.toArray(children);
+        if (!cells.length) return <tr {...props}>{children}</tr>;
+
+        const cellsText = cells.map((cell: any) => extractText(cell));
+        const cellsTextNormalized = cellsText.map((txt) =>
+          txt ? normalizeTrpValue(txt, undefined) : "",
+        );
+
+        const firstCell = (cellsTextNormalized[0] || "").trim().toLowerCase();
+        const isTotalRow = firstCell.includes("total geral");
+
+        if (isTotalRow) {
+          const lastValue = (
+            cellsTextNormalized[cellsTextNormalized.length - 1] || ""
+          ).trim();
+
+          const borderTop = `1px solid ${alpha(theme.palette.divider, 0.2)}`;
+          const rowBg = alpha(theme.palette.grey[500], 0.04);
+
+          return (
+            <tr {...props}>
+              <td
+                colSpan={4}
+                style={{
+                  fontWeight: 800,
+                  textAlign: "right",
+                  paddingRight: "10px",
+                  borderLeft: "none",
+                  borderRight: "none",
+                  borderTop,
+                  padding: "10px 12px",
+                  background: rowBg,
+                }}
+              >
+                Total Geral
+              </td>
+              <td
+                style={{
+                  fontWeight: 800,
+                  textAlign: "right",
+                  whiteSpace: "nowrap",
+                  borderLeft: "none",
+                  borderRight: "none",
+                  borderTop,
+                  padding: "10px 12px",
+                  background: rowBg,
+                }}
+              >
+                {lastValue}
+              </td>
+            </tr>
+          );
+        }
+
+        const keep = rowHasValue(cellsTextNormalized);
+        if (!keep) return null;
+
+        return <tr {...props}>{children}</tr>;
+      },
+    }),
+    [richText, theme],
+  );
+
+  // ── Render: Paper e Box IDÊNTICOS ao TrpMarkdownView ─────────────────────
+
   return (
+    // Sem Paper próprio — o TrpResultPage já envolve com o Paper correto.
+    // Só replica o Box de estilos do TrpMarkdownView.
     <Box
       sx={{
-        fontFamily: '"Georgia", "Times New Roman", serif',
-        lineHeight: 1.75,
-        color: 'text.primary',
-        maxWidth: 860,
-        mx: 'auto',
-        p: { xs: 2, sm: 4 },
-        bgcolor: 'background.paper',
-        borderRadius: 2,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-        position: 'relative',
+        "& p": {
+          marginBottom: 2,
+          lineHeight: 1.8,
+          color: theme.palette.text.primary,
+        },
+        "& h1": {
+          marginTop: 0,
+          marginBottom: 3,
+          fontWeight: 700,
+          color: theme.palette.text.primary,
+          fontSize: "1.75rem",
+          paddingBottom: 2,
+          borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+        },
+        "& h2": {
+          marginTop: 0,
+          marginBottom: 2.5,
+          fontWeight: 600,
+          color: theme.palette.text.primary,
+          fontSize: "1.5rem",
+          paddingBottom: 1.5,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+        },
+        "& h3, & h4, & h5, & h6": {
+          marginTop: 2,
+          marginBottom: 1.5,
+          fontWeight: 600,
+          color: theme.palette.text.primary,
+        },
+        "& ul, & ol": { marginBottom: 2, paddingLeft: 3 },
+        "& li": { marginBottom: 0.5, lineHeight: 1.8 },
+        "& table": {
+          width: "100%",
+          borderCollapse: "collapse",
+          marginTop: 2,
+          marginBottom: 2,
+          borderRadius: 2,
+          overflow: "hidden",
+          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+          boxShadow: `0 1px 3px ${alpha("#000", 0.08)}`,
+          "& th, & td": {
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            padding: 1.5,
+            textAlign: "left",
+            fontSize: "0.9375rem",
+            verticalAlign: "top",
+          },
+          "& th": {
+            backgroundColor: alpha(theme.palette.grey[500], 0.08),
+            fontWeight: 600,
+            color: theme.palette.text.primary,
+            fontSize: "0.875rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.02em",
+          },
+          "& td": { color: theme.palette.text.primary },
+          "& tr:nth-of-type(even) td": {
+            backgroundColor: alpha(theme.palette.primary.main, 0.02),
+          },
+          // Hover diferenciado em modo edição
+          "& tr:hover td": {
+            backgroundColor: editMode
+              ? alpha(theme.palette.primary.main, 0.06)
+              : alpha(theme.palette.primary.main, 0.04),
+          },
+        },
+        "& code": {
+          backgroundColor: alpha(theme.palette.text.primary, 0.06),
+          padding: "2px 6px",
+          borderRadius: 1,
+          fontSize: "0.875em",
+        },
+        "& pre": {
+          backgroundColor: alpha(theme.palette.text.primary, 0.04),
+          padding: 2,
+          borderRadius: 2,
+          overflow: "auto",
+          "& code": { backgroundColor: "transparent", padding: 0 },
+        },
       }}
     >
-      {editMode && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            px: 1.25,
-            py: 0.4,
-            bgcolor: 'warning.light',
-            color: 'warning.dark',
-            borderRadius: 1,
-            fontSize: '0.7rem',
-            fontFamily: 'sans-serif',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            userSelect: 'none',
-          }}
-        >
-          Modo edição
-        </Box>
-      )}
-
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
         components={components as any}
       >
-        {markdownWithTokens}
+        {sanitizedContent}
       </ReactMarkdown>
     </Box>
   );

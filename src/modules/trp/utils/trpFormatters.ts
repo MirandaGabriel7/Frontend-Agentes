@@ -43,12 +43,50 @@ export function parsePtBRDate(str: string): string {
   return str;
 }
 
+// ─── Humanização de enums (espelha trpEnums.ts do backend) ──────────────────
+const ENUM_DISPLAY: Record<string, string> = {
+  // tipo_contrato
+  BENS: 'Bens',
+  SERVICOS: 'Serviços',
+  OBRAS: 'Obras',
+  SERVICOS_ENGENHARIA: 'Serviços de Engenharia',
+
+  // tipo_base_prazo
+  DATA_RECEBIMENTO: 'Data de recebimento',
+  INICIO_SERVICO: 'Início do serviço',
+  SERVICO: 'Conclusão do serviço',
+  ENTREGA_REAL: 'Data de entrega real',
+
+  // condicao_prazo
+  NO_PRAZO: 'No prazo',
+  FORA_DO_PRAZO: 'Fora do prazo',
+  ATRASADO: 'Fora do prazo',
+
+  // condicao_quantidade_ordem
+  TOTAL: 'Total (conforme a ordem)',
+  PARCIAL: 'Parcial',
+  MAIOR: 'Maior que a ordem',
+  CONFORME_EMPENHO: 'Total (conforme a ordem)',
+};
+
+function humanizeEnumValue(value: string): string {
+  const upper = value.trim().toUpperCase();
+  return ENUM_DISPLAY[upper] ?? value;
+}
+
 /** Display value for any field type (always returns a printable string) */
 export function displayValue(value: any, type: FieldType): string {
   if (value === undefined || value === null || value === '') return '—';
   if (type === 'number') return formatPtBRNumber(value);
   if (type === 'date') return formatPtBRDate(String(value));
-  return String(value);
+
+  const str = String(value);
+  // Se o valor parece um enum técnico (UPPER_SNAKE_CASE), humaniza
+  if (/^[A-Z][A-Z0-9_]+$/.test(str.trim())) {
+    return humanizeEnumValue(str);
+  }
+
+  return str;
 }
 
 /** Escape a string so it's safe to embed in markdown without breaking structure */
