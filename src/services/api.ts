@@ -135,9 +135,7 @@ function unwrapListItems<T>(
 function extractFilenameFromDisposition(header?: string | null): string | null {
   if (!header) return null;
 
-  const filenameMatch = header.match(
-    /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i,
-  );
+  const filenameMatch = header.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
   if (!filenameMatch) return null;
 
   let filename = filenameMatch[1];
@@ -408,9 +406,18 @@ export async function generateTrp(
     );
   }
 
-  requireNonNegativeFinite(dr.prazoProvisorioDiasUteis, "prazoProvisorioDiasUteis");
-  requireNonNegativeFinite(dr.prazoDefinitivoDiasUteis, "prazoDefinitivoDiasUteis");
-  requireNonNegativeFinite(dr.prazoLiquidacaoDiasCorridos, "prazoLiquidacaoDiasCorridos");
+  requireNonNegativeFinite(
+    dr.prazoProvisorioDiasUteis,
+    "prazoProvisorioDiasUteis",
+  );
+  requireNonNegativeFinite(
+    dr.prazoDefinitivoDiasUteis,
+    "prazoDefinitivoDiasUteis",
+  );
+  requireNonNegativeFinite(
+    dr.prazoLiquidacaoDiasCorridos,
+    "prazoLiquidacaoDiasCorridos",
+  );
 
   const vTipo = dr.vencimentoTipo;
 
@@ -419,7 +426,10 @@ export async function generateTrp(
   }
 
   if (vTipo === "DIAS_CORRIDOS") {
-    requireNonNegativeFinite(dr.vencimentoDiasCorridos, "vencimentoDiasCorridos");
+    requireNonNegativeFinite(
+      dr.vencimentoDiasCorridos,
+      "vencimentoDiasCorridos",
+    );
   }
 
   if (vTipo === "DIA_FIXO") {
@@ -524,9 +534,7 @@ export async function fetchTrpRunsSummary(): Promise<TrpRunsSummary> {
     await api.get<TrpRunsSummaryApiResponse>("/trp/runs/summary");
 
   if (response.data.success !== true) {
-    throw new Error(
-      response.data.message || "Falha ao buscar resumo de TRPs",
-    );
+    throw new Error(response.data.message || "Falha ao buscar resumo de TRPs");
   }
 
   return response.data.data || { total: 0, completed: 0, failed: 0 };
@@ -540,12 +548,121 @@ export async function downloadTrpRun(
     throw new Error("runId deve ser um UUID válido");
   }
 
-  await downloadRunBlob(
-    `/trp/runs/${runId}/download`,
-    runId,
-    format,
-    "TRP",
+  await downloadRunBlob(`/trp/runs/${runId}/download`, runId, format, "TRP");
+}
+
+// ---------------------------------------------------------------------------
+// TRP Versioning (NEW)
+// ---------------------------------------------------------------------------
+
+export interface TrpRunVersionListItem {
+  run_id: string;
+  version_number: number;
+  is_current: boolean;
+  created_at: string;
+  created_by?: string | null;
+
+  status?: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  file_name?: string | null;
+
+  // opcional, se o backend devolver
+  family_id?: string | null;
+}
+
+export interface TrpListRunVersionsApiResponse {
+  success: boolean;
+  data?:
+    | TrpRunVersionListItem[]
+    | { items: TrpRunVersionListItem[]; nextCursor?: string };
+  nextCursor?: string;
+  message?: string;
+}
+
+export interface CreateTrpRunVersionPayload {
+  // ✅ use o que a UI tem hoje:
+  campos_trp_normalizados: Record<string, unknown>;
+
+  // ✅ o markdown que você quer “fixar” como final nessa versão
+  documento_markdown_final: string;
+
+  // opcional: se você quiser guardar o prime também
+  documento_markdown_prime?: string | null;
+
+  // opcional: nome curto p/ aparecer no histórico
+  file_name?: string | null;
+}
+
+export interface CreateTrpRunVersionResponse {
+  run_id: string;
+  version_number: number;
+  is_current: boolean;
+  created_at: string;
+
+  // alguns backends devolvem isso também
+  status?: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+}
+
+export interface CreateTrpRunVersionApiResponse {
+  success: boolean;
+  data?: CreateTrpRunVersionResponse;
+  message?: string;
+}
+
+export async function listTrpRunVersions(
+  runId: string,
+  limit: number = 50,
+): Promise<TrpRunVersionListItem[]> {
+  if (!isUuid(runId)) {
+    throw new Error("runId deve ser um UUID válido");
+  }
+
+  const response = await api.get<TrpListRunVersionsApiResponse>(
+    `/trp/runs/${runId}/versions?limit=${encodeURIComponent(String(limit))}`,
   );
+
+  return unwrapListItems(response.data, "Falha ao listar versões do TRP").items;
+}
+
+export async function createTrpRunVersion(
+  runId: string,
+  payload: CreateTrpRunVersionPayload,
+): Promise<CreateTrpRunVersionResponse> {
+  if (!isUuid(runId)) {
+    throw new Error("runId deve ser um UUID válido");
+  }
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error("payload é obrigatório");
+  }
+
+  const md =
+    typeof payload.documento_markdown_final === "string"
+      ? payload.documento_markdown_final.trim()
+      : "";
+  if (!md) {
+    throw new Error("documento_markdown_final é obrigatório");
+  }
+
+  if (
+    !payload.campos_trp_normalizados ||
+    typeof payload.campos_trp_normalizados !== "object"
+  ) {
+    throw new Error("campos_trp_normalizados é obrigatório");
+  }
+
+  const safeFileName = sanitizeFileName(payload.file_name);
+
+  const response = await api.post<CreateTrpRunVersionApiResponse>(
+    `/trp/runs/${runId}/version`,
+    {
+      campos_trp_normalizados: payload.campos_trp_normalizados,
+      documento_markdown_final: md,
+      documento_markdown_prime: payload.documento_markdown_prime ?? null,
+      file_name: safeFileName,
+    },
+  );
+
+  return unwrapResponse(response.data, "Falha ao criar nova versão do TRP.");
 }
 
 // ---------------------------------------------------------------------------
@@ -746,9 +863,7 @@ export async function fetchTrdRunsSummary(): Promise<TrdRunsSummary> {
     await api.get<TrdRunsSummaryApiResponse>("/trd/runs/summary");
 
   if (response.data.success !== true) {
-    throw new Error(
-      response.data.message || "Falha ao buscar resumo de TRDs",
-    );
+    throw new Error(response.data.message || "Falha ao buscar resumo de TRDs");
   }
 
   return (
@@ -770,10 +885,5 @@ export async function downloadTrdRun(
     throw new Error("format deve ser pdf ou docx");
   }
 
-  await downloadRunBlob(
-    `/trd/runs/${runId}/download`,
-    runId,
-    format,
-    "TRD",
-  );
+  await downloadRunBlob(`/trd/runs/${runId}/download`, runId, format, "TRD");
 }

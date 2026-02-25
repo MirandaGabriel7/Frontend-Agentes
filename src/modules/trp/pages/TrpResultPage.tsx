@@ -1,11 +1,13 @@
 // src/modules/trp/pages/TrpResultPage.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Alert,
   alpha,
   Box,
   Button,
+  ButtonGroup,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -17,6 +19,8 @@ import {
   FormControlLabel,
   FormLabel,
   IconButton,
+  Menu,
+  MenuItem,
   Paper,
   Radio,
   RadioGroup,
@@ -32,19 +36,115 @@ import {
 } from "@mui/material";
 import {
   Description as WordIcon,
+  EditNote as EditNoteIcon,
   Gavel as TrdIcon,
+  History as HistoryIcon,
+  KeyboardArrowDown as ArrowDownIcon,
   KeyboardArrowUp as ArrowUpIcon,
   Close as CloseIcon,
   PictureAsPdf as PdfIcon,
+  Save as SaveIcon,
+  Undo as UndoIcon,
 } from "@mui/icons-material";
 import { TrpAgentOutput } from "../../../lib/types/trp";
-import { downloadTrpRun, fetchTrpRun, generateTrd, TrpRunData } from "../../../services/api";
+import {
+  createTrpRunVersion,
+  downloadTrpRun,
+  fetchTrpRun,
+  generateTrd,
+  listTrpRunVersions,
+  TrpRunData,
+} from "../../../services/api";
 import { useAuth } from "../../../contexts/AuthContext";
 import { isUuid } from "../../../utils/uuid";
 import { TrpSummaryCards } from "../components/TrpSummaryCards";
 import { TrpMarkdownView } from "../components/TrpMarkdownView";
 import { TrpStructuredDataPanel } from "../components/TrpStructuredDataPanel";
+import { TrpInteractiveView } from "../components/TrpInteractiveView";
 import { createTrpViewModel, TrpViewModel } from "../utils/trpViewModel";
+import {
+  buildTrpMarkdownWithTokens,
+  resolveTemplateToMarkdown,
+  setValueByPath,
+} from "../utils/trpTemplate";
+import { canonicalizeCampos } from "../utils/canonicalizeCampos";
+
+// ---------------------------------------------------------------------------
+// Helpers locais
+// ---------------------------------------------------------------------------
+
+const isDevMode = () =>
+  import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
+
+const getErrorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback;
+
+const getApiError = (err: unknown): { status?: number; message?: string } =>
+  typeof err === "object" && err !== null
+    ? (err as { status?: number; message?: string })
+    : {};
+
+function tryFormatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  return Number.isFinite(d.getTime()) ? d.toLocaleString("pt-BR") : value;
+}
+
+function normalizeIdentificacaoObjetoMarkdown(markdown: string): string {
+  if (!markdown || typeof markdown !== "string") return markdown;
+
+  const cleanCell = (cell: unknown) =>
+    String(cell)
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/\s*\n\s*/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+  const replaceObjetoRow = (input: string) =>
+    input.replace(
+      /^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim,
+      (_all, p1, cell, p3) => `${p1}${cleanCell(cell)}${p3}`,
+    );
+
+  const sectionRegex =
+    /(\n#{2,3}\s*1\.\s*Identificação do Contrato\s*\n)([\s\S]*?)(\n#{2,3}\s*2\.\s*Objeto fornecido\/prestado\s*\n|\n#{2,3}\s*2\.\s*Objeto\s*\n|$)/i;
+
+  const m = markdown.match(sectionRegex);
+  if (!m) return replaceObjetoRow(markdown);
+
+  const [, before, body, after] = m;
+  return markdown.replace(sectionRegex, `${before}${replaceObjetoRow(body)}${after}`);
+}
+
+function pickTrpFileName(run: TrpRunData | null, fallbackId?: string | null): string {
+  const s = typeof run?.fileName === "string" ? run.fileName.trim() : "";
+  return s || (fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado");
+}
+
+// ---------------------------------------------------------------------------
+// Tipos locais
+// ---------------------------------------------------------------------------
+
+type SnackbarState = {
+  open: boolean;
+  message: string;
+  severity?: "error" | "success" | "warning";
+};
+
+type TrpVersionItem = {
+  runId: string;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  fileName?: string;
+  createdAt: string;
+  familyId: string;
+  versionNumber: number | null;
+  isCurrent: boolean;
+  baseRunId: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Sub-componentes pequenos
+// ---------------------------------------------------------------------------
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,55 +158,17 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
   </div>
 );
 
-function normalizeIdentificacaoObjetoMarkdown(markdown: string): string {
-  if (!markdown || typeof markdown !== "string") return markdown;
-
-  const sectionRegex =
-    /(\n#{2,3}\s*1\.\s*Identificação do Contrato\s*\n)([\s\S]*?)(\n#{2,3}\s*2\.\s*Objeto fornecido\/prestado\s*\n|\n#{2,3}\s*2\.\s*Objeto\s*\n|$)/i;
-
-  const cleanCell = (cell: unknown) =>
-    String(cell)
-      .replace(/<br\s*\/?>/gi, " ")
-      .replace(/\s*\n\s*/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-
-  const replaceObjetoRow = (input: string) =>
-    input.replace(/^(\|\s*Objeto\s*\|\s*)(.*?)(\s*\|\s*)$/gim, (_all, p1, cell, p3) => {
-      return `${p1}${cleanCell(cell)}${p3}`;
-    });
-
-  const m = markdown.match(sectionRegex);
-  if (!m) return replaceObjetoRow(markdown);
-
-  const before = m[1];
-  const body = m[2];
-  const after = m[3];
-
-  return markdown.replace(sectionRegex, `${before}${replaceObjetoRow(body)}${after}`);
-}
-
-type SnackbarState = {
-  open: boolean;
-  message: string;
-  severity?: "error" | "success" | "warning";
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pendente",
+  RUNNING: "Em processamento",
+  PROCESSING: "Em processamento",
+  COMPLETED: "Concluído",
+  FAILED: "Falhou",
 };
 
-type ApiErrorLike = {
-  status?: number;
-  message?: string;
-};
-
-const isDevMode = (): boolean =>
-  import.meta.env?.MODE === "development" || import.meta.env?.DEV === true;
-
-const getErrorMessage = (err: unknown, fallback: string): string =>
-  err instanceof Error ? err.message : fallback;
-
-const getApiError = (err: unknown): ApiErrorLike => {
-  if (typeof err === "object" && err !== null) return err as ApiErrorLike;
-  return {};
-};
+// ---------------------------------------------------------------------------
+// Componente principal
+// ---------------------------------------------------------------------------
 
 export const TrpResultPage: React.FC = () => {
   const { id: runId } = useParams<{ id: string }>();
@@ -114,58 +176,86 @@ export const TrpResultPage: React.FC = () => {
   const theme = useTheme();
   const { signOut } = useAuth();
 
+  // ── Dados ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [runData, setRunData] = useState<TrpRunData | null>(null);
   const [viewModel, setViewModel] = useState<TrpViewModel | null>(null);
 
+  // ── UI geral ───────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [downloadingDocx, setDownloadingDocx] = useState(false);
-
   const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: "" });
-
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // ── Downloads ──────────────────────────────────────────────────────────────
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  // ── TRD ───────────────────────────────────────────────────────────────────
   const [trdDialogOpen, setTrdDialogOpen] = useState(false);
   const [trdHouveRessalvas, setTrdHouveRessalvas] = useState<"NAO" | "SIM">("NAO");
   const [trdRessalvasTexto, setTrdRessalvasTexto] = useState("");
   const [trdSubmitting, setTrdSubmitting] = useState(false);
 
-  const canGenerateTrd = !!runId && isUuid(runId) && runData?.status === "COMPLETED";
+  // ── Versões ────────────────────────────────────────────────────────────────
+  const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versions, setVersions] = useState<TrpVersionItem[]>([]);
 
-  const pickTrpFileName = (run: TrpRunData | null, fallbackId?: string | null): string => {
-    const s = typeof run?.fileName === "string" ? run.fileName.trim() : "";
-    if (s) return s;
-    return fallbackId ? `TRP_${fallbackId}` : "TRP_Gerado";
-  };
+  // ── Inline editing ─────────────────────────────────────────────────────────
+  const originalCamposRef = useRef<Record<string, any>>({});
+  const [draftCampos, setDraftCampos] = useState<Record<string, any>>({});
+  const [editMode, setEditMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
+  const [saveVersionFileName, setSaveVersionFileName] = useState("");
+  const [savingVersion, setSavingVersion] = useState(false);
 
-  const notify = (next: SnackbarState) => setSnackbar(next);
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const canOperateRun = !!runId && isUuid(runId) && runData?.status === "COMPLETED";
+  const canGenerateTrd = canOperateRun;
 
-  const handleAuthError = async () => {
+  // markdown base (original do backend) — fonte para injetar tokens
+  const [draftMarkdownBase, setDraftMarkdownBase] = useState<string>("");
+
+  const markdownWithTokens = useMemo(
+    () =>
+      draftMarkdownBase
+        ? buildTrpMarkdownWithTokens(draftMarkdownBase, draftCampos)
+        : "",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draftMarkdownBase, draftCampos],
+  );
+
+  const resolvedMarkdown = useMemo(
+    () => resolveTemplateToMarkdown(markdownWithTokens, draftCampos),
+    [markdownWithTokens, draftCampos],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Notificações
+  // ---------------------------------------------------------------------------
+
+  const notify = useCallback((next: SnackbarState) => setSnackbar(next), []);
+
+  const handleAuthError = useCallback(async () => {
     notify({ open: true, message: "Sessão expirada / sem permissão", severity: "error" });
     await signOut();
     navigate("/login", {
       replace: true,
       state: { message: "Sua sessão expirou. Faça login novamente." },
     });
-  };
+  }, [notify, signOut, navigate]);
 
-  const loadData = async () => {
-    if (!runId) {
-      setError("ID do TRP não fornecido na URL");
-      setLoading(false);
-      return;
-    }
+  // ---------------------------------------------------------------------------
+  // Carregamento de dados
+  // ---------------------------------------------------------------------------
 
-    if (!isUuid(runId)) {
-      setError("ID do TRP inválido");
-      setLoading(false);
-      return;
-    }
+  const loadData = useCallback(async () => {
+    if (!runId) { setError("ID do TRP não fornecido na URL"); setLoading(false); return; }
+    if (!isUuid(runId)) { setError("ID do TRP inválido"); setLoading(false); return; }
 
     try {
       setLoading(true);
@@ -174,10 +264,6 @@ export const TrpResultPage: React.FC = () => {
       const run = await fetchTrpRun(runId);
 
       if (run.runId !== runId) {
-        console.error(
-          "[TrpResultPage]",
-          `Inconsistência: runId da rota (${runId}) não corresponde ao run retornado (${run.runId})`
-        );
         setError("Erro ao carregar TRP: inconsistência de dados");
         setLoading(false);
         return;
@@ -187,197 +273,196 @@ export const TrpResultPage: React.FC = () => {
         console.debug("[TrpResultPage] Run carregado:", {
           runId: run.runId,
           status: run.status,
-          hasDocumentoMarkdownFinal: !!run.documento_markdown_final,
-          documentoMarkdownFinalLength: run.documento_markdown_final?.length,
-          hasCamposTrpNormalizados: !!run.campos_trp_normalizados,
-          hasContextoRecebimentoRaw: !!run.contexto_recebimento_raw,
-          camposKeys: run.campos_trp_normalizados ? Object.keys(run.campos_trp_normalizados) : [],
-          contextoKeys: run.contexto_recebimento_raw ? Object.keys(run.contexto_recebimento_raw) : [],
+          hasMarkdown: !!run.documento_markdown_final,
+          hasCampos: !!run.campos_trp_normalizados,
         });
       }
 
       setRunData(run);
-      setViewModel(createTrpViewModel(run));
+      const vm = createTrpViewModel(run);
+      setViewModel(vm);
+
+      // Inicializa draft campos com os dados carregados
+      const campos = (vm.campos ?? {}) as Record<string, any>;
+      originalCamposRef.current = JSON.parse(JSON.stringify(campos));
+      setDraftCampos(JSON.parse(JSON.stringify(campos)));
+      // Salva o markdown real do backend como base para injeção de tokens
+      setDraftMarkdownBase(vm.documento_markdown ?? "");
     } catch (err) {
-      console.error("[TrpResultPage] Erro ao carregar TRP:", err);
       setError(getErrorMessage(err, "Erro desconhecido ao carregar TRP"));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
+  useEffect(() => { void loadData(); }, [loadData]);
+
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      setShowScrollTop(scrollTop > 400);
-    };
+    const handleScroll = () =>
+      setShowScrollTop((window.pageYOffset || document.documentElement.scrollTop) > 400);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleScrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  // ---------------------------------------------------------------------------
+  // Downloads
+  // ---------------------------------------------------------------------------
 
-  const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
-
-  const handleDownload = async (format: "pdf" | "docx") => {
-    if (!runId) {
-      notify({ open: true, message: "ID do TRP não encontrado na URL", severity: "error" });
-      return;
-    }
-
-    if (!isUuid(runId)) {
-      notify({ open: true, message: "ID do TRP inválido", severity: "error" });
-      return;
-    }
-
-    if (runData && runData.runId !== runId) {
-      notify({
-        open: true,
-        message: "Inconsistência: o documento carregado não corresponde ao ID da URL",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (runData?.status !== "COMPLETED") {
-      notify({
-        open: true,
-        message: "Documento ainda não concluído. Aguarde a finalização do processamento.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    const setDownloading = format === "pdf" ? setDownloadingPdf : setDownloadingDocx;
-
-    try {
-      setDownloading(true);
-      await downloadTrpRun(runId, format);
-      notify({
-        open: true,
-        message: `Exportando documento oficial do TRP em ${format.toUpperCase()}...`,
-        severity: "success",
-      });
-    } catch (err) {
-      const apiErr = getApiError(err);
-      const status = apiErr.status;
-      const errorMessage = apiErr.message || "Erro ao baixar arquivo";
-
-      if (status === 401 || status === 403) {
-        await handleAuthError();
+  const handleDownload = useCallback(
+    async (format: "pdf" | "docx") => {
+      if (!runId || !isUuid(runId)) {
+        notify({ open: true, message: "ID do TRP inválido", severity: "error" });
+        return;
+      }
+      if (runData?.status !== "COMPLETED") {
+        notify({ open: true, message: "Documento ainda não concluído.", severity: "warning" });
         return;
       }
 
-      if (status === 404) {
-        notify({ open: true, message: "Documento não encontrado", severity: "error" });
-      } else if (status === 409) {
-        notify({ open: true, message: "Documento ainda não finalizado", severity: "warning" });
-      } else if (status === 429) {
-        notify({ open: true, message: "Aguarde antes de gerar novamente", severity: "warning" });
-      } else {
-        notify({ open: true, message: errorMessage, severity: "error" });
+      const setDownloading = format === "pdf" ? setDownloadingPdf : setDownloadingDocx;
+      try {
+        setDownloading(true);
+        await downloadTrpRun(runId, format);
+        notify({ open: true, message: `Exportando TRP em ${format.toUpperCase()}...`, severity: "success" });
+      } catch (err) {
+        const apiErr = getApiError(err);
+        if (apiErr.status === 401 || apiErr.status === 403) { await handleAuthError(); return; }
+        notify({ open: true, message: apiErr.message || "Erro ao baixar arquivo", severity: "error" });
+      } finally {
+        setDownloading(false);
       }
-    } finally {
-      setDownloading(false);
-    }
-  };
+    },
+    [runId, runData, notify, handleAuthError],
+  );
 
-  const handleDownloadPdf = () => void handleDownload("pdf");
-  const handleDownloadWord = () => void handleDownload("docx");
+  // ---------------------------------------------------------------------------
+  // Inline editing
+  // ---------------------------------------------------------------------------
 
-  const handleOpenTrdDialog = () => {
-    if (!canGenerateTrd) {
-      notify({
-        open: true,
-        message: "TRP ainda não concluído. Aguarde a finalização para gerar o TRD.",
-        severity: "warning",
+  const handleCommit = useCallback((fieldId: string, value: any) => {
+    setDraftCampos((prev) => setValueByPath(prev, fieldId, value));
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleCancelEdits = useCallback(() => {
+    setDraftCampos(JSON.parse(JSON.stringify(originalCamposRef.current)));
+    setHasUnsavedChanges(false);
+    setEditMode(false);
+  }, []);
+
+  const handleSaveVersion = useCallback(async () => {
+    if (!runId || !isUuid(runId)) return;
+
+    try {
+      setSavingVersion(true);
+      const res = await createTrpRunVersion(runId, {
+        campos_trp_normalizados: canonicalizeCampos(draftCampos),
+        documento_markdown_final: resolvedMarkdown,
+        file_name: saveVersionFileName.trim() || null,
       });
-      return;
+
+      originalCamposRef.current = JSON.parse(JSON.stringify(draftCampos));
+      setHasUnsavedChanges(false);
+      setSaveVersionDialogOpen(false);
+      setEditMode(false);
+
+      notify({ open: true, message: `Nova versão criada com sucesso! (v${res.version_number})`, severity: "success" });
+
+      const newRunId = (res as any)?.runId || (res as any)?.run_id;
+      if (typeof newRunId === "string" && isUuid(newRunId)) {
+        navigate(`/agents/trp/resultado/${newRunId}`);
+      }
+    } catch (err) {
+      const apiErr = getApiError(err);
+      if (apiErr.status === 401 || apiErr.status === 403) { await handleAuthError(); return; }
+      notify({ open: true, message: apiErr.message || "Erro ao criar nova versão", severity: "error" });
+    } finally {
+      setSavingVersion(false);
     }
-    setTrdHouveRessalvas("NAO");
-    setTrdRessalvasTexto("");
-    setTrdDialogOpen(true);
-  };
+  }, [runId, draftCampos, resolvedMarkdown, saveVersionFileName, notify, handleAuthError, navigate]);
 
-  const handleCloseTrdDialog = () => {
-    if (trdSubmitting) return;
-    setTrdDialogOpen(false);
-  };
+  // ---------------------------------------------------------------------------
+  // Versões
+  // ---------------------------------------------------------------------------
 
-  const handleConfirmGenerateTrd = async () => {
+  const refreshVersions = useCallback(async (targetRunId: string) => {
+    const items = await listTrpRunVersions(targetRunId);
+    setVersions(
+      (items ?? []).map((v) => ({
+        runId: v.run_id,
+        status: v.status ?? "COMPLETED",
+        fileName: v.file_name ?? undefined,
+        createdAt: v.created_at,
+        familyId: v.family_id ?? "",
+        versionNumber: v.version_number ?? null,
+        isCurrent: v.is_current,
+        baseRunId: null,
+      }))
+    );
+  }, []);
+
+  const handleOpenVersionsDialog = useCallback(async () => {
     if (!runId || !isUuid(runId)) {
       notify({ open: true, message: "ID do TRP inválido", severity: "error" });
       return;
     }
-
-    if (runData?.status !== "COMPLETED") {
-      notify({
-        open: true,
-        message: "TRP ainda não concluído. Aguarde a finalização para gerar o TRD.",
-        severity: "warning",
-      });
-      return;
+    try {
+      setVersionsDialogOpen(true);
+      setVersionsLoading(true);
+      await refreshVersions(runId);
+    } catch (err) {
+      const apiErr = getApiError(err);
+      if (apiErr.status === 401 || apiErr.status === 403) { await handleAuthError(); return; }
+      notify({ open: true, message: apiErr.message || "Falha ao carregar versões", severity: "error" });
+    } finally {
+      setVersionsLoading(false);
     }
+  }, [runId, notify, handleAuthError, refreshVersions]);
+
+  // ---------------------------------------------------------------------------
+  // TRD
+  // ---------------------------------------------------------------------------
+
+  const handleConfirmGenerateTrd = useCallback(async () => {
+    if (!runId || !isUuid(runId) || runData?.status !== "COMPLETED") return;
 
     const houve_ressalvas = trdHouveRessalvas === "SIM";
-    const ressalvas_texto = trdRessalvasTexto?.trim() ?? "";
-
-    if (houve_ressalvas && ressalvas_texto.length === 0) {
-      notify({
-        open: true,
-        message: "Informe o texto das ressalvas para gerar o TRD.",
-        severity: "warning",
-      });
+    if (houve_ressalvas && !trdRessalvasTexto.trim()) {
+      notify({ open: true, message: "Informe o texto das ressalvas.", severity: "warning" });
       return;
     }
 
     try {
       setTrdSubmitting(true);
-
       const res = await generateTrd({
         trp_run_id: runId,
         houve_ressalvas,
-        ressalvas_texto: houve_ressalvas ? ressalvas_texto : null,
+        ressalvas_texto: houve_ressalvas ? trdRessalvasTexto.trim() : null,
       });
-
-      notify({ open: true, message: "TRD gerado com sucesso. Abrindo resultado...", severity: "success" });
+      notify({ open: true, message: "TRD gerado com sucesso!", severity: "success" });
       setTrdDialogOpen(false);
       navigate(`/agents/trd/resultado/${res.runId}`);
     } catch (err) {
       const apiErr = getApiError(err);
-      const status = apiErr.status;
-      const msg = apiErr.message || "Erro ao gerar TRD. Tente novamente em instantes.";
-
-      if (status === 401 || status === 403) {
-        await handleAuthError();
-        return;
-      }
-
-      notify({ open: true, message: msg, severity: "error" });
+      if (apiErr.status === 401 || apiErr.status === 403) { await handleAuthError(); return; }
+      notify({ open: true, message: apiErr.message || "Erro ao gerar TRD.", severity: "error" });
     } finally {
       setTrdSubmitting(false);
     }
-  };
+  }, [runId, runData, trdHouveRessalvas, trdRessalvasTexto, notify, handleAuthError, navigate]);
 
-  const statusLabels: Record<string, string> = useMemo(
-    () => ({
-      PENDING: "Pendente",
-      RUNNING: "Em processamento",
-      FAILED: "Falhou",
-    }),
-    []
+  // ---------------------------------------------------------------------------
+  // Dados derivados para a UI
+  // ---------------------------------------------------------------------------
+
+  const termoNome = useMemo(
+    () => pickTrpFileName(runData, viewModel?.runId || null),
+    [runData, viewModel],
   );
-
-  const termoNome = useMemo(() => pickTrpFileName(runData, viewModel?.runId || null), [runData, viewModel]);
 
   const markdownUi = useMemo(
     () => normalizeIdentificacaoObjetoMarkdown(viewModel?.documento_markdown || ""),
-    [viewModel]
+    [viewModel],
   );
 
   const data: TrpAgentOutput | null = useMemo(() => {
@@ -385,12 +470,13 @@ export const TrpResultPage: React.FC = () => {
     return {
       documento_markdown: markdownUi,
       campos: viewModel.campos,
-      meta: {
-        fileName: termoNome,
-        hash_tdr: viewModel.runId || "",
-      },
+      meta: { fileName: termoNome, hash_tdr: viewModel.runId || "" },
     };
   }, [markdownUi, termoNome, viewModel]);
+
+  // ---------------------------------------------------------------------------
+  // Estados de loading / erro
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
@@ -403,14 +489,7 @@ export const TrpResultPage: React.FC = () => {
   if (error) {
     return (
       <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
-              Tentar novamente
-            </Button>
-          }
-        >
+        <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => window.location.reload()}>Tentar novamente</Button>}>
           {error}
         </Alert>
       </Box>
@@ -421,18 +500,13 @@ export const TrpResultPage: React.FC = () => {
     return (
       <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
         <Alert severity={runData.status === "FAILED" ? "error" : "info"}>
-          <Typography variant="h6" gutterBottom>
-            Status: {statusLabels[runData.status] || runData.status}
-          </Typography>
+          <Typography variant="h6" gutterBottom>Status: {STATUS_LABELS[runData.status] || runData.status}</Typography>
           <Typography variant="body2">
             {runData.status === "PENDING" && "O TRP está aguardando processamento."}
-            {runData.status === "RUNNING" &&
-              "O TRP está sendo processado. Aguarde alguns instantes e recarregue a página."}
+            {(runData.status === "RUNNING" || (runData.status as any) === "PROCESSING") && "O TRP está sendo processado. Aguarde e recarregue."}
             {runData.status === "FAILED" && "O processamento do TRP falhou. Tente gerar novamente."}
           </Typography>
-          <Button variant="outlined" size="small" onClick={() => runId && window.location.reload()} sx={{ mt: 2 }}>
-            Recarregar
-          </Button>
+          <Button variant="outlined" size="small" onClick={() => window.location.reload()} sx={{ mt: 2 }}>Recarregar</Button>
         </Alert>
       </Box>
     );
@@ -446,8 +520,13 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Render principal
+  // ---------------------------------------------------------------------------
+
   return (
     <Box
+      ref={contentRef}
       sx={{
         width: "100%",
         maxWidth: { xs: "100%", sm: "1400px" },
@@ -455,110 +534,54 @@ export const TrpResultPage: React.FC = () => {
         px: { xs: 2, sm: 3, md: 4 },
         py: { xs: 3, sm: 4, md: 5 },
       }}
-      ref={contentRef}
     >
-      <Box sx={{ mb: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
-            justifyContent: "space-between",
-            alignItems: { xs: "flex-start", sm: "center" },
-            gap: 2,
-            mb: 3,
-          }}
-        >
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <Box sx={{ mb: 3.5 }}>
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, gap: 2 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary, mb: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: theme.palette.text.primary, mb: 0.75 }}>
               Termo de Recebimento Provisório
             </Typography>
             <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-              Revisão do documento gerado pela IA
+              Revisão e edição do documento gerado pela IA
             </Typography>
           </Box>
 
-          <Stack
-            spacing={1}
-            sx={{
-              alignItems: { xs: "flex-start", sm: "flex-end" },
-              width: { xs: "100%", sm: "auto" },
-              maxWidth: { xs: "100%", sm: 520 },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: { xs: "flex-start", sm: "flex-end" },
-                gap: 0.5,
-              }}
-            >
-              <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 600 }}>
-                Nome do TRP:
-              </Typography>
-
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}
-              >
-                {data.meta.fileName}
-              </Typography>
-
-              <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 600, mt: 0.5 }}>
-                ID:
-              </Typography>
-
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 420 }}
-              >
-                {data.meta.hash_tdr}
-              </Typography>
-            </Box>
-          </Stack>
+          <Paper elevation={0} sx={{ p: 1.5, borderRadius: 3, border: `1px solid ${alpha(theme.palette.divider, 0.12)}`, bgcolor: alpha(theme.palette.grey[50], 0.55), width: { xs: "100%", md: "auto" }, minWidth: { md: 520 } }}>
+            <Stack spacing={0.75} sx={{ alignItems: { xs: "flex-start", md: "flex-end" } }}>
+              <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 800 }}>Nome do TRP</Typography>
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 520 }}>{data.meta.fileName}</Typography>
+              <Divider flexItem sx={{ my: 0.5 }} />
+              <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontWeight: 800 }}>ID</Typography>
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary, wordBreak: "break-all", maxWidth: 520 }}>{data.meta.hash_tdr}</Typography>
+            </Stack>
+          </Paper>
         </Box>
       </Box>
 
-      <Box sx={{ mb: 4 }}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 3,
-            borderRadius: 3,
-            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-            bgcolor: alpha(theme.palette.info.main, 0.06),
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 2,
-          }}
-        >
-          <Box sx={{ color: theme.palette.info.main, mt: 0.5 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
-                fill="currentColor"
-              />
-            </svg>
+      {/* ── Banner informativo ─────────────────────────────────────────────── */}
+      <Box sx={{ mb: 3.5 }}>
+        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${alpha(theme.palette.info.main, 0.18)}`, bgcolor: alpha(theme.palette.info.main, 0.06), display: "flex", alignItems: "flex-start", gap: 2 }}>
+          <Box sx={{ color: theme.palette.info.main, mt: 0.5, flexShrink: 0 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" /></svg>
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: theme.palette.info.dark, mb: 1 }}>
-              Revisão do Documento
-            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: theme.palette.info.dark, mb: 0.75 }}>Como usar</Typography>
             <Typography variant="body2" sx={{ color: theme.palette.text.primary, lineHeight: 1.6 }}>
-              Por favor, revise cuidadosamente todas as informações apresentadas no Termo de Recebimento Provisório antes
-              de salvar o documento no processo. Verifique se os dados do contrato, fornecedor, nota fiscal e condições
-              de recebimento estão corretos e completos. Após a revisão, você poderá baixar o documento em PDF ou Word e
-              salvá-lo no sistema de gestão de processos.
+              Clique em <b>Editar documento</b> para modificar os valores diretamente no documento. Ao finalizar, salve como <b>nova versão</b>. Você também pode exportar em PDF/Word ou gerar o TRD.
             </Typography>
           </Box>
         </Paper>
       </Box>
 
+      {/* ── Cards resumo ───────────────────────────────────────────────────── */}
       <TrpSummaryCards campos={data.campos} />
 
+      {/* ── Painel principal ───────────────────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
+          mt: 3,
           borderRadius: 4,
           border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
           background: theme.palette.background.paper,
@@ -566,199 +589,177 @@ export const TrpResultPage: React.FC = () => {
           overflow: "hidden",
         }}
       >
+        {/* Tabs + Ações */}
         <Box
           sx={{
             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-            bgcolor: alpha(theme.palette.grey[50], 0.5),
+            bgcolor: alpha(theme.palette.grey[50], 0.55),
             px: { xs: 2, sm: 3 },
+            py: 1.25,
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "stretch", md: "center" },
+            justifyContent: "space-between",
+            gap: 1.25,
           }}
         >
           <Tabs
             value={activeTab}
-            onChange={(_, newValue) => setActiveTab(newValue)}
+            onChange={(_, v) => setActiveTab(v)}
             sx={{
-              minHeight: 64,
-              "& .MuiTab-root": {
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "0.9375rem",
-                minHeight: 64,
-                px: { xs: 2, sm: 3 },
-                color: theme.palette.text.secondary,
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  color: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.04),
-                },
-                "&.Mui-selected": {
-                  color: theme.palette.primary.main,
-                  fontWeight: 700,
-                },
-              },
-              "& .MuiTabs-indicator": {
-                height: 3,
-                borderRadius: "3px 3px 0 0",
-                bgcolor: theme.palette.primary.main,
-              },
+              minHeight: 48,
+              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem", minHeight: 48, px: { xs: 1.5, sm: 2.5 }, color: theme.palette.text.secondary, transition: "all 0.2s ease", "&:hover": { color: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.04) }, "&.Mui-selected": { color: theme.palette.primary.main, fontWeight: 900 } },
+              "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0", bgcolor: theme.palette.primary.main },
             }}
           >
-            <Tab
-              label="Visualização do Documento"
-              sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
-            />
-            <Tab
-              label="Dados Estruturados"
-              sx={{ "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
-            />
+            <Tab label="Documento" />
+            <Tab label="Dados estruturados" />
           </Tabs>
+
+          <Box sx={{ display: "flex", justifyContent: { xs: "flex-start", md: "flex-end" }, alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+            <ButtonGroup variant="outlined" size="medium" sx={{ "& .MuiButton-root": { textTransform: "none", fontWeight: 800, borderColor: alpha(theme.palette.divider, 0.18) } }}>
+              <Tooltip title="Histórico de versões">
+                <span>
+                  <Button
+                    onClick={handleOpenVersionsDialog}
+                    disabled={!runId || !isUuid(runId) || savingVersion}
+                    startIcon={<HistoryIcon />}
+                    sx={{ borderRadius: 999, px: 2 }}
+                  >
+                    Versões
+                  </Button>
+                </span>
+              </Tooltip>
+            </ButtonGroup>
+
+            <Tooltip title={!canGenerateTrd ? "Aguarde o TRP finalizar" : "Gerar Termo de Recebimento Definitivo"}>
+              <span>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => { setTrdHouveRessalvas("NAO"); setTrdRessalvasTexto(""); setTrdDialogOpen(true); }}
+                  disabled={!canGenerateTrd || trdSubmitting || savingVersion}
+                  startIcon={<TrdIcon />}
+                  sx={{ textTransform: "none", fontWeight: 900, px: 2.25, borderRadius: 999, boxShadow: `0 10px 24px ${alpha(theme.palette.secondary.main, 0.18)}` }}
+                >
+                  Gerar TRD
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Tooltip title={!canOperateRun ? "Aguarde processamento" : "Exportar documento"}>
+              <span>
+                <Button
+                  variant="contained"
+                  onClick={(e) => setExportAnchorEl(e.currentTarget)}
+                  disabled={!canOperateRun || downloadingPdf || downloadingDocx || savingVersion || trdSubmitting}
+                  endIcon={<ArrowDownIcon />}
+                  startIcon={(downloadingPdf || downloadingDocx) ? <CircularProgress size={18} color="inherit" /> : <PdfIcon />}
+                  sx={{ textTransform: "none", fontWeight: 900, px: 2.25, borderRadius: 999, boxShadow: `0 10px 24px ${alpha(theme.palette.primary.main, 0.18)}` }}
+                >
+                  Exportar
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={() => setExportAnchorEl(null)}>
+              <MenuItem onClick={() => { setExportAnchorEl(null); void handleDownload("pdf"); }} disabled={downloadingPdf || downloadingDocx}>
+                <PdfIcon fontSize="small" style={{ marginRight: 10 }} /> Baixar PDF
+              </MenuItem>
+              <MenuItem onClick={() => { setExportAnchorEl(null); void handleDownload("docx"); }} disabled={downloadingPdf || downloadingDocx}>
+                <WordIcon fontSize="small" style={{ marginRight: 10 }} /> Baixar Word
+              </MenuItem>
+            </Menu>
+          </Box>
         </Box>
 
+        {/* ── Tab 0: Documento (com inline editing) ─────────────────────── */}
         <TabPanel value={activeTab} index={0}>
-          <Box
-            sx={{
-              px: { xs: 3, sm: 4, md: 5 },
-              pt: { xs: 2, sm: 2.5, md: 0 },
-              pb: { xs: 3, sm: 4, md: 5 },
-            }}
-          >
+          <Box sx={{ px: { xs: 3, sm: 4, md: 5 }, pb: { xs: 3, sm: 4, md: 5 } }}>
+
+            {/* Toolbar de edição inline */}
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "flex-end",
                 alignItems: "center",
                 gap: 1.5,
+                mb: 2.5,
                 flexWrap: "wrap",
-                mb: 1.25,
+                p: 1.5,
+                borderRadius: 2,
+                border: editMode ? `1px dashed ${alpha(theme.palette.warning.main, 0.5)}` : "1px solid transparent",
+                bgcolor: editMode ? alpha(theme.palette.warning.main, 0.04) : "transparent",
+                transition: "all 0.2s ease",
               }}
             >
-              <Tooltip
-                title={
-                  !canGenerateTrd
-                    ? "Aguarde o TRP finalizar para gerar o TRD"
-                    : "Gerar Termo de Recebimento Definitivo (TRD)"
-                }
-              >
-                <span>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    color="secondary"
-                    startIcon={<TrdIcon sx={{ fontSize: 22 }} />}
-                    onClick={handleOpenTrdDialog}
-                    disabled={!canGenerateTrd || trdSubmitting}
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 800,
-                      px: 2.25,
-                      py: 1.25,
-                      borderRadius: 999,
-                      boxShadow: `0 8px 20px ${alpha(theme.palette.secondary.main, 0.18)}`,
-                      "&:hover": {
-                        boxShadow: `0 10px 24px ${alpha(theme.palette.secondary.main, 0.26)}`,
-                      },
-                      "&:disabled": { opacity: 0.65 },
-                    }}
-                  >
-                    Gerar TRD
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip
-                title={
-                  !runId || !isUuid(runId)
-                    ? "ID do TRP inválido"
-                    : runData?.status !== "COMPLETED"
-                    ? "Aguarde processamento"
-                    : downloadingPdf
-                    ? "Exportando documento oficial do TRP..."
-                    : "Exportar PDF"
-                }
-              >
-                <span>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={
-                      downloadingPdf ? <CircularProgress size={22} color="inherit" /> : <PdfIcon sx={{ fontSize: 22 }} />
-                    }
-                    onClick={handleDownloadPdf}
-                    disabled={
-                      !runId ||
-                      !isUuid(runId) ||
-                      downloadingPdf ||
-                      downloadingDocx ||
-                      runData?.status !== "COMPLETED"
-                    }
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 700,
-                      px: 2.5,
-                      py: 1.25,
-                      borderRadius: 999,
-                      boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.18)}`,
-                      "&:hover": {
-                        boxShadow: `0 10px 24px ${alpha(theme.palette.primary.main, 0.26)}`,
-                      },
-                    }}
-                  >
-                    {downloadingPdf ? "Exportando..." : "Baixar PDF"}
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip
-                title={
-                  !runId || !isUuid(runId)
-                    ? "ID do TRP inválido"
-                    : runData?.status !== "COMPLETED"
-                    ? "Aguarde processamento"
-                    : downloadingDocx
-                    ? "Exportando documento oficial do TRP..."
-                    : "Exportar DOCX"
-                }
-              >
-                <span>
+              {!editMode ? (
+                <Tooltip title="Clique nos valores do documento para editá-los diretamente">
                   <Button
                     variant="outlined"
-                    size="large"
-                    startIcon={downloadingDocx ? <CircularProgress size={22} /> : <WordIcon sx={{ fontSize: 22 }} />}
-                    onClick={handleDownloadWord}
-                    disabled={
-                      !runId ||
-                      !isUuid(runId) ||
-                      downloadingPdf ||
-                      downloadingDocx ||
-                      runData?.status !== "COMPLETED"
-                    }
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 700,
-                      px: 2.5,
-                      py: 1.25,
-                      borderRadius: 999,
-                      borderWidth: 2,
-                      borderColor: alpha(theme.palette.primary.main, 0.35),
-                      "&:hover": {
-                        bgcolor: alpha(theme.palette.primary.main, 0.06),
-                        borderColor: theme.palette.primary.main,
-                      },
-                      "&:disabled": {
-                        borderColor: alpha(theme.palette.divider, 0.12),
-                        color: alpha(theme.palette.text.primary, 0.45),
-                      },
-                    }}
+                    startIcon={<EditNoteIcon />}
+                    onClick={() => setEditMode(true)}
+                    disabled={!canOperateRun}
+                    size="small"
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
                   >
-                    {downloadingDocx ? "Exportando..." : "Baixar Word"}
+                    Editar documento
                   </Button>
-                </span>
-              </Tooltip>
+                </Tooltip>
+              ) : (
+                <>
+                  <Chip
+                    label="Modo de edição — clique nos valores para editar"
+                    color="warning"
+                    size="small"
+                    icon={<EditNoteIcon />}
+                    sx={{ fontWeight: 600 }}
+                  />
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<SaveIcon />}
+                    size="small"
+                    disabled={!hasUnsavedChanges || savingVersion}
+                    onClick={() => { setSaveVersionFileName(termoNome); setSaveVersionDialogOpen(true); }}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
+                  >
+                    Salvar nova versão
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<UndoIcon />}
+                    size="small"
+                    onClick={handleCancelEdits}
+                    disabled={savingVersion}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
+                  >
+                    Cancelar edições
+                  </Button>
+                  {hasUnsavedChanges && (
+                    <Typography variant="caption" color="warning.dark" sx={{ ml: "auto", fontStyle: "italic" }}>
+                      ● Alterações não salvas
+                    </Typography>
+                  )}
+                </>
+              )}
             </Box>
 
-            <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
+            {/* Documento interativo (ou estático fora do modo de edição) */}
+            {editMode ? (
+              <TrpInteractiveView
+                markdownWithTokens={markdownWithTokens}
+                campos={draftCampos}
+                editMode={editMode}
+                onCommit={handleCommit}
+              />
+            ) : (
+              <TrpMarkdownView content={data.documento_markdown} showTitle={false} />
+            )}
           </Box>
         </TabPanel>
 
+        {/* ── Tab 1: Dados estruturados ──────────────────────────────────── */}
         <TabPanel value={activeTab} index={1}>
           <Box sx={{ p: { xs: 3, sm: 4, md: 5 } }}>
             <TrpStructuredDataPanel campos={data.campos} />
@@ -766,70 +767,72 @@ export const TrpResultPage: React.FC = () => {
         </TabPanel>
       </Paper>
 
+      {/* ── Scroll to top ──────────────────────────────────────────────────── */}
       <Zoom in={showScrollTop}>
         <Fab
           color="primary"
           size="small"
-          onClick={handleScrollToTop}
-          sx={{
-            position: "fixed",
-            bottom: 32,
-            right: 32,
-            zIndex: 1000,
-            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-            "&:hover": {
-              boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
-            },
-          }}
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          sx={{ position: "fixed", bottom: 32, right: 32, zIndex: 1000, boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}` }}
           aria-label="Voltar ao topo"
         >
           <ArrowUpIcon />
         </Fab>
       </Zoom>
 
-      <Dialog open={trdDialogOpen} onClose={handleCloseTrdDialog} fullWidth maxWidth="sm">
-        <DialogTitle
-          sx={{
-            fontWeight: 800,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-          }}
-        >
-          Gerar TRD (Recebimento Definitivo)
-          <IconButton onClick={handleCloseTrdDialog} disabled={trdSubmitting} size="small">
-            <CloseIcon fontSize="small" />
-          </IconButton>
+      {/* ── Dialog: Salvar nova versão (inline editing) ────────────────────── */}
+      <Dialog open={saveVersionDialogOpen} onClose={() => !savingVersion && setSaveVersionDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          Salvar nova versão
+          <IconButton onClick={() => setSaveVersionDialogOpen(false)} disabled={savingVersion} size="small"><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+            Isso cria uma nova versão do TRP com as edições feitas. O documento original não é modificado.
+          </Typography>
+          <TextField
+            label="Nome do TRP (opcional)"
+            fullWidth
+            value={saveVersionFileName}
+            onChange={(e) => setSaveVersionFileName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleSaveVersion(); } }}
+            size="small"
+            disabled={savingVersion}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setSaveVersionDialogOpen(false)} disabled={savingVersion} sx={{ textTransform: "none", fontWeight: 800 }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleSaveVersion()}
+            disabled={savingVersion}
+            startIcon={savingVersion ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2.5, px: 2.25 }}
+          >
+            {savingVersion ? "Salvando..." : "Confirmar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
+      {/* ── Dialog: TRD ───────────────────────────────────────────────────── */}
+      <Dialog open={trdDialogOpen} onClose={() => !trdSubmitting && setTrdDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          Gerar TRD (Recebimento Definitivo)
+          <IconButton onClick={() => setTrdDialogOpen(false)} disabled={trdSubmitting} size="small"><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Informe se houve ressalvas no recebimento definitivo. Se houver, descreva as ressalvas para constarem no TRD.
+            Informe se houve ressalvas no recebimento definitivo.
           </Typography>
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2,
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-              bgcolor: alpha(theme.palette.grey[50], 0.65),
-            }}
-          >
+          <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.12)}`, bgcolor: alpha(theme.palette.grey[50], 0.65) }}>
             <FormControl component="fieldset" fullWidth>
-              <FormLabel sx={{ fontWeight: 700, mb: 1 }}>Houve ressalvas?</FormLabel>
-
-              <RadioGroup
-                row
-                value={trdHouveRessalvas}
-                onChange={(e) => setTrdHouveRessalvas(e.target.value as "NAO" | "SIM")}
-              >
+              <FormLabel sx={{ fontWeight: 800, mb: 1 }}>Houve ressalvas?</FormLabel>
+              <RadioGroup row value={trdHouveRessalvas} onChange={(e) => setTrdHouveRessalvas(e.target.value as "NAO" | "SIM")}>
                 <FormControlLabel value="NAO" control={<Radio />} label="Não" />
                 <FormControlLabel value="SIM" control={<Radio />} label="Sim" />
               </RadioGroup>
             </FormControl>
-
             {trdHouveRessalvas === "SIM" && (
               <>
                 <Divider sx={{ my: 2 }} />
@@ -840,47 +843,113 @@ export const TrpResultPage: React.FC = () => {
                   multiline
                   minRows={4}
                   fullWidth
-                  placeholder="Ex.: Entregas parciais, divergência de especificação, pendências documentais, etc."
+                  placeholder="Ex.: Entregas parciais, divergência de especificação, etc."
                 />
               </>
             )}
           </Paper>
         </DialogContent>
-
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={handleCloseTrdDialog} disabled={trdSubmitting} sx={{ textTransform: "none", fontWeight: 700 }}>
-            Cancelar
-          </Button>
-
+          <Button onClick={() => setTrdDialogOpen(false)} disabled={trdSubmitting} sx={{ textTransform: "none", fontWeight: 800 }}>Cancelar</Button>
           <Button
             variant="contained"
             color="secondary"
-            onClick={handleConfirmGenerateTrd}
-            disabled={
-              trdSubmitting ||
-              !canGenerateTrd ||
-              (trdHouveRessalvas === "SIM" && (trdRessalvasTexto?.trim()?.length ?? 0) === 0)
-            }
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2.5, px: 2.25 }}
+            onClick={() => void handleConfirmGenerateTrd()}
+            disabled={trdSubmitting || !canGenerateTrd || (trdHouveRessalvas === "SIM" && !trdRessalvasTexto.trim())}
             startIcon={trdSubmitting ? <CircularProgress size={18} color="inherit" /> : <TrdIcon />}
+            sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2.5, px: 2.25 }}
           >
             {trdSubmitting ? "Gerando..." : "Gerar TRD"}
           </Button>
         </DialogActions>
       </Dialog>
 
+      {/* ── Dialog: Histórico de versões ────────────────────────────────────── */}
+      <Dialog open={versionsDialogOpen} onClose={() => !savingVersion && setVersionsDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle sx={{ fontWeight: 950, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          Histórico de versões do TRP
+          <IconButton onClick={() => setVersionsDialogOpen(false)} disabled={savingVersion} size="small"><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            A versão marcada como <b>Atual</b> é a corrente (is_current=true).
+          </Typography>
+          <Paper elevation={0} sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.12)}`, overflow: "hidden" }}>
+            <Box sx={{ px: 2, py: 1.5, bgcolor: alpha(theme.palette.grey[50], 0.7), borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+              <Typography sx={{ fontWeight: 950 }}>Versões</Typography>
+            </Box>
+            <Box sx={{ p: 2 }}>
+              {versionsLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>
+              ) : versions.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">Nenhuma versão encontrada.</Typography>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                  {[...versions]
+                    .sort((a, b) => {
+                      const diff = (b.versionNumber ?? 0) - (a.versionNumber ?? 0);
+                      return diff !== 0 ? diff : String(b.createdAt).localeCompare(String(a.createdAt));
+                    })
+                    .map((v) => (
+                      <Paper key={v.runId} elevation={0} sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.12)}`, bgcolor: v.isCurrent ? alpha(theme.palette.primary.main, 0.06) : "transparent" }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+                          <Box sx={{ minWidth: 260 }}>
+                            <Typography sx={{ fontWeight: 950 }}>
+                              Versão {v.versionNumber ?? "-"}{v.isCurrent ? " • Atual" : ""}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+                              Criada em: {tryFormatDateTime(v.createdAt)}
+                            </Typography>
+                            {v.fileName && (
+                              <Typography variant="body2" color="text.secondary">Nome: {v.fileName}</Typography>
+                            )}
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+                              Run ID: <Box component="span" sx={{ fontFamily: "monospace" }}>{v.runId}</Box>
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <Button
+                              variant="outlined"
+                              onClick={() => { if (isUuid(v.runId)) navigate(`/agents/trp/resultado/${v.runId}`); }}
+                              sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
+                            >
+                              Abrir
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    ))}
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setVersionsDialogOpen(false)} disabled={savingVersion} sx={{ textTransform: "none", fontWeight: 900 }}>Fechar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Snackbar ───────────────────────────────────────────────────────── */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        message={snackbar.message}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        action={
-          <IconButton size="small" aria-label="close" color="inherit" onClick={handleCloseSnackbar}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        }
-      />
+      >
+        <Alert
+          severity={snackbar.severity ?? "info"}
+          variant="filled"
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ minWidth: 300 }}
+          action={
+            <IconButton size="small" color="inherit" onClick={() => setSnackbar((s) => ({ ...s, open: false }))}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
