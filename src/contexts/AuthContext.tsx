@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../infra/supabaseClient";
-import { isUuid } from "../utils/uuid";
+import { isUuid } from "@/features/trp/utils/uuid";
 
 interface AuthContextType {
   session: Session | null;

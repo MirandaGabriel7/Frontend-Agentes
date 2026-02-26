@@ -1,7 +1,7 @@
 // src/services/api.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { supabase } from "../infra/supabaseClient";
-import { isUuid } from "../utils/uuid";
+import { isUuid } from "@/features/trp/utils/uuid";
 
 import type {
   TrpTipoContrato,

@@ -15,7 +15,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
-import { isUuid } from "../utils/uuid";
+import { isUuid } from "@/features/trp/utils/uuid";
 
 type TabKey = "signin" | "signup" | "forgot";
 
