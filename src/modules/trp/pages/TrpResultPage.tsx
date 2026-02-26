@@ -7,7 +7,6 @@ import {
   Box,
   Button,
   ButtonGroup,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -44,7 +43,7 @@ import {
   Close as CloseIcon,
   PictureAsPdf as PdfIcon,
   Save as SaveIcon,
-  Undo as UndoIcon,
+  
 } from "@mui/icons-material";
 import { TrpAgentOutput } from "../../../lib/types/trp";
 import {
@@ -297,6 +296,15 @@ export const TrpResultPage: React.FC = () => {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
+  // Fecha todos os dialogs ao trocar de versão (runId muda)
+  useEffect(() => {
+    setVersionsDialogOpen(false);
+    setSaveVersionDialogOpen(false);
+    setTrdDialogOpen(false);
+    setEditMode(false);
+    setHasUnsavedChanges(false);
+  }, [runId]);
+
   useEffect(() => {
     const handleScroll = () =>
       setShowScrollTop((window.pageYOffset || document.documentElement.scrollTop) > 400);
@@ -386,17 +394,20 @@ export const TrpResultPage: React.FC = () => {
   // ---------------------------------------------------------------------------
 
   const refreshVersions = useCallback(async (targetRunId: string) => {
-    const items = await listTrpRunVersions(targetRunId);
+    const result = await listTrpRunVersions(targetRunId);
+    // O backend retorna { data: { items: [...] } } ou array direto
+    const raw = (result as any)?.data?.items ?? (result as any)?.items ?? result ?? [];
     setVersions(
-      (items ?? []).map((v) => ({
-        runId: v.run_id,
-        status: v.status ?? "COMPLETED",
-        fileName: v.file_name ?? undefined,
-        createdAt: v.created_at,
-        familyId: v.family_id ?? "",
-        versionNumber: v.version_number ?? null,
-        isCurrent: v.is_current,
-        baseRunId: null,
+      (raw as any[]).map((v: any) => ({
+        // backend já retorna camelCase (listVersionsByRunId no repository)
+        runId:         v.runId         ?? v.run_id         ?? "",
+        status:        v.status        ?? "COMPLETED",
+        fileName:      v.fileName      ?? v.file_name      ?? undefined,
+        createdAt:     v.createdAt     ?? v.created_at     ?? "",
+        familyId:      v.familyId      ?? v.family_id      ?? "",
+        versionNumber: v.versionNumber ?? v.version_number ?? null,
+        isCurrent:     v.isCurrent     ?? v.is_current     ?? false,
+        baseRunId:     v.baseRunId     ?? v.base_run_id    ?? null,
       }))
     );
   }, []);
@@ -559,20 +570,7 @@ export const TrpResultPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* ── Banner informativo ─────────────────────────────────────────────── */}
-      <Box sx={{ mb: 3.5 }}>
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${alpha(theme.palette.info.main, 0.18)}`, bgcolor: alpha(theme.palette.info.main, 0.06), display: "flex", alignItems: "flex-start", gap: 2 }}>
-          <Box sx={{ color: theme.palette.info.main, mt: 0.5, flexShrink: 0 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" /></svg>
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: theme.palette.info.dark, mb: 0.75 }}>Como usar</Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.text.primary, lineHeight: 1.6 }}>
-              Clique em <b>Editar documento</b> para modificar os valores diretamente no documento. Ao finalizar, salve como <b>nova versão</b>. Você também pode exportar em PDF/Word ou gerar o TRD.
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
+
 
       {/* ── Cards resumo ───────────────────────────────────────────────────── */}
       <TrpSummaryCards campos={data.campos} />
@@ -618,6 +616,19 @@ export const TrpResultPage: React.FC = () => {
 
           <Box sx={{ display: "flex", justifyContent: { xs: "flex-start", md: "flex-end" }, alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <ButtonGroup variant="outlined" size="medium" sx={{ "& .MuiButton-root": { textTransform: "none", fontWeight: 800, borderColor: alpha(theme.palette.divider, 0.18) } }}>
+              <Tooltip title={editMode ? "Sair do modo de edição" : "Editar valores diretamente no documento"}>
+                <span>
+                  <Button
+                    onClick={() => editMode ? handleCancelEdits() : setEditMode(true)}
+                    disabled={!canOperateRun || savingVersion || trdSubmitting}
+                    startIcon={<EditNoteIcon />}
+                    color={editMode ? "warning" : "primary"}
+                    sx={{ borderRadius: 999, px: 2, ...(editMode && { borderColor: theme.palette.warning.main, color: theme.palette.warning.dark }) }}
+                  >
+                    {editMode ? "Cancelar edição" : "Editar documento"}
+                  </Button>
+                </span>
+              </Tooltip>
               <Tooltip title="Histórico de versões">
                 <span>
                   <Button
@@ -677,73 +688,40 @@ export const TrpResultPage: React.FC = () => {
         <TabPanel value={activeTab} index={0}>
           <Box sx={{ px: { xs: 3, sm: 4, md: 5 }, pb: { xs: 3, sm: 4, md: 5 } }}>
 
-            {/* Toolbar de edição inline */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                mb: 2.5,
-                flexWrap: "wrap",
-                p: 1.5,
-                borderRadius: 2,
-                border: editMode ? `1px dashed ${alpha(theme.palette.warning.main, 0.5)}` : "1px solid transparent",
-                bgcolor: editMode ? alpha(theme.palette.warning.main, 0.04) : "transparent",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {!editMode ? (
-                <Tooltip title="Clique nos valores do documento para editá-los diretamente">
-                  <Button
-                    variant="outlined"
-                    startIcon={<EditNoteIcon />}
-                    onClick={() => setEditMode(true)}
-                    disabled={!canOperateRun}
-                    size="small"
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
-                  >
-                    Editar documento
-                  </Button>
-                </Tooltip>
-              ) : (
-                <>
-                  <Chip
-                    label="Modo de edição — clique nos valores para editar"
-                    color="warning"
-                    size="small"
-                    icon={<EditNoteIcon />}
-                    sx={{ fontWeight: 600 }}
-                  />
+            {/* Banner contextual + toolbar de edição — só aparecem em editMode */}
+            {editMode && (
+              <>
+                <Box sx={{ mb: 2, p: 2, borderRadius: 2, border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`, bgcolor: alpha(theme.palette.warning.main, 0.06), display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+                  <Box sx={{ color: theme.palette.warning.dark, mt: 0.25, flexShrink: 0 }}>
+                    <EditNoteIcon fontSize="small" />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: theme.palette.warning.dark, mb: 0.5 }}>Modo de edição ativo</Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.primary, lineHeight: 1.6 }}>
+                      Clique em qualquer valor no documento para editá-lo. Ao finalizar, clique em <b>Salvar nova versão</b>.
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5, flexWrap: "wrap" }}>
                   <Button
                     variant="contained"
                     color="primary"
-                    startIcon={<SaveIcon />}
-                    size="small"
+                    startIcon={savingVersion ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                    size="medium"
                     disabled={!hasUnsavedChanges || savingVersion}
                     onClick={() => { setSaveVersionFileName(termoNome); setSaveVersionDialogOpen(true); }}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999, px: 2.25 }}
                   >
                     Salvar nova versão
                   </Button>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    startIcon={<UndoIcon />}
-                    size="small"
-                    onClick={handleCancelEdits}
-                    disabled={savingVersion}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 999 }}
-                  >
-                    Cancelar edições
-                  </Button>
                   {hasUnsavedChanges && (
-                    <Typography variant="caption" color="warning.dark" sx={{ ml: "auto", fontStyle: "italic" }}>
+                    <Typography variant="caption" color="warning.dark" sx={{ fontStyle: "italic" }}>
                       ● Alterações não salvas
                     </Typography>
                   )}
-                </>
-              )}
-            </Box>
+                </Box>
+              </>
+            )}
 
             {/* Documento interativo (ou estático fora do modo de edição) */}
             {editMode ? (
@@ -910,7 +888,12 @@ export const TrpResultPage: React.FC = () => {
                           <Box sx={{ display: "flex", alignItems: "center" }}>
                             <Button
                               variant="outlined"
-                              onClick={() => { if (isUuid(v.runId)) navigate(`/agents/trp/resultado/${v.runId}`); }}
+                              onClick={() => {
+                                if (isUuid(v.runId)) {
+                                  setVersionsDialogOpen(false);
+                                  navigate(`/agents/trp/resultado/${v.runId}`);
+                                }
+                              }}
                               sx={{ textTransform: "none", fontWeight: 900, borderRadius: 2 }}
                             >
                               Abrir
