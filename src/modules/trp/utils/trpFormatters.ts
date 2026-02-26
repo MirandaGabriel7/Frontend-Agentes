@@ -43,47 +43,91 @@ export function parsePtBRDate(str: string): string {
   return str;
 }
 
-// ─── Humanização de enums (espelha trpEnums.ts do backend) ──────────────────
-const ENUM_DISPLAY: Record<string, string> = {
-  // tipo_contrato
-  BENS: 'Bens',
-  SERVICOS: 'Serviços',
-  OBRAS: 'Obras',
-  SERVICOS_ENGENHARIA: 'Serviços de Engenharia',
+// ─── Enums: espelha EXATAMENTE trpEnums.ts do backend ────────────────────────
 
-  // tipo_base_prazo
-  DATA_RECEBIMENTO: 'Data de recebimento',
-  INICIO_SERVICO: 'Início do serviço',
-  SERVICO: 'Conclusão do serviço',
-  ENTREGA_REAL: 'Data de entrega real',
+function normEnumKey(v: string): string {
+  return v.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 
-  // condicao_prazo
-  NO_PRAZO: 'No prazo',
-  FORA_DO_PRAZO: 'Fora do prazo',
-  ATRASADO: 'Fora do prazo',
-
-  // condicao_quantidade_ordem
-  TOTAL: 'Total (conforme a ordem)',
-  PARCIAL: 'Parcial',
-  MAIOR: 'Maior que a ordem',
-  CONFORME_EMPENHO: 'Total (conforme a ordem)',
+const ENUM_DISPLAY: Record<string, Record<string, string>> = {
+  tipo_contrato: {
+    BENS: 'Bens',
+    SERVICOS: 'Serviços',
+    SERVIÇOS: 'Serviços',
+    SERVICOS_CONTINUOS: 'Serviços contínuos',
+    SERVIÇOS_CONTINUOS: 'Serviços contínuos',
+    OBRA: 'Obra',
+  },
+  tipo_base_prazo: {
+    DATA_RECEBIMENTO: 'Data de recebimento',
+    DATA_ENTREGA: 'Data de entrega',
+    SERVICO: 'Conclusão do serviço',
+    DATA_CONCLUSAO_SERVICO: 'Conclusão do serviço',
+    NF: 'Nota Fiscal',
+    INICIO_SERVICO: 'Início do serviço',
+    INICIO_DO_SERVICO: 'Início do serviço',
+    DATA_INICIO_SERVICO: 'Início do serviço',
+  },
+  condicao_prazo: {
+    NO_PRAZO: 'No prazo',
+    FORA_DO_PRAZO: 'Fora do prazo',
+    NAO_PRAZO: 'Não se aplica',
+    NAO_APLICA: 'Não se aplica',
+    NAO_SE_APLICA: 'Não se aplica',
+    NAO_APLICAVEL: 'Não se aplica',
+    NAO_APLICÁVEL: 'Não se aplica',
+  },
+  condicao_quantidade_ordem: {
+    TOTAL: 'Total (conforme a ordem)',
+    PARCIAL: 'Parcial',
+    A_MAIOR: 'A maior',
+    A_MENOR: 'A menor',
+    NAO_APLICAVEL: 'Não se aplica',
+    NAO_APLICÁVEL: 'Não se aplica',
+    NAO_APLICA: 'Não se aplica',
+    NAO_SE_APLICA: 'Não se aplica',
+  },
+  condicao_quantidade_nf: {
+    TOTAL: 'Total (conforme a NF)',
+    PARCIAL: 'Parcial',
+    A_MAIOR: 'A maior',
+    A_MENOR: 'A menor',
+    NAO_APLICAVEL: 'Não se aplica',
+    NAO_SE_APLICA: 'Não se aplica',
+  },
 };
 
-function humanizeEnumValue(value: string): string {
-  const upper = value.trim().toUpperCase();
-  return ENUM_DISPLAY[upper] ?? value;
+// Campos que são enums — usados para humanização automática no displayValue
+const ENUM_FIELDS = new Set(Object.keys(ENUM_DISPLAY));
+
+export function humanizeEnumValue(fieldId: string, value: string): string {
+  const map = ENUM_DISPLAY[fieldId];
+  if (!map) return value;
+  const key = normEnumKey(value);
+  return map[key] ?? value;
 }
 
 /** Display value for any field type (always returns a printable string) */
-export function displayValue(value: any, type: FieldType): string {
+export function displayValue(value: any, type: FieldType, fieldId?: string): string {
   if (value === undefined || value === null || value === '') return '—';
+
   if (type === 'number') return formatPtBRNumber(value);
   if (type === 'date') return formatPtBRDate(String(value));
 
-  const str = String(value);
-  // Se o valor parece um enum técnico (UPPER_SNAKE_CASE), humaniza
-  if (/^[A-Z][A-Z0-9_]+$/.test(str.trim())) {
-    return humanizeEnumValue(str);
+  const str = String(value).trim();
+
+  // 1) Se o fieldId é um campo enum conhecido, humaniza diretamente
+  if (fieldId && ENUM_FIELDS.has(fieldId)) {
+    return humanizeEnumValue(fieldId, str);
+  }
+
+  // 2) Fallback: detecta UPPER_SNAKE_CASE genérico e tenta humanizar
+  if (/^[A-Z][A-Z0-9_]{2,}$/.test(str)) {
+    // Tenta em todos os maps
+    for (const map of Object.values(ENUM_DISPLAY)) {
+      const key = normEnumKey(str);
+      if (map[key]) return map[key];
+    }
   }
 
   return str;
@@ -91,6 +135,5 @@ export function displayValue(value: any, type: FieldType): string {
 
 /** Escape a string so it's safe to embed in markdown without breaking structure */
 export function escapeMarkdownValue(value: string): string {
-  // Escape pipe (table cell delimiter) and newlines
   return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').replace(/\r/g, '');
 }

@@ -37,7 +37,7 @@ export const EditableInlineField: React.FC<EditableInlineFieldProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // What to display in the document (formatted)
-  const formatted = displayValue(rawValue, fieldDef.type);
+  const formatted = displayValue(rawValue, fieldDef.type, fieldDef.fieldId);
 
   // Focus the input when entering edit mode
   useEffect(() => {
