@@ -3,7 +3,7 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
-import { isUuid } from "../utils/uuid";
+import { isUuid } from "@/features/trp/utils/uuid";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

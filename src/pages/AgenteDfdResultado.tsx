@@ -1,13 +1,13 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Alert, Skeleton } from '@mui/material';
-import { useMockDfdAnalysis } from '../modules/dfd/hooks/useMockDfdAnalysis';
-import { DfdResultHeader } from '../modules/dfd/components/DfdResultHeader';
-import { DfdOverviewCard } from '../modules/dfd/components/DfdOverviewCard';
-import { DfdHighlights } from '../modules/dfd/components/DfdHighlights';
-import { DfdGroupsGrid } from '../modules/dfd/components/DfdGroupsGrid';
-import { DfdGlobalSummary } from '../modules/dfd/components/DfdGlobalSummary';
-import { DfdMetaBar } from '../modules/dfd/components/DfdMetaBar';
+import { useMockDfdAnalysis } from '@features/dfd/hooks/useMockDfdAnalysis';
+import { DfdResultHeader } from '@features/dfd/components/DfdResultHeader';
+import { DfdOverviewCard } from '@features/dfd/components/DfdOverviewCard';
+import { DfdHighlights } from '@features/dfd/components/DfdHighlights';
+import { DfdGroupsGrid } from '@features/dfd/components/DfdGroupsGrid';
+import { DfdGlobalSummary } from '@features/dfd/components/DfdGlobalSummary';
+import { DfdMetaBar } from '@features/dfd/components/DfdMetaBar';
 
 const AgenteDfdResultado: React.FC = () => {
   const { id } = useParams<{ id: string }>();

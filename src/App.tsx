@@ -22,13 +22,13 @@ import AgenteDfdResultado from "./pages/AgenteDfdResultado";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 
-import { TrpPage } from "./modules/trp/pages/TrpPage";
-import { TrpResultPage } from "./modules/trp/pages/TrpResultPage";
-import { TrpHistoryPage } from "./modules/trp/pages/TrpHistoryPage";
+import { TrpPage } from "@/features/trp/pages/TrpPage";
+import { TrpResultPage } from "@/features/trp/pages/TrpResultPage";
+import { TrpHistoryPage } from "@/features/trp/pages/TrpHistoryPage";
 
-import { TrdPage } from "./modules/trd/pages/TrdPage";
-import { TrdHistoryPage } from "./modules/trd/pages/TrdHistoryPage";
-import { TrdResultPage } from "./modules/trd/pages/TrdResultPage";
+import { TrdPage } from "@/features/trd/pages/TrdPage";
+import { TrdHistoryPage } from "@/features/trd/pages/TrdHistoryPage";
+import { TrdResultPage } from "@/features/trd/pages/TrdResultPage";
 
 import { UiSettingsProvider, useUiSettings } from "./contexts/UiSettingsContext";
 

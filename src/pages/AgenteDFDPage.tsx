@@ -32,10 +32,10 @@ import { ExpandMore, ContentCopy, CheckCircle, Warning, Error as ErrorIcon } fro
 import axios from "axios";
 
 import type { DfdAnaliseResponse } from "../lib/types/dfd";
-import { DfdUploadCard } from "../modules/dfd/components/DfdUploadCard";
-import { DfdActionsBar } from "../modules/dfd/components/DfdActionsBar";
-import type { DfdHistoryItem } from "../modules/dfd/components/DfdHistoryCard";
-import { DfdHistoryCard } from "../modules/dfd/components/DfdHistoryCard";
+import { DfdUploadCard } from "@features/dfd/components/DfdUploadCard";
+import { DfdActionsBar } from "@features/dfd/components/DfdActionsBar";
+import type { DfdHistoryItem } from "@features/dfd/components/DfdHistoryCard";
+import { DfdHistoryCard } from "@features/dfd/components/DfdHistoryCard";
 
 const AGENTE_DFD_API_URL = import.meta.env.VITE_AGENTE_DFD_API_URL || "/api/dfd/analisar";
 type PageState = "idle" | "fileSelected" | "loading" | "success" | "error";
