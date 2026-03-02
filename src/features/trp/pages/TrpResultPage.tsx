@@ -43,7 +43,6 @@ import {
   Close as CloseIcon,
   PictureAsPdf as PdfIcon,
   Save as SaveIcon,
-  
 } from "@mui/icons-material";
 import { TrpAgentOutput } from "@/lib/types/trp";
 import {
@@ -67,6 +66,10 @@ import {
   setValueByPath,
 } from "@/features/trp/utils/trpTemplate";
 import { canonicalizeCampos } from "@/features/trp/utils/canonicalizeCampos";
+
+// ── NOVO: polling do pipeline interno ─────────────────────────────────────
+import { usePipelineStatus } from "@/features/pipeline/hooks/usePipelineStatus";
+import { PipelineStatusPanel } from "@/features/pipeline/PipelineStatusPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers locais
@@ -157,13 +160,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
   </div>
 );
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pendente",
-  RUNNING: "Em processamento",
-  PROCESSING: "Em processamento",
-  COMPLETED: "Concluído",
-  FAILED: "Falhou",
-};
 
 // ---------------------------------------------------------------------------
 // Componente principal
@@ -233,6 +229,33 @@ export const TrpResultPage: React.FC = () => {
     [markdownWithTokens, draftCampos],
   );
 
+  // ── POLLING: ativo enquanto o job não estiver COMPLETED ──────────────────
+  const isJobPending =
+    runData === null ||
+    runData.status === "PENDING" ||
+    (runData.status as string) === "PROCESSING" ||
+    (runData.status as string) === "RUNNING";
+
+  const {
+    status: pipelineStatus,
+    steps: pipelineSteps,
+    elapsedMs,
+    errorMessage: pipelineError,
+    isDone: pipelineIsDone,
+  } = usePipelineStatus({
+    jobId: runId ?? null,
+    documentType: "TRP",
+    enabled: !!runId && isUuid(runId ?? "") && isJobPending,
+    pollIntervalMs: 2000,
+  });
+
+  // Quando o pipeline terminar com COMPLETED, recarrega os dados do run
+  useEffect(() => {
+    if (pipelineIsDone && pipelineStatus === "COMPLETED" && isJobPending) {
+      void loadData();
+    }
+  }, [pipelineIsDone, pipelineStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---------------------------------------------------------------------------
   // Notificações
   // ---------------------------------------------------------------------------
@@ -281,11 +304,9 @@ export const TrpResultPage: React.FC = () => {
       const vm = createTrpViewModel(run);
       setViewModel(vm);
 
-      // Inicializa draft campos com os dados carregados
       const campos = (vm.campos ?? {}) as Record<string, any>;
       originalCamposRef.current = JSON.parse(JSON.stringify(campos));
       setDraftCampos(JSON.parse(JSON.stringify(campos)));
-      // Salva o markdown real do backend como base para injeção de tokens
       setDraftMarkdownBase(vm.documento_markdown ?? "");
     } catch (err) {
       setError(getErrorMessage(err, "Erro desconhecido ao carregar TRP"));
@@ -296,7 +317,6 @@ export const TrpResultPage: React.FC = () => {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  // Fecha todos os dialogs ao trocar de versão (runId muda)
   useEffect(() => {
     setVersionsDialogOpen(false);
     setSaveVersionDialogOpen(false);
@@ -395,11 +415,9 @@ export const TrpResultPage: React.FC = () => {
 
   const refreshVersions = useCallback(async (targetRunId: string) => {
     const result = await listTrpRunVersions(targetRunId);
-    // O backend retorna { data: { items: [...] } } ou array direto
     const raw = (result as any)?.data?.items ?? (result as any)?.items ?? result ?? [];
     setVersions(
       (raw as any[]).map((v: any) => ({
-        // backend já retorna camelCase (listVersionsByRunId no repository)
         runId:         v.runId         ?? v.run_id         ?? "",
         status:        v.status        ?? "COMPLETED",
         fileName:      v.fileName      ?? v.file_name      ?? undefined,
@@ -507,18 +525,44 @@ export const TrpResultPage: React.FC = () => {
     );
   }
 
+  // ── NOVO: exibe painel de progresso enquanto o pipeline ainda está rodando ──
   if (runData && runData.status !== "COMPLETED") {
+    const isFailed = runData.status === "FAILED" || pipelineStatus === "FAILED";
+
     return (
-      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
-        <Alert severity={runData.status === "FAILED" ? "error" : "info"}>
-          <Typography variant="h6" gutterBottom>Status: {STATUS_LABELS[runData.status] || runData.status}</Typography>
-          <Typography variant="body2">
-            {runData.status === "PENDING" && "O TRP está aguardando processamento."}
-            {(runData.status === "RUNNING" || (runData.status as any) === "PROCESSING") && "O TRP está sendo processado. Aguarde e recarregue."}
-            {runData.status === "FAILED" && "O processamento do TRP falhou. Tente gerar novamente."}
-          </Typography>
-          <Button variant="outlined" size="small" onClick={() => window.location.reload()} sx={{ mt: 2 }}>Recarregar</Button>
-        </Alert>
+      <Box
+        sx={{
+          maxWidth: 600,
+          mx: "auto",
+          mt: { xs: 4, sm: 8 },
+          px: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 3,
+        }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 800, textAlign: "center" }}>
+          {isFailed ? "Falha na geração" : "Gerando seu documento..."}
+        </Typography>
+
+        <PipelineStatusPanel
+          status={pipelineStatus ?? (runData.status as any)}
+          steps={pipelineSteps}
+          elapsedMs={elapsedMs}
+          errorMessage={pipelineError}
+        />
+
+        {isFailed && (
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
+            <Button variant="outlined" onClick={() => navigate("/agents/trp")}>
+              Tentar novamente
+            </Button>
+            <Button variant="text" onClick={() => window.location.reload()}>
+              Recarregar
+            </Button>
+          </Box>
+        )}
       </Box>
     );
   }
@@ -532,7 +576,7 @@ export const TrpResultPage: React.FC = () => {
   }
 
   // ---------------------------------------------------------------------------
-  // Render principal
+  // Render principal (COMPLETED)
   // ---------------------------------------------------------------------------
 
   return (
@@ -569,8 +613,6 @@ export const TrpResultPage: React.FC = () => {
           </Paper>
         </Box>
       </Box>
-
-
 
       {/* ── Cards resumo ───────────────────────────────────────────────────── */}
       <TrpSummaryCards campos={data.campos} />
@@ -684,11 +726,9 @@ export const TrpResultPage: React.FC = () => {
           </Box>
         </Box>
 
-        {/* ── Tab 0: Documento (com inline editing) ─────────────────────── */}
+        {/* ── Tab 0: Documento ──────────────────────────────────────────── */}
         <TabPanel value={activeTab} index={0}>
           <Box sx={{ px: { xs: 3, sm: 4, md: 5 }, pb: { xs: 3, sm: 4, md: 5 } }}>
-
-            {/* Banner contextual + toolbar de edição — só aparecem em editMode */}
             {editMode && (
               <>
                 <Box sx={{ mb: 2, p: 2, borderRadius: 2, border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`, bgcolor: alpha(theme.palette.warning.main, 0.06), display: "flex", alignItems: "flex-start", gap: 1.5 }}>
@@ -723,7 +763,6 @@ export const TrpResultPage: React.FC = () => {
               </>
             )}
 
-            {/* Documento interativo (ou estático fora do modo de edição) */}
             {editMode ? (
               <TrpInteractiveView
                 markdownWithTokens={markdownWithTokens}
@@ -758,7 +797,7 @@ export const TrpResultPage: React.FC = () => {
         </Fab>
       </Zoom>
 
-      {/* ── Dialog: Salvar nova versão (inline editing) ────────────────────── */}
+      {/* ── Dialog: Salvar nova versão ─────────────────────────────────────── */}
       <Dialog open={saveVersionDialogOpen} onClose={() => !savingVersion && setSaveVersionDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           Salvar nova versão
